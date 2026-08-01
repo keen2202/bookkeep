@@ -1,0 +1,21 @@
+# Node
+node_modules/
+dist/
+*.log
+
+# Test coverage
+coverage/
+
+# Flutter/Dart
+.dart_tool/
+build/
+.flutter-plugins*
+.packages
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store

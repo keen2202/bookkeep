@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "name": "餐饮",
+      "icon": "restaurant",
+      "color": 4294934147,
+      "kind": "expense",
+      "children": [
+        { "name": "早餐", "icon": "free_breakfast", "color": 4294934147 },
+        { "name": "午餐", "icon": "lunch_dining", "color": 4294934147 },
+        { "name": "晚餐", "icon": "dinner_dining", "color": 4294934147 },
+        { "name": "外卖", "icon": "delivery_dining", "color": 4294934147 },
+        { "name": "咖啡饮料", "icon": "local_cafe", "color": 4286865023 },
+        { "name": "零食", "icon": "cookie", "color": 4294934147 },
+        { "name": "水果", "icon": "local_grocery_store", "color": 4291958271 }
+      ]
+    },
+    {
+      "name": "交通",
+      "icon": "directions_bus",
+      "color": 4280391411,
+      "kind": "expense",
+      "children": [
+        { "name": "公交地铁", "icon": "directions_subway", "color": 4280391411 },
+        { "name": "打车", "icon": "local_taxi", "color": 4280391411 },
+        { "name": "加油", "icon": "local_gas_station", "color": 4280391411 },
+        { "name": "停车", "icon": "local_parking", "color": 4280391411 },
+        { "name": "高铁/飞机", "icon": "flight", "color": 4280391411 },
+        { "name": "共享单车", "icon": "pedal_bike", "color": 4280391411 }
+      ]
+    },
+    {
+      "name": "购物",
+      "icon": "shopping_cart",
+      "color": 4289993251,
+      "kind": "expense",
+      "children": [
+        { "name": "服饰", "icon": "checkroom", "color": 4289993251 },
+        { "name": "美妆", "icon": "face_retouching_natural", "color": 4289993251 },
+        { "name": "数码", "icon": "devices_other", "color": 4289993251 },
+        { "name": "家居", "icon": "chair", "color": 4289993251 },
+        { "name": "日用百货", "icon": "storefront", "color": 4289993251 },
+        { "name": "宠物", "icon": "pets", "color": 4289993251 }
+      ]
+    },
+    {
+      "name": "居住",
+      "icon": "home",
+      "color": 4282924427,
+      "kind": "expense",
+      "children": [
+        { "name": "房租", "icon": "house", "color": 4282924427 },
+        { "name": "房贷", "icon": "home_work", "color": 4282924427 },
+        { "name": "物业", "icon": "apartment", "color": 4282924427 },
+        { "name": "水电燃气", "icon": "bolt", "color": 4282924427 },
+        { "name": "网络", "icon": "wifi", "color": 4282924427 },
+        { "name": "装修维修", "icon": "handyman", "color": 4282924427 }
+      ]
+    },
+    {
+      "name": "娱乐",
+      "icon": "sports_esports",
+      "color": 4284624895,
+      "kind": "expense",
+      "children": [
+        { "name": "电影演出", "icon": "movie", "color": 4284624895 },
+        { "name": "游戏", "icon": "videogame_asset", "color": 4284624895 },
+        { "name": "旅游", "icon": "hiking", "color": 4284624895 },
+        { "name": "健身", "icon": "fitness_center", "color": 4284624895 },
+        { "name": "休闲活动", "icon": "attractions", "color": 4284624895 }
+      ]
+    },
+    {
+      "name": "医疗",
+      "icon": "medical_services",
+      "color": 4283290623,
+      "kind": "expense",
+      "children": [
+        { "name": "门诊", "icon": "local_hospital", "color": 4283290623 },
+        { "name": "药品", "icon": "medication", "color": 4283290623 },
+        { "name": "住院", "icon": "bed", "color": 4283290623 },
+        { "name": "体检", "icon": "monitor_heart", "color": 4283290623 },
+        { "name": "医保", "icon": "health_and_safety", "color": 4283290623 }
+      ]
+    },
+    {
+      "name": "教育",
+      "icon": "school",
+      "color": 4283215696,
+      "kind": "expense",
+      "children": [
+        { "name": "学费", "icon": "school", "color": 4283215696 },
+        { "name": "培训", "icon": "cast_for_education", "color": 4283215696 },
+        { "name": "图书", "icon": "menu_book", "color": 4283215696 },
+        { "name": "文具", "icon": "edit", "color": 4283215696 }
+      ]
+    },
+    {
+      "name": "人情",
+      "icon": "favorite",
+      "color": 4288606164,
+      "kind": "expense",
+      "children": [
+        { "name": "礼物", "icon": "card_giftcard", "color": 4288606164 },
+        { "name": "红包", "icon": "redeem", "color": 4288606164 },
+        { "name": "请客", "icon": "celebration", "color": 4288606164 },
+        { "name": "孝敬", "icon": "volunteer_activism", "color": 4288606164 }
+      ]
+    },
+    {
+      "name": "通讯",
+      "icon": "phone_iphone",
+      "color": 4287396007,
+      "kind": "expense",
+      "children": [
+        { "name": "话费", "icon": "call", "color": 4287396007 },
+        { "name": "流量", "icon": "network_cell", "color": 4287396007 }
+      ]
+    },
+    {
+      "name": "金融",
+      "icon": "account_balance",
+      "color": 4286611456,
+      "kind": "expense",
+      "children": [
+        { "name": "投资", "icon": "show_chart", "color": 4286611456 },
+        { "name": "保险", "icon": "shield", "color": 4286611456 },
+        { "name": "手续费", "icon": "receipt_long", "color": 4286611456 }
+      ]
+    },
+    {
+      "name": "其他支出",
+      "icon": "more_horiz",
+      "color": 4287007403,
+      "kind": "expense",
+      "children": [
+        { "name": "捐赠", "icon": "volunteer_activism", "color": 4287007403 },
+        { "name": "税费", "icon": "request_quote", "color": 4287007403 },
+        { "name": "其他", "icon": "more_horiz", "color": 4287007403 }
+      ]
+    },
+    {
+      "name": "工资",
+      "icon": "payments",
+      "color": 4282355199,
+      "kind": "income",
+      "children": [
+        { "name": "基本工资", "icon": "payments", "color": 4282355199 },
+        { "name": "奖金", "icon": "card_giftcard", "color": 4282355199 },
+        { "name": "补贴", "icon": "savings", "color": 4282355199 }
+      ]
+    },
+    {
+      "name": "理财",
+      "icon": "trending_up",
+      "color": 4282355199,
+      "kind": "income",
+      "children": [
+        { "name": "利息", "icon": "percent", "color": 4282355199 },
+        { "name": "基金", "icon": "savings", "color": 4282355199 },
+        { "name": "股票", "icon": "show_chart", "color": 4282355199 }
+      ]
+    },
+    {
+      "name": "其他收入",
+      "icon": "redeem",
+      "color": 4282355199,
+      "kind": "income",
+      "children": [
+        { "name": "红包", "icon": "redeem", "color": 4282355199 },
+        { "name": "二手出售", "icon": "sell", "color": 4282355199 },
+        { "name": "退款", "icon": "currency_exchange", "color": 4282355199 }
+      ]
+    }
+  ]
+}

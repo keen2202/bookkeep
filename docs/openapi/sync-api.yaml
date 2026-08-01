@@ -1,0 +1,252 @@
+openapi: 3.1.0
+info:
+  title: bookkeep Sync API
+  version: 0.1.0
+  description: >
+    Incremental sync protocol for the bookkeep bookkeeping app.
+    Op-log model: clients append operations (create/update/delete) locally,
+    push batches to the server, and pull others' operations with a cursor.
+    Conflicts resolve by last-write-wins on (lamport, client_id); deletes
+    take priority over updates. All endpoints are authorized to book
+    granularity (403 on cross-book access).
+servers:
+  - url: https://api.bookkeep.example.com/v1
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Op:
+      type: object
+      required: [entity, entity_id, op, payload, lamport, client_id]
+      properties:
+        entity:
+          type: string
+          enum: [account, category, transaction, budget, recurring_rule]
+        entity_id:
+          type: string
+          format: uuid
+        op:
+          type: string
+          enum: [c, u, d]
+        payload:
+          type: object
+          description: Full entity snapshot; null for delete ops
+          nullable: true
+        lamport:
+          type: integer
+          minimum: 1
+          description: Lamport clock value (per-client monotonic)
+        client_id:
+          type: string
+          format: uuid
+        book_id:
+          type: string
+          format: uuid
+          description: Required for ops created against a shared book
+    OpBatch:
+      type: object
+      required: [book_id, ops]
+      properties:
+        book_id:
+          type: string
+          format: uuid
+        ops:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/Op'
+    PushResponse:
+      type: object
+      required: [accepted_seq]
+      properties:
+        accepted_seq:
+          type: integer
+          description: Server-side seq of the last accepted op in this batch
+        accepted:
+          type: integer
+    PullResponse:
+      type: object
+      required: [ops, next_seq]
+      properties:
+        ops:
+          type: array
+          items:
+            $ref: '#/components/schemas/Op'
+        next_seq:
+          type: integer
+          description: Cursor for the next pull request
+    AuthTokens:
+      type: object
+      required: [access_token, refresh_token]
+      properties:
+        access_token:
+          type: string
+          description: JWT, 15 min TTL
+        refresh_token:
+          type: string
+          description: Opaque rotating token, 30 day TTL
+    UserCredentials:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+paths:
+  /auth/register:
+    post:
+      summary: Register a user and receive token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCredentials'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/login:
+    post:
+      summary: Exchange credentials for a token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCredentials'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/refresh:
+    post:
+      summary: Rotate a refresh token for a new pair (old token invalidated)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Rotated tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid or already-used refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /sync/push:
+    post:
+      summary: Upload a batch of ops; server persists after book-permission check
+      description: >
+        Ops are validated, deduplicated by (book_id, entity, entity_id, lamport, client_id),
+        and stored in a single transaction. Returns the last accepted server seq.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpBatch'
+      responses:
+        '200':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushResponse'
+        '403':
+          description: Caller is not a member of the book (viewer cannot write)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Batch validation failed (bad op, oversize)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /sync/pull:
+    get:
+      summary: Cursor-based incremental pull of ops since a seq
+      parameters:
+        - name: book_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: since_seq
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 500
+      responses:
+        '200':
+          description: Ops since cursor (empty array when caught up)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullResponse'
+        '403':
+          description: Caller is not a member of the book
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

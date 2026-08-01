@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主流记账 APP 产品调研报告</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1f2933; --muted:#5b6b7b; --line:#e3e8ee;
+    --brand:#2f7d6e; --brand-soft:#e8f3f0; --accent:#c2410c;
+    --ok:#1a7f4b; --warn:#c2410c; --no:#b42318; --soft:#f6f8fa;
+    --chip:#eef2f6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--fg);line-height:1.7;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 28px 80px}
+  header.hero{border-bottom:3px solid var(--brand);padding-bottom:22px;margin-bottom:30px}
+  header.hero h1{font-size:30px;margin:0 0 8px;letter-spacing:.5px}
+  header.hero .sub{color:var(--muted);font-size:14px}
+  header.hero .meta{margin-top:14px;font-size:13px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap}
+  header.hero .meta b{color:var(--fg)}
+  h2{font-size:22px;margin:46px 0 14px;padding-left:12px;border-left:5px solid var(--brand);color:var(--fg)}
+  h3{font-size:17px;margin:26px 0 8px;color:var(--brand)}
+  p{margin:10px 0}
+  .lead{font-size:15.5px;color:#33414f;background:var(--brand-soft);border-radius:10px;padding:16px 18px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  thead th{background:var(--brand);color:#fff;font-weight:600;position:sticky;top:0}
+  tbody th{background:var(--soft);font-weight:600;color:#33414f;white-space:nowrap}
+  tbody tr:nth-child(even) td{background:#fafcfd}
+  .tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:12px;font-weight:600}
+  .yes{background:#e6f6ec;color:var(--ok)}
+  .part{background:#fdf0e6;color:var(--warn)}
+  .no{background:#fde8e6;color:var(--no)}
+  .note{font-size:13px;color:var(--muted);margin:6px 0 0}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .pill{display:inline-block;background:var(--chip);border-radius:8px;padding:3px 9px;margin:3px 4px 0 0;font-size:12.5px}
+  .prio{display:inline-block;width:42px;text-align:center;border-radius:6px;color:#fff;font-weight:700;font-size:12px;padding:2px 0}
+  .p0{background:var(--no)} .p1{background:var(--accent)} .p2{background:var(--brand)}
+  ul{margin:8px 0 8px 4px;padding-left:20px}
+  li{margin:5px 0}
+  .callout{border-left:4px solid var(--accent);background:#fff7f1;padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0}
+  .toc{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px 22px;columns:2;font-size:13.5px}
+  .toc a{color:var(--brand);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  footer{margin-top:48px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:12.5px}
+  .small{font-size:12.5px;color:var(--muted)}
+  @media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>主流记账 APP 产品调研报告</h1>
+  <div class="sub">面向记账类产品开发的竞品分析与功能优先级建议</div>
+  <div class="meta">
+    <span><b>调研对象：</b>随手记 · 鲨鱼记账 · MoneyWiz · 薄荷记账 · 钱迹</span>
+    <span><b>报告日期：</b>2026-07-31</span>
+    <span><b>数据来源：</b>各应用官网 / 应用商店 / 行业榜单 / 媒体评测（2024–2026）</span>
+  </div>
+</header>
+
+<div class="toc">
+  <a href="#s1">1. 执行摘要</a><br>
+  <a href="#s2">2. 调研范围与方法</a><br>
+  <a href="#s3">3. 核心功能清单对比</a><br>
+  <a href="#s4">4. UI/UX 设计风格与交互特点</a><br>
+  <a href="#s5">5. 目标用户群体及使用场景</a><br>
+  <a href="#s6">6. 盈利模式对比</a><br>
+  <a href="#s7">7. 数据同步与安全性方案</a><br>
+  <a href="#s8">8. 各产品优缺点对比总结</a><br>
+  <a href="#s9">9. 后续开发功能优先级建议</a><br>
+  <a href="#s10">10. 结论</a>
+</div>
+
+<!-- ============ 1 ============ -->
+<h2 id="s1">1. 执行摘要</h2>
+<div class="lead">
+记账 App 赛道已形成鲜明的“两极分化”：一端是<b>极简纯净派</b>（钱迹、薄荷记账、iCost），以“无广告、启动快、专注记账”赢得口碑；另一端是<b>全能平台派</b>（随手记、MoneyWiz），功能覆盖记账、预算、报表、投资、家庭协同乃至银行直连，但学习成本高、界面庞杂。鲨鱼记账则占据“轻量但高效”的中间地带，靠 3 秒极速记账和图标化交互成为装机量最大的国产选手（注册超 3100 万）。
+<br><br>
+对新产品而言，<b>“极致轻量 + 数据自主权 + 免费够用的核心”</b>是已被验证的差异化路径；而会员订阅（而非广告）是更可持续、用户反感度更低的商业化方式。自动记账（短信/支付识别、AI 语音）、多账本与共享账本、WebDav/本地备份，则是拉开体验差距的关键功能点。
+</div>
+
+<p class="small">注：“等”涵盖的延伸产品（一木记账、MOZE、iCost、挖财、叨叨记账、喵喵记账等）因篇幅在后文以补充点评形式呈现，主对比表聚焦于用户明确指定的 5 款。</p>
+
+<!-- ============ 2 ============ -->
+<h2 id="s2">2. 调研范围与方法</h2>
+<p>本次调研覆盖 5 款具有代表性、覆盖不同定位的记账产品，力求在“极简派 / 全能派 / 国际派”之间形成有效对照：</p>
+<table>
+  <thead><tr><th>产品</th><th>定位</th><th>开发商 / 背景</th><th>规模与口碑（参考）</th></tr></thead>
+  <tbody>
+    <tr><th>随手记</th><td>全能老牌 / 个人+小微经营</td><td>随手科技（金蝶系），2010 年前后上线</td><td>累计用户 2 亿+，曾连续 1900 天 App Store 财务榜第一</td></tr>
+    <tr><th>鲨鱼记账</th><td>轻量高效 / 极简快速</td><td>鲨鱼记账团队（2017 运营）</td><td>注册超 3100 万、月活超 600 万</td></tr>
+    <tr><th>MoneyWiz</th><td>国际全能 / 跨平台专业</td><td>SILVERWIZ LLC（美国）</td><td>跨平台 4.7–4.8 分，4000+ 评价</td></tr>
+    <tr><th>薄荷记账</th><td>高颜值 / 免费增值</td><td>南京集约科技（2019 成立）</td><td>体积仅 10.77MB，被用户称“最良心”</td></tr>
+    <tr><th>钱迹</th><td>极简纯净 / “三无”</td><td>独立小团队（记账爱好者）</td><td>用户 600 万+，App Store 4.9 分 / 2.2 万评分</td></tr>
+  </tbody>
+</table>
+<p class="note">信息综合自各产品官网、App Store / 应用商店页面、Maigoo 十大记账软件榜单（2026-03 更新）、IT 时报及多家媒体评测。价格为公开披露区间，实际以各平台当期活动为准。</p>
+
+<!-- ============ 3 ============ -->
+<h2 id="s3">3. 核心功能清单对比</h2>
+<p>下表以“功能项 × 产品”矩阵呈现，<span class="tag yes">✓ 完整</span> <span class="tag part">△ 部分/会员</span> <span class="tag no">✗ 缺失</span>。其中△表示基础可用、进阶需会员，或仅部分平台支持。</p>
+
+<table>
+  <thead>
+    <tr><th>功能项</th><th>随手记</th><th>鲨鱼记账</th><th>MoneyWiz</th><th>薄荷记账</th><th>钱迹</th></tr>
+  </thead>
+  <tbody>
+    <tr><th>极速/快速记账</th><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓ 3秒</span></td><td><span class="tag part">△</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓ 3秒</span></td></tr>
+    <tr><th>多账户 / 资产管理</th><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td></tr>
+    <tr><th>多账本</th><td><span class="tag yes">✓</span></td><td><span class="tag part">△ 会员</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓ 免费</span></td><td><span class="tag part">△ 会员</span></td></tr>
+    <tr><th>共享 / 多人记账</th><td><span class="tag yes">✓</span></td><td><span class="tag part">△ 会员</span></td><td><span class="tag part">△ 同步</span></td><td><span class="tag yes">✓</span></td><td><span class="tag part">△ 会员</span></td></tr>
+    <tr><th>预算（总/分类）</th><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓ 信封式</span></td><td><span class="tag yes">✓ 含二级</span></td><td><span class="tag part">△ 会员</span></td></tr>
+    <tr><th>报表（饼/柱/折线）</th><td><span class="tag yes">✓ 18种</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓ 30+</span></td><td><span class="tag yes">✓ 自定义</span></td><td><span class="tag yes">✓</span></td></tr>
+    <tr><th>自动 / 导入记账</th><td><span class="tag yes">✓ 微信/支付宝/银行卡/短信</span></td><td><span class="tag part">△ OCR小票</span></td><td><span class="tag yes">✓ 4万+银行直连</span></td><td><span class="tag yes">✓ 截图/CSV</span></td><td><span class="tag yes">✓ AI自动/CSV</span></td></tr>
+    <tr><th>周期 / 分期</th><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓</span></td><td><span class="tag part">△ 会员</span></td></tr>
+    <tr><th>多币种</th><td><span class="tag part">△</span></td><td><span class="tag part">△</span></td><td><span class="tag yes">✓ 实时汇率</span></td><td><span class="tag yes">✓ 100+币种</span></td><td><span class="tag yes">✓ 100+币种</span></td></tr>
+    <tr><th>桌面小组件</th><td><span class="tag yes">✓</span></td><td><span class="tag part">△</span></td><td><span class="tag part">△</span></td><td><span class="tag yes">✓ 10种</span></td><td><span class="tag yes">✓</span></td></tr>
+    <tr><th>投资记账（股票/基金）</th><td><span class="tag part">△</span></td><td><span class="tag no">✗</span></td><td><span class="tag yes">✓ 含加密/外汇</span></td><td><span class="tag part">△ 专业版</span></td><td><span class="tag no">✗</span></td></tr>
+    <tr><th>票据 / 附件</th><td><span class="tag yes">✓</span></td><td><span class="tag part">△ OCR</span></td><td><span class="tag yes">✓ 收据</span></td><td><span class="tag yes">✓ 图片</span></td><td><span class="tag part">△ 会员</span></td></tr>
+    <tr><th>云端同步</th><td><span class="tag yes">✓ 多端</span></td><td><span class="tag yes">✓</span></td><td><span class="tag part">△ 订阅</span></td><td><span class="tag yes">✓ 免费</span></td><td><span class="tag yes">✓ 免费</span></td></tr>
+    <tr><th>本地 / WebDav 备份</th><td><span class="tag part">△ 网盘/邮件</span></td><td><span class="tag no">✗</span></td><td><span class="tag no">✗</span></td><td><span class="tag yes">✓ WebDav</span></td><td><span class="tag part">△ 导出</span></td></tr>
+    <tr><th>隐私锁</th><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓ 手势</span></td><td><span class="tag yes">✓</span></td><td><span class="tag yes">✓ 指纹/手势</span></td><td><span class="tag yes">✓ 人脸/密码</span></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+<b>功能密度观察：</b>随手记与 MoneyWiz 功能最“重”，但随手记偏“场景模板化”（百种账本模板），MoneyWiz 偏“会计专业化”（信封预算、投资、银行直连）。薄荷记账以最小体积提供了最均衡的免费功能集（含免费多账本、WebDav、多币种），钱迹则在“免费云同步 + 无广告”基础上把进阶功能（预算/多账本/共享）放到会员层。
+</div>
+
+<!-- ============ 4 ============ -->
+<h2 id="s4">4. UI/UX 设计风格与交互特点</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>随手记</h3>
+    <p>功能入口密集、信息量大，首页聚合收支报表。支持高度自定义（首页、导航栏、图标、主题、账本封面、夜间模式）。<b>缺点：</b>界面庞杂，被多次评价为“对新手不友好、学习成本高、功能用不上”。</p>
+  </div>
+  <div class="card">
+    <h3>鲨鱼记账</h3>
+    <p>极简清爽、配色明快，主界面核心功能一目了然，“+</span> → 选类型 → 输金额”三步 3 秒完成。图标化操作、智能备注提示。社区氛围浓，但免费版有广告、易误触跳转。</p>
+  </div>
+  <div class="card">
+    <h3>MoneyWiz</h3>
+    <p>专业金融工具风格，桌面级功能下沉到移动端。布局信息密度高、可定制字段与多级分类。<b>缺点：</b>界面偏复杂，学习曲线陡，部分用户反馈报表定制空间有限。</p>
+  </div>
+  <div class="card">
+    <h3>薄荷记账</h3>
+    <p>白绿色纯色搭配、极简清新、无广告干扰。可爱图标、8 种主题换肤、暗夜模式、10 种自定义小组件。视觉统一、上手成本低，部分评测认为“使用不够人性化”。</p>
+  </div>
+  <div class="card">
+    <h3>钱迹</h3>
+    <p>极简到“冷淡”，主页仅“账单 / 资产 / 记账”三个核心选项，无动效冗余。启动快（秒开模式）、三秒记录，专注感强。遵循 Android 绿色应用公约，无后台耗电。</p>
+  </div>
+</div>
+
+<h3>交互共性趋势</h3>
+<ul>
+  <li><b>极速记账成为标配：</b>3 秒 / 一步记账是留存关键交互，图标化、预设模板、智能备注提示被广泛采用。</li>
+  <li><b>语音 / AI 记账升温：</b>随手记 AI 语音（一句话多笔）、钱迹 AI 自动匹配、一木语音记账，降低输入门槛。</li>
+  <li><b>桌面小组件价值凸显：</b>不打开 App 即可速记/速查，薄荷（10 种）、钱迹、随手记均重点投入。</li>
+  <li><b>日历视图普及：</b>收支日历、现金流日历成为回溯消费的高频入口。</li>
+</ul>
+
+<!-- ============ 5 ============ -->
+<h2 id="s5">5. 目标用户群体及使用场景</h2>
+<table>
+  <thead><tr><th>产品</th><th>核心目标用户</th><th>典型使用场景</th><th>用户画像关键词</th></tr></thead>
+  <tbody>
+    <tr><th>随手记</th><td>个人、家庭、学生、小微经营者</td><td>日常消费、家庭共用账、小店经营、旅行专项、借贷台账</td><td>全场景、重功能、愿付会员</td></tr>
+    <tr><th>鲨鱼记账</th><td>学生、年轻上班族、轻量记账者</td><td>碎片化随手记、生活费管理、旅行记账、家庭轻协同</td><td>极简、效率、低门槛</td></tr>
+    <tr><th>MoneyWiz</th><td>专业用户、多平台用户、自由职业/小企业、跨境人群</td><td>多币种资产管理、投资/加密/外汇、银行自动对账、跨设备办公</td><td>专业、跨境、全平台</td></tr>
+    <tr><th>薄荷记账</th><td>个人与家庭、颜值党、注重隐私者</td><td>日常收支、家庭/恋爱/生意/旅行账本、报销、多币种出国</td><td>高颜值、免费、干净</td></tr>
+    <tr><th>钱迹</th><td>极简主义者、厌恶广告/理财推销者、入门用户</td><td>纯粹记录开销、多平台同步、家庭共享、存钱计划（365/52周）</td><td>纯净、轻小、克制</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 6 ============ -->
+<h2 id="s6">6. 盈利模式对比</h2>
+<table>
+  <thead><tr><th>产品</th><th>基础免费策略</th><th>付费 / 会员</th><th>其他营收</th></tr></thead>
+  <tbody>
+    <tr><th>随手记</th><td>基础记账全免费，无强制广告</td><td>VIP 会员：基础/专业/免广告/空间会员多档；活动价低至 8.1 元/月，专业会员限时 4.6 折</td><td>历史上含 P2P/理财/贷款超市（已清退）；神象云 SaaS 转型</td></tr>
+    <tr><th>鲨鱼记账</th><td>记账/预算/图表基础免费</td><td>免广告会员 12 元/年；标准会员 119 元/年、38 元/季、15 元/月；专业版 18 元/月去广告</td><td>购物返现、鲨鱼社区</td></tr>
+    <tr><th>MoneyWiz</th><td>账户/预算/交易数量无限制免费</td><td>Standard $19.99/年（多设备同步）；Premium $4.99/月或 $49.99/年（银行直连+同步）；1 周试用</td><td>纯订阅制，无广告</td></tr>
+    <tr><th>薄荷记账</th><td>95%+ 功能免费，<b>无广告</b></td><td>少量增值服务（高级主题、额外云存储等）</td><td>免费增值，口碑驱动</td></tr>
+    <tr><th>钱迹</th><td><b>永远无广告</b>；核心记账/统计/云同步/导出免费</td><td>6 元/月、半年 24 元、36 元/年、终身 128 元；会员解锁多账本/预算/共享/标签/周期/分期/高级导出/主题等；老用户(2025-04-01 前)免费</td><td>纯会员制，无理财无社区</td></tr>
+  </tbody>
+</table>
+<div class="callout">
+<b>商业化启示：</b>① 订阅制（钱迹、MoneyWiz、薄荷）用户反感度最低；广告变现（鲨鱼、随手记历史）虽快但伤害体验与口碑。② “核心功能免费 + 进阶会员”是主流且被接受的结构，关键是<b>免费层要“够用”</b>。③ 钱迹“终身会员 128 元”与“老用户免费”是增强信任与口碑的巧思。
+</div>
+
+<!-- ============ 7 ============ -->
+<h2 id="s7">7. 数据同步与安全性方案</h2>
+<table>
+  <thead><tr><th>产品</th><th>同步机制</th><th>备份方式</th><th>安全 / 隐私</th></tr></thead>
+  <tbody>
+    <tr><th>随手记</th><td>手机/网页/小程序实时双向同步</td><td>本地、第三方网盘、邮件多重备份；离线可用</td><td>云端加密存储；账号体系</td></tr>
+    <tr><th>鲨鱼记账</th><td>登录后实时云端同步，多设备切换</td><td>云同步为主；离线本地保存，联网自动同步</td><td>“银行级加密”；手势密码；微信/QQ/手机登录</td></tr>
+    <tr><th>MoneyWiz</th><td>离线可用，联网自动同步云端</td><td>MoneyWiz Cloud 备份</td><td><b>256 位端到端加密</b>（传输与存储）；无广告</td></tr>
+    <tr><th>薄荷记账</th><td>免费云同步，iOS/Android/网页跨平台</td><td>本地备份、<b>WebDav 备份</b>、云同步</td><td>加密存储；数字/手势/指纹解锁；无广告</td></tr>
+    <tr><th>钱迹</th><td>注册后数据免费云同步，多平台（iOS/Android/鸿蒙/Win/Mac）</td><td>云端加密；导出 Excel/CSV；卡片备份</td><td>加密存储；人脸/数字密码；鸿蒙防窥；遵循 Android 绿色应用公约（无敏感信息获取）</td></tr>
+  </tbody>
+</table>
+<div class="callout">
+<b>安全与信任趋势：</b>端到端加密（MoneyWiz）、<b>WebDav / 本地备份（薄荷、钱迹导出）</b>让用户掌握数据主权，是建立信任的高杠杆点。隐私锁（指纹/手势/人脸）已成标配。值得注意的是，<b>无后台、不获取敏感信息</b>（钱迹）本身是卖点。
+</div>
+
+<!-- ============ 8 ============ -->
+<h2 id="s8">8. 各产品优缺点对比总结</h2>
+<table>
+  <thead><tr><th>产品</th><th>优点</th><th>缺点 / 风险</th></tr></thead>
+  <tbody>
+    <tr><th>随手记</th>
+      <td>功能最全、场景模板极多；报表专业（18 种）；多端同步；AI 语音记账；家庭/生意协同成熟</td>
+      <td>界面庞杂、学习成本高；广告显眼、去广告收费；新手用不上多数功能；历史理财业务带来品牌疑虑</td></tr>
+    <tr><th>鲨鱼记账</th>
+      <td>极简快速（3 秒）、图标化上手零门槛；装机量最大；社区氛围；预算/日历清晰</td>
+      <td>免费版有广告、去广告需付费；易误触跳转外链；进阶（多账本/共享/导入）需会员；无 WebDav</td></tr>
+    <tr><th>MoneyWiz</th>
+      <td>跨平台完整（iOS/Android/Mac/Win/Web）；银行直连（4 万+银行/55 国）；投资/加密/外汇；30+ 报表；256 位加密</td>
+      <td>界面复杂、学习曲线陡；订阅贵（$）；报表定制有限；对非美银行支持弱；偶有同步问题；本地化不足</td></tr>
+    <tr><th>薄荷记账</th>
+      <td>高颜值、体积小（10.77MB）；95%+ 免费无广告；免费多账本、WebDav 备份、多币种；功能均衡</td>
+      <td>部分评测认为“使用不够人性化”；投资记账需专业版；品牌声量相对低</td></tr>
+    <tr><th>钱迹</th>
+      <td>纯净无广告无后台、启动极快；免费云同步+导出；多平台；口碑极佳（4.9）；“终身会员”增强信任</td>
+      <td>免费版进阶受限（预算/多账本/共享/标签需会员）；功能相对克制，无投资记账；重度用户可能不够用</td></tr>
+  </tbody>
+</table>
+
+<div class="card">
+  <h3>延伸竞品一句话点评（补充“等”）</h3>
+  <p>
+    <span class="pill">一木记账</span> 清新浅绿、语音/自动记账突出，会员 8 元/月、买断 98 元；但自动记账需后台常驻，有用户反馈换机同步明细丢失。<br>
+    <span class="pill">MOZE</span> 被誉为“国产记账之光”，iOS 专业向、隐私强、会计级交互、信用卡功能突出。<br>
+    <span class="pill">iCost</span> 极致极简、纯本地存储无账号体系、自动记录消费地点、智能文本/语音记账。<br>
+    <span class="pill">挖财</span> 老牌、报表强、社区成熟、短信/账单导入；用户量 1.3 亿+。<br>
+    <span class="pill">叨叨记账</span> 对话式/角色互动记账，趣味化拉新，适合年轻/二次元群体。<br>
+    <span class="pill">喵喵记账</span> 养猫游戏化记账，但广告多、关闭隐蔽，免广告/VIP 体验割裂。
+  </p>
+</div>
+
+<!-- ============ 9 ============ -->
+<h2 id="s9">9. 后续开发功能优先级建议</h2>
+<p>结合上述竞争空白与用户痛点，将功能按<b>“必要性 × 差异化 × 成本”</b>划分为三个优先级。建议采用“先竖体验、再拉差异、后做商业化”的节奏。</p>
+
+<h3><span class="prio p0">P0</span> 核心必备（MVP 必须，决定能否留存）</h3>
+<table>
+  <thead><tr><th>功能</th><th>理由（来自竞品洞察）</th><th>关键设计点</th></tr></thead>
+  <tbody>
+    <tr><th>极速记账（&lt;3 秒）</th><td>鲨鱼/钱迹均以此为核心留存手段</td><td>“+”→类型→金额一步完成；图标化分类；智能备注提示；桌面小组件速记</td></tr>
+    <tr><th>多账户 / 资产管理</th><td>所有产品的基础骨架</td><td>现金/银行卡/信用卡/储值卡/电子钱包；实时余额更新；账户走势图</td></tr>
+    <tr><th>分类体系 + 自定义</th><td>钱迹/iCost 的成功基础</td><td>一二级分类、自定义名称/排序/图标；标签多维（商家/项目/城市）</td></tr>
+    <tr><th>预算（总/分类）</th><td>控支刚需，随手记/鲨鱼/MoneyWiz 均强</td><td>月度总预算+分类预算；超支预警；日均预算动态</td></tr>
+    <tr><th>基础报表</th><td>记账价值闭环</td><td>饼图/柱状/折线；按日周月年；消费结构一目了然</td></tr>
+    <tr><th>云端同步 + 隐私锁</th><td>安全感与换机留存</td><td>账号云同步；指纹/手势/数字锁；离线可用</td></tr>
+  </tbody>
+</table>
+
+<h3><span class="prio p1">P1</span> 差异化（拉开体验差距，建立口碑）</h3>
+<table>
+  <thead><tr><th>功能</th><th>理由</th><th>关键设计点</th></tr></thead>
+  <tbody>
+    <tr><th>多账本 + 共享账本</th><td>家庭/旅行/生意场景刚需；薄荷免费、钱迹收费，存在“免费+共享”空白</td><td>生活/家庭/旅行/生意模板；邀请成员+角色权限；数据隔离</td></tr>
+    <tr><th>自动 / 智能记账</th><td>降低门槛的核心差异化；鲨鱼 OCR、钱迹 AI、一木自动记账</td><td>支付宝/微信 CSV 导入；短信/支付识别；AI 语音“一句话记账”；小票 OCR</td></tr>
+    <tr><th>本地 / WebDav 备份 + 导出</th><td>薄荷因 WebDav 赢得“数据主权”信任；竞品普遍缺失</td><td>免费导出 Excel/CSV；WebDav 自主备份；无平台锁定</td></tr>
+    <tr><th>周期 / 分期记账</th><td>房租/订阅/信用卡高频痛点</td><td>周期自动生成；分期关联额度；还款提醒</td></tr>
+    <tr><th>多币种 + 汇率</th><td>跨境/出国场景；MoneyWiz/薄荷/钱迹均支持</td><td>100+ 币种；实时汇率；手动改汇率</td></tr>
+    <tr><th>日历 / 现金流视图</th><td>回溯消费的天然入口</td><td>收支日历；现金流趋势；预算进度可视化</td></tr>
+  </tbody>
+</table>
+
+<h3><span class="prio p2">P2</span> 增值与商业化（验证后投入）</h3>
+<table>
+  <thead><tr><th>功能</th><th>理由 / 注意</th><th>关键设计点</th></tr></thead>
+  <tbody>
+    <tr><th>会员订阅体系</th><td>最可持续、反感最低；钱迹终身制可参考</td><td>“核心免费够用 + 进阶会员”；去广告/高级导出/多账本/主题；谨慎设计免费边界</td></tr>
+    <tr><th>投资记账（股票/基金）</th><td>MoneyWiz 强项、国内缺口</td><td>持仓/收益自动同步；仅当用户规模验证后再做，避免复杂度过高</td></tr>
+    <tr><th>高级可视化报表</th><td>随手记 18 种、MoneyWiz 30+ 的纵深</td><td>资产负债表、净资产曲线、现金流预测；导出 PDF</td></tr>
+    <tr><th>存钱计划模板</th><td>钱迹 365/52 周法提升仪式感与留存</td><td>目标/起始/递增自定义；进度可视化</td></tr>
+    <tr><th>广告 / 返现（谨慎）</th><td>鲨鱼购物返现可参考，但需克制</td><td>若引入广告，务必提供“去广告会员”且默认不伤核心路径</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+<b>战略建议（一句话）：</b>以<b>“极简纯净 + 免费够用 + 数据自主权（WebDav/导出）+ 多账本免费共享”</b>切入，避开随手记的“重”与鲨鱼“广告变现”的口碑陷阱；商业化押注<b>订阅制</b>而非广告，用 AI/自动记账与跨平台同步做长期差异化护城河。
+</div>
+
+<!-- ============ 10 ============ -->
+<h2 id="s10">10. 结论</h2>
+<p>记账赛道并未饱和，而是呈现出清晰的<b>“轻 vs 重”分层机会</b>。随手记代表的功能全集模式因复杂度与广告问题留出了“干净轻量”的市场；鲨鱼记账虽装机量大，但广告与会员墙削弱了口碑；MoneyWiz 在专业与跨境场景无人能及却难本地化；薄荷与钱迹证明<b>“无广告 + 免费核心 + 数据自主”</b>可以形成强口碑护城河。</p>
+<p>对新产品而言，最优路径是：<b>先用 P0 把“极速、干净、免费够用”的体验做扎实，再用 P1 的“多账本共享 + 自动记账 + WebDav 数据主权”建立差异化，最后用 P2 的订阅制变现</b>。避开广告变现的短期诱惑，把“用户信任”作为最核心的产品资产。</p>
+
+<footer>
+  本报告基于公开资料整理，价格与功能以各产品官方当期信息为准。生成日期 2026-07-31，供记账类产品立项与功能规划参考。
+</footer>
+
+</div>
+</body>
+</html>
