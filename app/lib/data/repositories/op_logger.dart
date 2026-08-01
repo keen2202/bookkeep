@@ -4,19 +4,22 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/constants.dart';
 import '../local/database.dart';
+import '../local/tables/app_meta_table.dart';
 import '../local/tables/sync_ops_table.dart';
 
 /// 同步操作日志统一入口（BK-T-007）：全部写路径经此入队。
 /// lamport 逻辑时钟单调递增（并纳入合并中观察到的远端最大 lamport，保证因果序）；
 /// client_id 为持久化 uuid；payload 为完整实体快照，跨设备引用字段为远端 uuid。
+/// sync_ops 按账本分区（Spec §4.1 / BK-T-010），游标按账本独立。
 class OpLogger {
   OpLogger(this.db);
 
-  static const clientIdKey = 'client_id';
-  static const lastSyncedSeqKey = 'sync_last_seq';
-  static const bookIdKey = 'sync_book_id';
-  static const maxRemoteLamportKey = 'sync_max_remote_lamport';
+  static const clientIdKey = AppMetaKeys.clientId;
+  static const lastSyncedSeqKeyPrefix = 'sync_last_seq_';
+  static const bookIdKey = AppMetaKeys.syncBookId;
+  static const maxRemoteLamportKey = AppMetaKeys.maxRemoteLamport;
 
   final AppDatabase db;
   static const _uuid = Uuid();
@@ -34,10 +37,12 @@ class OpLogger {
     required String remoteId,
     required SyncOpCode op,
     Map<String, dynamic>? payload,
+    String bookId = kDefaultBookId,
   }) async {
     final lamport = await nextLamport();
     final cid = await clientId();
     await db.into(db.syncOps).insert(SyncOpsCompanion.insert(
+          bookId: Value(bookId),
           entity: entity,
           entityId: entityId,
           remoteId: Value(remoteId),
@@ -54,8 +59,13 @@ class OpLogger {
   /// 新实体的跨设备身份（uuid v4）
   String newUuid() => _uuid.v4();
 
-  Future<List<SyncOp>> pendingOps({int limit = 500}) {
-    final q = db.select(db.syncOps)..where((t) => t.pushed.equals(false));
+  Future<List<SyncOp>> pendingOps({String? bookId, int limit = 500}) {
+    final q = db.select(db.syncOps);
+    if (bookId != null) {
+      q.where((t) => t.pushed.equals(false) & t.bookId.equals(bookId));
+    } else {
+      q.where((t) => t.pushed.equals(false));
+    }
     q.orderBy([(t) => OrderingTerm.asc(t.id)]);
     q.limit(limit);
     return q.get();
@@ -120,16 +130,18 @@ class OpLogger {
     return id;
   }
 
-  Future<int> lastSyncedSeq() async {
-    final rows = await (db.select(db.appMeta)..where((t) => t.key.equals(lastSyncedSeqKey))).get();
+  Future<int> lastSyncedSeq({String? bookId}) async {
+    final key = '$lastSyncedSeqKeyPrefix${bookId ?? kDefaultBookId}';
+    final rows = await (db.select(db.appMeta)..where((t) => t.key.equals(key))).get();
     if (rows.isEmpty) return 0;
     return int.tryParse(rows.single.value) ?? 0;
   }
 
-  Future<void> setLastSyncedSeq(int seq) async {
+  Future<void> setLastSyncedSeq(int seq, {String? bookId}) async {
+    final key = '$lastSyncedSeqKeyPrefix${bookId ?? kDefaultBookId}';
     await db.into(db.appMeta)
         .insert(
-          AppMetaCompanion.insert(key: lastSyncedSeqKey, value: '$seq'),
+          AppMetaCompanion.insert(key: key, value: '$seq'),
           onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('$seq'))),
         );
   }

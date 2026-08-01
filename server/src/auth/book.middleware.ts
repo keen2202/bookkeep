@@ -24,7 +24,12 @@ export function requireBookMember(pool: DbPool, opts: { allowWrite: boolean }) {
       res.status(401).json({ error: 'unauthorized' });
       return;
     }
-    const bookId = (opts.allowWrite ? req.body?.book_id : req.query.book_id) as unknown;
+    // book 来源：body.book_id（sync push）/ query.book_id（sync pull）/ 路径参数 :bookId（成员管理，BK-T-010）
+    const bookId = (
+      opts.allowWrite
+        ? (req.body?.book_id ?? req.params.bookId)
+        : (req.query.book_id ?? req.params.bookId)
+    ) as unknown;
     if (typeof bookId !== 'string' || !UUID_RE.test(bookId)) {
       res.status(400).json({ error: 'book_id must be a uuid' });
       return;

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import '../../core/constants/constants.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/op_logger.dart';
 import '../../domain/models/remote_op.dart';
@@ -17,13 +18,14 @@ class SyncEngine {
     required this.opLogger,
     required SyncApi api,
     required TokenStore tokenStore,
-    required SyncMerger merger,
+    SyncMerger? merger,
     this.email,
     this.password,
     this.bookId,
   })  : _api = api,
         _tokenStore = tokenStore,
-        _merger = merger;
+        // 合并归属本引擎账本（Spec §4.1 / BK-T-010）
+        _merger = merger ?? SyncMerger(opLogger.db, bookId: bookId ?? kDefaultBookId);
 
   final OpLogger opLogger;
   final SyncApi _api;
@@ -136,7 +138,7 @@ class SyncEngine {
     var rounds = 0;
     while (rounds < 20) {
       rounds++;
-      final pending = await opLogger.pendingOps();
+      final pending = await opLogger.pendingOps(bookId: bookId);
       var queueDrained = true;
       if (pending.isNotEmpty) {
         phaseNotifier.value = SyncPhase.pushing;
@@ -152,7 +154,7 @@ class SyncEngine {
       }
 
       phaseNotifier.value = SyncPhase.pulling;
-      final since = await opLogger.lastSyncedSeq();
+      final since = await opLogger.lastSyncedSeq(bookId: bookId);
       final pull = await _api.pull(bookId!, since, accessToken: _tokens!.accessToken);
       // 本机 op 已物化到本地库，跳过避免重复建行
       final foreign = pull.ops.where((o) => o.clientId != ownClientId).toList();
@@ -169,7 +171,7 @@ class SyncEngine {
         await opLogger.recordRemoteLamports(foreign.map((o) => o.lamport));
       }
       if (pull.nextSeq > since) {
-        await opLogger.setLastSyncedSeq(pull.nextSeq);
+        await opLogger.setLastSyncedSeq(pull.nextSeq, bookId: bookId);
       }
 
       if (queueDrained && pull.ops.isEmpty) break;

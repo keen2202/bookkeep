@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/constants/constants.dart';
 import '../../core/errors/repository_exceptions.dart';
 import '../../domain/models/category_seed.dart';
 import '../local/database.dart';
@@ -9,28 +10,34 @@ import 'op_logger.dart';
 
 /// 分类仓库（Spec §3.3 / BK-P0-003）。
 /// 系统 seed 分类由各设备本地按版本安装（不产生同步 op）；
-/// 自定义分类的增删改经 OpLogger 入队。
+/// 自定义分类的增删改经 OpLogger 入队；查询/写入按账本过滤（Spec §4.1 / BK-T-010）。
 class CategoryRepository {
-  CategoryRepository(this.db, {OpLogger? opLogger}) : opLogger = opLogger ?? OpLogger(db);
+  CategoryRepository(this.db, {OpLogger? opLogger, this.bookId})
+      : opLogger = opLogger ?? OpLogger(db);
 
   final AppDatabase db;
   final OpLogger opLogger;
+  final String? bookId;
 
   static const seedMetaKey = 'seed_version';
 
-  /// 安装系统分类 seed（幂等：app_meta 记录版本，仅当版本更新时插入）
+  Future<String> _bookId() async => bookId ?? kDefaultBookId;
+
+  /// 安装系统分类 seed（幂等：app_meta 记录版本，仅当版本更新时插入）。
+  /// seed 分类归属当前账本（各账本独立分类体系）。
   Future<int> installSeeds(CategorySeed seed) async {
     final current = await currentSeedVersion();
     if (current >= seed.version) return 0;
+    final currentBookId = await _bookId();
 
     final now = DateTime.now().toUtc();
     var inserted = 0;
     await db.transaction(() async {
       for (final parent in seed.parents) {
-        final parentId = await _insertNode(parent, null, now);
+        final parentId = await _insertNode(parent, null, now, currentBookId);
         inserted++;
         for (final child in parent.children) {
-          await _insertNode(child, parentId, now);
+          await _insertNode(child, parentId, now, currentBookId);
           inserted++;
         }
       }
@@ -42,8 +49,9 @@ class CategoryRepository {
     return inserted;
   }
 
-  Future<int> _insertNode(CategorySeedNode node, int? parentId, DateTime now) {
+  Future<int> _insertNode(CategorySeedNode node, int? parentId, DateTime now, String bookId) {
     return db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: Value(bookId),
           remoteId: Value(opLogger.newUuid()),
           parentId: Value(parentId),
           name: node.name,
@@ -67,8 +75,10 @@ class CategoryRepository {
   Future<List<Category>> listCategories({
     CategoryKind? kind,
     bool includeDeleted = false,
-  }) {
+  }) async {
+    final currentBookId = await _bookId();
     final q = db.select(db.categories)
+      ..where((t) => t.bookId.equals(currentBookId))
       ..orderBy([
         (t) => OrderingTerm.asc(t.sortOrder),
         (t) => OrderingTerm.asc(t.id),
@@ -89,10 +99,12 @@ class CategoryRepository {
     required CategoryKind kind,
     int? parentId,
   }) async {
+    final currentBookId = await _bookId();
     return db.transaction(() async {
       final now = DateTime.now().toUtc();
       final remoteId = opLogger.newUuid();
       final id = await db.into(db.categories).insert(CategoriesCompanion.insert(
+            bookId: Value(currentBookId),
             remoteId: Value(remoteId),
             parentId: Value(parentId),
             name: name,
@@ -107,6 +119,7 @@ class CategoryRepository {
         entityId: id,
         remoteId: remoteId,
         op: SyncOpCode.c,
+        bookId: currentBookId,
         payload: {
           'id': id,
           'parent_id': parentId == null ? null : await _remoteIdOf(parentId),
@@ -165,6 +178,7 @@ class CategoryRepository {
         entityId: id,
         remoteId: category.remoteId!,
         op: SyncOpCode.d,
+        bookId: await _bookId(),
       );
     });
   }
@@ -181,6 +195,7 @@ class CategoryRepository {
       entityId: id,
       remoteId: category.remoteId!,
       op: op,
+      bookId: await _bookId(),
       payload: {
         'id': id,
         'parent_id': category.parentId == null ? null : await _remoteIdOf(category.parentId!),

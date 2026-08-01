@@ -6,3 +6,6 @@ String formatMoney(int minor, {String symbol = '¥'}) {
   final sign = minor < 0 ? '-' : '';
   return '$sign$symbol$yuan.$cents';
 }
+
+/// 锁定态金额掩码（Spec §3.6 脱敏：列表/报表/账户）
+String maskedMoney({String symbol = '¥'}) => '$symbol***';

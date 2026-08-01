@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 
+import '../../core/constants/constants.dart';
+import '../../core/utils/money.dart';
 import '../local/database.dart';
 
 class DailyTotal {
@@ -32,69 +34,102 @@ class PeriodBucket {
   final int amountMinor;
 }
 
-/// 报表只读查询层（Spec §3.5 / BK-P0-005）：单条 GROUP BY SQL，避免 N+1
+/// 报表只读查询层（Spec §3.5 / BK-P0-005）：单条 GROUP BY SQL，避免 N+1；
+/// 强制按账本过滤（Spec §4.1 / BK-T-010）
 class ReportsRepository {
-  ReportsRepository(this.db);
+  ReportsRepository(this.db, {this.bookId});
   final AppDatabase db;
+  final String? bookId;
 
-  /// 按日聚合：支出/收入（不含已删除与转账）
+  Future<String> _bookId() async => bookId ?? kDefaultBookId;
+
+  /// 按日聚合：支出/收入（不含已删除与转账）。
+  /// 多币种：按币种分组后经 [rates] 折算到主币种（Spec §4.5）。
   Future<List<DailyTotal>> dailyTotals({
     required DateTime start,
     required DateTime end,
+    Map<String, int> rates = const {},
   }) async {
+    final currentBookId = await _bookId();
     final rows = await db.customSelect(
-      "SELECT date(occurred_at, 'unixepoch') AS day, "
+      "SELECT date(occurred_at, 'unixepoch') AS day, currency, "
       'COALESCE(SUM(CASE WHEN type = ? THEN -amount_minor END), 0) AS expense, '
       'COALESCE(SUM(CASE WHEN type = ? THEN amount_minor END), 0) AS income '
       'FROM transactions '
-      'WHERE deleted_at IS NULL AND type IN (?, ?) '
+      'WHERE deleted_at IS NULL AND type IN (?, ?) AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
-      'GROUP BY day ORDER BY day',
+      'GROUP BY day, currency ORDER BY day',
       variables: [
         Variable.withString('expense'),
         Variable.withString('income'),
         Variable.withString('expense'),
         Variable.withString('income'),
+        Variable.withString(currentBookId),
         Variable.withDateTime(start),
         Variable.withDateTime(end),
       ],
     ).get();
-    return [
-      for (final row in rows)
-        DailyTotal(
-          date: row.read<String>('day'),
-          expenseMinor: row.read<int>('expense'),
-          incomeMinor: row.read<int>('income'),
+    final byDay = <String, DailyTotal>{};
+    for (final row in rows) {
+      final day = row.read<String>('day');
+      final currency = row.read<String>('currency');
+      final expense = _convert(row.read<int>('expense'), currency, rates);
+      final income = _convert(row.read<int>('income'), currency, rates);
+      byDay.update(
+        day,
+        (t) => DailyTotal(
+          date: day,
+          expenseMinor: t.expenseMinor + expense,
+          incomeMinor: t.incomeMinor + income,
         ),
-    ];
+        ifAbsent: () => DailyTotal(date: day, expenseMinor: expense, incomeMinor: income),
+      );
+    }
+    final days = byDay.keys.toList()..sort();
+    return [for (final d in days) byDay[d]!];
   }
 
-  /// 分类占比（单条分组 SQL）
+  /// 分类占比（单条分组 SQL；按币种折算主币种）
   Future<List<CategorySlice>> categoryBreakdown({
     required DateTime start,
     required DateTime end,
+    Map<String, int> rates = const {},
   }) async {
+    final currentBookId = await _bookId();
     final rows = await db.customSelect(
-      'SELECT t.category_id, c.name AS category_name, '
+      'SELECT t.category_id, c.name AS category_name, t.currency, '
       'COALESCE(SUM(-t.amount_minor), 0) AS amount '
       'FROM transactions t LEFT JOIN categories c ON c.id = t.category_id '
-      'WHERE t.type = ? AND t.deleted_at IS NULL '
+      'WHERE t.type = ? AND t.deleted_at IS NULL AND t.book_id = ? '
       'AND t.occurred_at >= ? AND t.occurred_at < ? '
-      'GROUP BY t.category_id ORDER BY amount DESC',
+      'GROUP BY t.category_id, t.currency',
       variables: [
         Variable.withString('expense'),
+        Variable.withString(currentBookId),
         Variable.withDateTime(start),
         Variable.withDateTime(end),
       ],
     ).get();
-    return [
-      for (final row in rows)
-        CategorySlice(
-          categoryId: row.read<int?>('category_id') ?? 0,
-          categoryName: row.read<String?>('category_name') ?? '未分类',
-          amountMinor: row.read<int>('amount'),
+    final byCategory = <int, CategorySlice>{};
+    for (final row in rows) {
+      final id = row.read<int?>('category_id') ?? 0;
+      final name = row.read<String?>('category_name') ?? '未分类';
+      final currency = row.read<String>('currency');
+      final amount = _convert(row.read<int>('amount'), currency, rates);
+      byCategory.update(
+        id,
+        (s) => CategorySlice(
+          categoryId: id,
+          categoryName: name,
+          amountMinor: s.amountMinor + amount,
         ),
-    ];
+        ifAbsent: () =>
+            CategorySlice(categoryId: id, categoryName: name, amountMinor: amount),
+      );
+    }
+    final slices = byCategory.values.toList()
+      ..sort((a, b) => b.amountMinor.compareTo(a.amountMinor));
+    return slices;
   }
 
   /// 周期分桶（周/月）对比
@@ -102,28 +137,38 @@ class ReportsRepository {
     required DateTime start,
     required DateTime end,
     required BucketGranularity granularity,
+    Map<String, int> rates = const {},
   }) async {
+    final currentBookId = await _bookId();
     final format = granularity == BucketGranularity.week
         ? "%Y-W%W" // 周
         : '%Y-%m'; // 月
     final rows = await db.customSelect(
-      "SELECT strftime(?, occurred_at, 'unixepoch') AS bucket, "
+      "SELECT strftime(?, occurred_at, 'unixepoch') AS bucket, currency, "
       'COALESCE(SUM(-amount_minor), 0) AS amount '
       'FROM transactions '
-      'WHERE type = ? AND deleted_at IS NULL '
+      'WHERE type = ? AND deleted_at IS NULL AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
-      'GROUP BY bucket ORDER BY bucket',
+      'GROUP BY bucket, currency',
       variables: [
         Variable.withString(format),
         Variable.withString('expense'),
+        Variable.withString(currentBookId),
         Variable.withDateTime(start),
         Variable.withDateTime(end),
       ],
     ).get();
-    final results = <PeriodBucket>[];
+    final byBucket = <String, int>{};
     for (final row in rows) {
       final bucket = row.read<String>('bucket');
-      final amount = row.read<int>('amount');
+      final currency = row.read<String>('currency');
+      final amount = _convert(row.read<int>('amount'), currency, rates);
+      byBucket.update(bucket, (v) => v + amount, ifAbsent: () => amount);
+    }
+    final buckets = byBucket.keys.toList()..sort();
+    final results = <PeriodBucket>[];
+    for (final bucket in buckets) {
+      final amount = byBucket[bucket]!;
       if (granularity == BucketGranularity.week) {
         final parts = bucket.split('-W');
         final year = int.parse(parts[0]);
@@ -138,6 +183,15 @@ class ReportsRepository {
       }
     }
     return results;
+  }
+
+  /// 按汇率表折算（rates: code → kRateScale 刻度；缺失按 1:1）
+  int _convert(int amountMinor, String currency, Map<String, int> rates) {
+    if (amountMinor == 0 || currency == 'CNY') return amountMinor;
+    return Money.convert(
+      amountMinor: amountMinor,
+      rateScaled: rates[currency] ?? kRateScale,
+    );
   }
 
   String _two(int v) => v.toString().padLeft(2, '0');

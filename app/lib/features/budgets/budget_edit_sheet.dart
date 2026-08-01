@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/services/budget_progress_calculator.dart';
 import '../../features/quick_entry/amount_parser.dart';
+import '../books/books_providers.dart' show budgetRepositoryProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
-import 'budgets_page.dart' show budgetRepositoryProvider, budgetsViewModelProvider;
+import 'budgets_page.dart' show budgetsViewModelProvider;
 
 /// 新建/编辑预算（Spec §3.4）：总预算或一级分类预算，月起始日取自当前周期
 class BudgetEditSheet extends ConsumerStatefulWidget {

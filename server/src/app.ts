@@ -1,5 +1,6 @@
 import express from 'express';
 import { authMiddleware } from './auth/middleware';
+import { booksRouter } from './books/books.routes';
 import { DbPool } from './db/pool';
 import { authRouter } from './routes/auth.routes';
 import { healthRouter } from './routes/health.routes';
@@ -17,6 +18,7 @@ export function createApp({ pool, jwtSecret = 'dev-secret' }: AppDeps) {
 
   app.use('/health', healthRouter(pool));
   app.use('/auth', authRouter({ pool, jwtSecret }));
+  app.use('/books', authMiddleware(jwtSecret), booksRouter({ pool }));
   app.use('/sync', authMiddleware(jwtSecret), syncRouter({ pool }));
 
   app.get('/api/protected', authMiddleware(jwtSecret), (req, res) => {

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
+import '../auth_lock/lock_controller.dart';
+import '../books/books_providers.dart' show accountRepositoryProvider;
 import 'account_card.dart';
 import 'account_edit_sheet.dart';
 import 'accounts_providers.dart';
@@ -34,7 +36,9 @@ class AccountsPage extends ConsumerWidget {
                         Text('净资产', style: Theme.of(context).textTheme.bodyMedium),
                         const SizedBox(height: 4),
                         Text(
-                          formatMoney(vm.netWorth),
+                          ref.watch(amountMaskProvider)
+                              ? maskedMoney()
+                              : formatMoney(vm.netWorth),
                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],

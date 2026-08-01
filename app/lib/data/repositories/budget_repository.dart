@@ -1,17 +1,23 @@
 import 'package:drift/drift.dart';
 
+import '../../core/constants/constants.dart';
 import '../local/database.dart';
 import '../local/tables/sync_ops_table.dart';
 import 'op_logger.dart';
 
-/// 预算仓库（Spec §3.4 / BK-P0-004）：写路径统一经 OpLogger 入队
+/// 预算仓库（Spec §3.4 / BK-P0-004）：写路径统一经 OpLogger 入队；
+/// 查询/写入按账本过滤（Spec §4.1 / BK-T-010）
 class BudgetRepository {
-  BudgetRepository(this.db, {OpLogger? opLogger}) : opLogger = opLogger ?? OpLogger(db);
+  BudgetRepository(this.db, {OpLogger? opLogger, this.bookId})
+      : opLogger = opLogger ?? OpLogger(db);
 
   final AppDatabase db;
   final OpLogger opLogger;
+  final String? bookId;
 
   static const _alertPrefix = 'budget_alert_';
+
+  Future<String> _bookId() async => bookId ?? kDefaultBookId;
 
   Future<int> createBudget({
     required int? categoryId,
@@ -19,9 +25,11 @@ class BudgetRepository {
     required int amountMinor,
     int threshold = 80,
   }) async {
+    final currentBookId = await _bookId();
     return db.transaction(() async {
       final remoteId = opLogger.newUuid();
       final id = await db.into(db.budgets).insert(BudgetsCompanion.insert(
+            bookId: Value(currentBookId),
             remoteId: Value(remoteId),
             categoryId: Value(categoryId),
             period: period,
@@ -33,6 +41,7 @@ class BudgetRepository {
         entityId: id,
         remoteId: remoteId,
         op: SyncOpCode.c,
+        bookId: currentBookId,
         payload: {
           'id': id,
           'category_id': categoryId == null ? null : await _remoteIdOf(categoryId),
@@ -72,6 +81,7 @@ class BudgetRepository {
         entityId: id,
         remoteId: budget.remoteId!,
         op: SyncOpCode.d,
+        bookId: await _bookId(),
       );
     });
   }
@@ -88,6 +98,7 @@ class BudgetRepository {
       entityId: id,
       remoteId: budget.remoteId!,
       op: op,
+      bookId: await _bookId(),
       payload: {
         'id': id,
         'category_id': budget.categoryId == null ? null : await _remoteIdOf(budget.categoryId!),
@@ -98,8 +109,11 @@ class BudgetRepository {
     );
   }
 
-  Future<List<Budget>> listBudgets() {
-    final q = db.select(db.budgets)..orderBy([(t) => OrderingTerm.asc(t.id)]);
+  Future<List<Budget>> listBudgets() async {
+    final currentBookId = await _bookId();
+    final q = db.select(db.budgets)
+      ..where((t) => t.bookId.equals(currentBookId))
+      ..orderBy([(t) => OrderingTerm.asc(t.id)]);
     return q.get();
   }
 
@@ -109,14 +123,16 @@ class BudgetRepository {
     required DateTime start,
     required DateTime end,
   }) async {
+    final currentBookId = await _bookId();
     final query = db.customSelect(
       'SELECT COALESCE(SUM(-amount_minor), 0) AS spent '
       'FROM transactions '
-      'WHERE type = ? AND deleted_at IS NULL '
+      'WHERE type = ? AND deleted_at IS NULL AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
       '${categoryId != null ? 'AND category_id = ?' : ''}',
       variables: [
         Variable.withString('expense'),
+        Variable.withString(currentBookId),
         Variable.withDateTime(start),
         Variable.withDateTime(end),
         if (categoryId != null) Variable.withInt(categoryId),

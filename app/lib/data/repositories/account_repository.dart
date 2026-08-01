@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/constants/constants.dart';
 import '../../core/errors/repository_exceptions.dart';
 import '../local/database.dart';
 import '../local/tables/accounts_table.dart';
@@ -7,12 +8,17 @@ import '../local/tables/sync_ops_table.dart';
 import '../local/tables/transactions_table.dart';
 import 'op_logger.dart';
 
-/// 账户仓库（Spec §3.2 / BK-P0-002）：写路径统一经 OpLogger 入队
+/// 账户仓库（Spec §3.2 / BK-P0-002）：写路径统一经 OpLogger 入队；
+/// 查询/写入强制按账本过滤（Spec §4.1 / BK-T-010）
 class AccountRepository {
-  AccountRepository(this.db, {OpLogger? opLogger}) : opLogger = opLogger ?? OpLogger(db);
+  AccountRepository(this.db, {OpLogger? opLogger, this.bookId})
+      : opLogger = opLogger ?? OpLogger(db);
 
   final AppDatabase db;
   final OpLogger opLogger;
+  final String? bookId;
+
+  Future<String> _bookId() async => bookId ?? kDefaultBookId;
 
   Future<int> createAccount({
     required String name,
@@ -20,10 +26,12 @@ class AccountRepository {
     String currency = 'CNY',
     int initialBalance = 0,
   }) async {
+    final currentBookId = await _bookId();
     return db.transaction(() async {
       final now = DateTime.now().toUtc();
       final remoteId = opLogger.newUuid();
       final id = await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: Value(currentBookId),
             remoteId: Value(remoteId),
             accountType: type,
             name: name,
@@ -36,6 +44,7 @@ class AccountRepository {
         entityId: id,
         remoteId: remoteId,
         op: SyncOpCode.c,
+        bookId: currentBookId,
         payload: {
           'id': id,
           'type': type.name,
@@ -54,8 +63,10 @@ class AccountRepository {
     return (db.select(db.accounts)..where((t) => t.id.equals(id))).getSingle();
   }
 
-  Future<List<Account>> listAccounts({bool includeArchived = false}) {
+  Future<List<Account>> listAccounts({bool includeArchived = false}) async {
+    final currentBookId = await _bookId();
     final q = db.select(db.accounts)
+      ..where((t) => t.bookId.equals(currentBookId))
       ..orderBy([(t) => OrderingTerm.asc(t.name)]);
     if (!includeArchived) {
       q.where((t) => t.archived.equals(false));
@@ -111,11 +122,13 @@ class AccountRepository {
     required int amountMinor,
     required DateTime occurredAt,
   }) async {
+    final currentBookId = await _bookId();
     return db.transaction(() async {
       final now = DateTime.now().toUtc();
       final fromRemoteId = opLogger.newUuid();
       final pairedRemoteId = opLogger.newUuid();
       final fromId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
+            bookId: Value(currentBookId),
             remoteId: Value(fromRemoteId),
             accountId: fromAccountId,
             type: TransactionType.transfer,
@@ -125,6 +138,7 @@ class AccountRepository {
             updatedAt: now,
           ));
       final pairedId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
+            bookId: Value(currentBookId),
             remoteId: Value(pairedRemoteId),
             accountId: toAccountId,
             type: TransactionType.transfer,
@@ -145,6 +159,7 @@ class AccountRepository {
         entityId: fromId,
         remoteId: fromRemoteId,
         op: SyncOpCode.c,
+        bookId: currentBookId,
         payload: {
           'id': fromId,
           'account_id': fromAccountRef,
@@ -161,6 +176,7 @@ class AccountRepository {
         entityId: pairedId,
         remoteId: pairedRemoteId,
         op: SyncOpCode.c,
+        bookId: currentBookId,
         payload: {
           'id': pairedId,
           'account_id': toAccountRef,
@@ -188,6 +204,7 @@ class AccountRepository {
       entityId: id,
       remoteId: account.remoteId!,
       op: op,
+      bookId: await _bookId(),
       payload: {
         'id': id,
         'type': account.accountType.name,
@@ -202,12 +219,13 @@ class AccountRepository {
 
   /// 按日刷新账户快照缓存（余额 = initial + Σ流水，SQL 聚合）
   Future<void> refreshSnapshots(DateTime date) async {
+    final currentBookId = await _bookId();
     final endOfDay = DateTime.utc(date.year, date.month, date.day, 23, 59, 59);
     final totals = await db.customSelect(
       'SELECT account_id, SUM(amount_minor) AS total '
-      'FROM transactions WHERE deleted_at IS NULL AND occurred_at <= ? '
+      'FROM transactions WHERE deleted_at IS NULL AND occurred_at <= ? AND book_id = ? '
       'GROUP BY account_id',
-      variables: [Variable.withDateTime(endOfDay)],
+      variables: [Variable.withDateTime(endOfDay), Variable.withString(currentBookId)],
     ).get();
 
     final day = _dayKey(date);

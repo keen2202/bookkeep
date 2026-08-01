@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
@@ -39,7 +40,8 @@ void main() {
       merger: SyncMerger(db),
       email: email,
       password: password,
-      bookId: bookId ?? await logger.ensureBookId(),
+      // 默认测试账本 = kDefaultBookId（与直接插入/入队行一致，BK-T-010）
+      bookId: bookId ?? kDefaultBookId,
     );
   }
 
@@ -114,7 +116,7 @@ void main() {
   test('offline sync fails into error phase and recovers with all 100 ops and no duplicates', () async {
     await setUpEngine();
     for (var i = 0; i < 100; i++) {
-      await logger.enqueue(entity: 'transaction', entityId: i, remoteId: logger.newUuid(), op: SyncOpCode.c, payload: {'amount_minor': -i});
+      await logger.enqueue(entity: 'transaction', entityId: i, remoteId: logger.newUuid(), op: SyncOpCode.c, bookId: kDefaultBookId, payload: {'amount_minor': -i});
     }
     server.offline = true;
 
@@ -236,7 +238,6 @@ void main() {
       opLogger: loggerA,
       api: server,
       tokenStore: InMemoryTokenStore(),
-      merger: SyncMerger(dbA),
       email: 'a@test.local',
       password: 'password-123',
       bookId: bookId,
@@ -247,7 +248,6 @@ void main() {
       opLogger: loggerB,
       api: server,
       tokenStore: InMemoryTokenStore(),
-      merger: SyncMerger(dbB),
       email: 'b@test.local',
       password: 'password-123',
       bookId: bookId,
@@ -257,6 +257,7 @@ void main() {
     final accountRemote = loggerA.newUuid();
     final txRemote = loggerA.newUuid();
     await dbA.into(dbA.accounts).insert(AccountsCompanion.insert(
+          bookId: const Value(bookId),
           remoteId: Value(accountRemote),
           accountType: AccountType.cash,
           name: '钱包',
@@ -264,6 +265,7 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await dbA.into(dbA.transactions).insert(TransactionsCompanion.insert(
+          bookId: const Value(bookId),
           remoteId: Value(txRemote),
           accountId: 1,
           type: TransactionType.expense,
@@ -272,8 +274,8 @@ void main() {
           occurredAt: DateTime.utc(2026, 8, 1, 12),
           updatedAt: DateTime.utc(2026, 8, 1, 12),
         ));
-    await loggerA.enqueue(entity: 'account', entityId: 1, remoteId: accountRemote, op: SyncOpCode.c, payload: {'type': 'cash', 'name': '钱包', 'currency': 'CNY', 'initial_balance': 0, 'archived': false});
-    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.c, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -100, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': null, 'auto_generated': false});
+    await loggerA.enqueue(entity: 'account', entityId: 1, remoteId: accountRemote, op: SyncOpCode.c, bookId: bookId, payload: {'type': 'cash', 'name': '钱包', 'currency': 'CNY', 'initial_balance': 0, 'archived': false});
+    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.c, bookId: bookId, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -100, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': null, 'auto_generated': false});
     await engineA.sync();
 
     // B 同步拿到 A 的数据
@@ -283,7 +285,7 @@ void main() {
     // A 修改并同步（lamport 3）
     await (dbA.update(dbA.transactions)..where((t) => t.id.equals(1)))
         .write(const TransactionsCompanion(amountMinor: Value(-300), note: Value('A改')));
-    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.u, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -300, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'A改', 'auto_generated': false});
+    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.u, bookId: bookId, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -300, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'A改', 'auto_generated': false});
     await engineA.sync();
 
     // B 已看到 A 的修改（远端 lamport 3）后再改 → lamport 4 > 3，B 必胜
@@ -292,7 +294,7 @@ void main() {
     expect(bTx.note, 'A改');
     await (dbB.update(dbB.transactions)..where((t) => t.id.equals(bTx.id)))
         .write(const TransactionsCompanion(amountMinor: Value(-500), note: Value('B改')));
-    await loggerB.enqueue(entity: 'transaction', entityId: bTx.id, remoteId: txRemote, op: SyncOpCode.u, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -500, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'B改', 'auto_generated': false});
+    await loggerB.enqueue(entity: 'transaction', entityId: bTx.id, remoteId: txRemote, op: SyncOpCode.u, bookId: bookId, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -500, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'B改', 'auto_generated': false});
     await engineB.sync();
 
     // 双方再同步 → 收敛到 B 的修改
@@ -321,7 +323,6 @@ void main() {
       opLogger: loggerA,
       api: server,
       tokenStore: InMemoryTokenStore(),
-      merger: SyncMerger(dbA),
       email: 'a@test.local',
       password: 'password-123',
       bookId: bookId,
@@ -332,7 +333,6 @@ void main() {
       opLogger: loggerB,
       api: server,
       tokenStore: InMemoryTokenStore(),
-      merger: SyncMerger(dbB),
       email: 'b@test.local',
       password: 'password-123',
       bookId: bookId,
@@ -342,6 +342,7 @@ void main() {
     final accountRemote = loggerA.newUuid();
     final txRemote = loggerA.newUuid();
     await dbA.into(dbA.accounts).insert(AccountsCompanion.insert(
+          bookId: const Value(bookId),
           remoteId: Value(accountRemote),
           accountType: AccountType.cash,
           name: '钱包',
@@ -349,6 +350,7 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await dbA.into(dbA.transactions).insert(TransactionsCompanion.insert(
+          bookId: const Value(bookId),
           remoteId: Value(txRemote),
           accountId: 1,
           type: TransactionType.expense,
@@ -357,19 +359,19 @@ void main() {
           occurredAt: DateTime.utc(2026, 8, 1, 12),
           updatedAt: DateTime.utc(2026, 8, 1, 12),
         ));
-    await loggerA.enqueue(entity: 'account', entityId: 1, remoteId: accountRemote, op: SyncOpCode.c, payload: {'type': 'cash', 'name': '钱包', 'currency': 'CNY', 'initial_balance': 0, 'archived': false});
-    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.c, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -100, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': null, 'auto_generated': false});
+    await loggerA.enqueue(entity: 'account', entityId: 1, remoteId: accountRemote, op: SyncOpCode.c, bookId: bookId, payload: {'type': 'cash', 'name': '钱包', 'currency': 'CNY', 'initial_balance': 0, 'archived': false});
+    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.c, bookId: bookId, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -100, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': null, 'auto_generated': false});
     await engineA.sync();
     await engineB.sync();
 
     // 双方各自并发修改（均未看到对方的修改）
     await (dbA.update(dbA.transactions)..where((t) => t.id.equals(1)))
         .write(const TransactionsCompanion(amountMinor: Value(-300), note: Value('A改')));
-    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.u, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -300, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'A改', 'auto_generated': false});
+    await loggerA.enqueue(entity: 'transaction', entityId: 1, remoteId: txRemote, op: SyncOpCode.u, bookId: bookId, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -300, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'A改', 'auto_generated': false});
     final bTx = await dbB.select(dbB.transactions).getSingle();
     await (dbB.update(dbB.transactions)..where((t) => t.id.equals(bTx.id)))
         .write(const TransactionsCompanion(amountMinor: Value(-500), note: Value('B改')));
-    await loggerB.enqueue(entity: 'transaction', entityId: bTx.id, remoteId: txRemote, op: SyncOpCode.u, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -500, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'B改', 'auto_generated': false});
+    await loggerB.enqueue(entity: 'transaction', entityId: bTx.id, remoteId: txRemote, op: SyncOpCode.u, bookId: bookId, payload: {'account_id': accountRemote, 'category_id': null, 'type': 'expense', 'amount_minor': -500, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': 'B改', 'auto_generated': false});
 
     await engineA.sync();
     await engineB.sync();

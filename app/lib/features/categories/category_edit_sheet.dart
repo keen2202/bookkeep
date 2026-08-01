@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/tables/categories_table.dart';
-import 'categories_page.dart' show categoryRepositoryProvider, categoriesViewModelProvider;
+import '../books/books_providers.dart' show categoryRepositoryProvider;
+import 'categories_page.dart' show categoriesViewModelProvider;
 
 /// 新建/编辑分类（Spec §3.3 / BK-P0-003）
 class CategoryEditSheet extends ConsumerStatefulWidget {

@@ -45,4 +45,15 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   revoked_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS invite_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_hash TEXT NOT NULL UNIQUE,
+  book_id UUID NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('editor', 'viewer')),
+  created_by UUID NOT NULL REFERENCES users(id),
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;

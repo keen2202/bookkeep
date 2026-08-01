@@ -3,16 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
-import '../../data/local/database_provider.dart';
-import '../../data/repositories/budget_repository.dart';
 import '../../domain/services/budget_progress_calculator.dart';
+import '../auth_lock/lock_controller.dart';
+import '../books/books_providers.dart' show budgetRepositoryProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'budget_edit_sheet.dart';
 import 'budget_progress_bar.dart';
-
-final budgetRepositoryProvider = Provider<BudgetRepository>((ref) {
-  return BudgetRepository(ref.watch(databaseProvider));
-});
 
 class BudgetWithProgress {
   const BudgetWithProgress({required this.budget, required this.progress});
@@ -90,16 +86,18 @@ class BudgetsPage extends ConsumerWidget {
   }
 }
 
-class _BudgetCard extends StatelessWidget {
+class _BudgetCard extends ConsumerWidget {
   const _BudgetCard({required this.item, required this.categoryName});
 
   final BudgetWithProgress item;
   final String categoryName;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final progress = item.progress;
     final theme = Theme.of(context);
+    final masked = ref.watch(amountMaskProvider);
+    final money = masked ? maskedMoney() : null;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -111,7 +109,7 @@ class _BudgetCard extends StatelessWidget {
               children: [
                 Text(categoryName, style: theme.textTheme.titleMedium),
                 Text(
-                  '${formatMoney(progress.spentMinor)} / ${formatMoney(item.budget.amountMinor)}',
+                  '${money ?? formatMoney(progress.spentMinor)} / ${money ?? formatMoney(item.budget.amountMinor)}',
                   style: theme.textTheme.bodyMedium,
                 ),
               ],
@@ -122,9 +120,9 @@ class _BudgetCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('剩余 ${formatMoney(progress.remainingMinor)}',
+                Text('剩余 ${money ?? formatMoney(progress.remainingMinor)}',
                     style: theme.textTheme.bodySmall),
-                Text('日均 ${formatMoney(progress.dailyBudgetMinor)}',
+                Text('日均 ${money ?? formatMoney(progress.dailyBudgetMinor)}',
                     style: theme.textTheme.bodySmall),
                 if (progress.exceeded)
                   Text('已超支', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error))

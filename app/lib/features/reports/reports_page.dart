@@ -3,35 +3,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database_provider.dart';
 import '../../data/repositories/reports_repository.dart';
+import '../accounts/accounts_providers.dart' show exchangeRateServiceProvider;
+import '../auth_lock/lock_controller.dart';
+import '../books/books_providers.dart' show reportsRepositoryProvider;
 import 'charts/report_charts.dart';
-
-final reportsRepositoryProvider = Provider<ReportsRepository>((ref) {
-  return ReportsRepository(ref.watch(databaseProvider));
-});
 
 typedef ReportWindow = ({DateTime start, DateTime end});
 
+/// 报表汇率表（非主币种 → kRateScale 刻度；Spec §4.5 折算主币种）
+final reportRatesProvider = FutureProvider<Map<String, int>>((ref) async {
+  final service = ref.watch(exchangeRateServiceProvider);
+  final db = ref.watch(databaseProvider);
+  final currencies = await db.select(db.currencies).get();
+  final rates = <String, int>{};
+  for (final c in currencies) {
+    if (c.code == 'CNY') continue;
+    rates[c.code] = await service.rateScaled(c.code);
+  }
+  return rates;
+});
+
 final dailyTotalsProvider =
-    FutureProvider.family<List<DailyTotal>, ReportWindow>((ref, window) {
-  return ref.watch(reportsRepositoryProvider).dailyTotals(start: window.start, end: window.end);
+    FutureProvider.family<List<DailyTotal>, ReportWindow>((ref, window) async {
+  final rates = await ref.watch(reportRatesProvider.future);
+  return ref
+      .watch(reportsRepositoryProvider)
+      .dailyTotals(start: window.start, end: window.end, rates: rates);
 });
 
 final categoryBreakdownProvider =
-    FutureProvider.family<List<CategorySlice>, ReportWindow>((ref, window) {
+    FutureProvider.family<List<CategorySlice>, ReportWindow>((ref, window) async {
+  final rates = await ref.watch(reportRatesProvider.future);
   return ref
       .watch(reportsRepositoryProvider)
-      .categoryBreakdown(start: window.start, end: window.end);
+      .categoryBreakdown(start: window.start, end: window.end, rates: rates);
 });
 
 final periodBucketsProvider =
     FutureProvider.family<List<PeriodBucket>, ({ReportWindow window, ReportRange range})>(
-        (ref, key) {
+        (ref, key) async {
+  final rates = await ref.watch(reportRatesProvider.future);
   return ref.watch(reportsRepositoryProvider).periodBuckets(
         start: key.window.start,
         end: key.window.end,
         granularity: key.range == ReportRange.day || key.range == ReportRange.week
             ? BucketGranularity.week
             : BucketGranularity.month,
+        rates: rates,
       );
 });
 
@@ -79,6 +97,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     final daily = ref.watch(dailyTotalsProvider(window));
     final slices = ref.watch(categoryBreakdownProvider(window));
     final buckets = ref.watch(periodBucketsProvider((window: window, range: _range)));
+    // 隐私锁锁定/后台态强制脱敏（Spec §3.6），叠加用户手动隐藏金额开关
+    final hideAmounts = _hideAmounts || ref.watch(amountMaskProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -109,15 +129,15 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
               children: [
                 _Section(
                   title: '分类占比',
-                  child: slices.maybeWhen(data: (s) => CategoryPieChart(slices: s, hideAmounts: _hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
+                  child: slices.maybeWhen(data: (s) => CategoryPieChart(slices: s, hideAmounts: hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
                 ),
                 _Section(
                   title: '周期对比',
-                  child: buckets.maybeWhen(data: (b) => PeriodBarChart(buckets: b, hideAmounts: _hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
+                  child: buckets.maybeWhen(data: (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
                 ),
                 _Section(
                   title: '收支趋势',
-                  child: daily.maybeWhen(data: (d) => TrendLineChart(totals: d, hideAmounts: _hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
+                  child: daily.maybeWhen(data: (d) => TrendLineChart(totals: d, hideAmounts: hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
                 ),
               ],
             ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/tables/accounts_table.dart';
+import '../books/books_providers.dart' show accountRepositoryProvider;
 import 'account_card.dart' show accountTypeLabel;
 import 'accounts_providers.dart';
 

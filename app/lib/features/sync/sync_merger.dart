@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/constants/constants.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/accounts_table.dart';
 import '../../data/local/tables/categories_table.dart';
@@ -12,12 +13,14 @@ import '../../domain/services/lww_resolver.dart';
 /// 实体身份 = 各表 remote_id 列（uuid v4）；幂等：create 已存在即跳过；
 /// u/d 未找到目标时：update 按完整快照 upsert 物化（LWW 折叠场景），delete 跳过。
 /// 畸形 payload 单 op 跳过，不中断整批合并（评审 H1）。
+/// 合并结果归属 sync 引擎的账本（Spec §4.1 / BK-T-010）。
 class SyncMerger {
-  SyncMerger(this.db, {LwwResolver? resolver})
+  SyncMerger(this.db, {LwwResolver? resolver, this.bookId = kDefaultBookId})
       : _resolver = resolver ?? const LwwResolver();
 
   final AppDatabase db;
   final LwwResolver _resolver;
+  final String bookId;
 
   static const _entities = {'account', 'category', 'transaction', 'budget'};
 
@@ -124,6 +127,7 @@ class SyncMerger {
     final type = _enumFromName(p['type'], AccountType.values);
     if (type == null) return null;
     return db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: Value(bookId),
           remoteId: Value(remoteId),
           accountType: type,
           name: _str(p, 'name') ?? '',
@@ -140,6 +144,7 @@ class SyncMerger {
     final parentRef = _str(p, 'parent_id');
     final parentId = parentRef == null ? null : await _localIdByRemoteId('category', parentRef);
     return db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: Value(bookId),
           remoteId: Value(remoteId),
           parentId: Value(parentId),
           name: _str(p, 'name') ?? '',
@@ -168,6 +173,7 @@ class SyncMerger {
     final transferId = transferRef == null ? null : await _localIdByRemoteId('transaction', transferRef);
 
     return db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: Value(bookId),
           remoteId: Value(remoteId),
           accountId: accountId,
           categoryId: Value(categoryId),
@@ -188,6 +194,7 @@ class SyncMerger {
     final categoryRef = _str(p, 'category_id');
     final categoryId = categoryRef == null ? null : await _localIdByRemoteId('category', categoryRef);
     return db.into(db.budgets).insert(BudgetsCompanion.insert(
+          bookId: Value(bookId),
           remoteId: Value(remoteId),
           categoryId: Value(categoryId),
           period: _str(p, 'period') ?? '',
@@ -273,20 +280,24 @@ class SyncMerger {
   Future<int?> _localIdByRemoteId(String entity, String remoteId) async {
     switch (entity) {
       case 'account':
-        final row =
-            await (db.select(db.accounts)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
+        final row = await (db.select(db.accounts)
+              ..where((t) => t.remoteId.equals(remoteId) & t.bookId.equals(bookId)))
+            .getSingleOrNull();
         return row?.id;
       case 'category':
-        final row =
-            await (db.select(db.categories)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
+        final row = await (db.select(db.categories)
+              ..where((t) => t.remoteId.equals(remoteId) & t.bookId.equals(bookId)))
+            .getSingleOrNull();
         return row?.id;
       case 'transaction':
-        final row =
-            await (db.select(db.transactions)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
+        final row = await (db.select(db.transactions)
+              ..where((t) => t.remoteId.equals(remoteId) & t.bookId.equals(bookId)))
+            .getSingleOrNull();
         return row?.id;
       case 'budget':
-        final row =
-            await (db.select(db.budgets)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
+        final row = await (db.select(db.budgets)
+              ..where((t) => t.remoteId.equals(remoteId) & t.bookId.equals(bookId)))
+            .getSingleOrNull();
         return row?.id;
     }
     return null;

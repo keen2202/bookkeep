@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
-import '../../data/local/database_provider.dart';
 import '../../data/local/tables/categories_table.dart';
 import '../../data/local/tables/transactions_table.dart';
-import '../../data/repositories/account_repository.dart';
-import '../../data/repositories/transaction_repository.dart';
 import '../../domain/usecases/create_transaction.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
 import '../accounts/accounts_providers.dart';
+import '../books/books_providers.dart' show accountRepositoryProvider, transactionRepositoryProvider;
 import '../budgets/budgets_page.dart' show budgetsViewModelProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'amount_keyboard.dart';
@@ -31,19 +29,18 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   @override
   void initState() {
     super.initState();
+    // 经 provider 注入当前账本上下文（Spec §4.1：写路径归属当前账本）
     _controller = QuickEntryController(
-      createTransaction: CreateTransaction(
-        TransactionRepository(ref.read(databaseProvider)),
-      ),
-      transactionRepository: TransactionRepository(ref.read(databaseProvider)),
-      accountRepository: AccountRepository(ref.read(databaseProvider)),
+      createTransaction: CreateTransaction(ref.read(transactionRepositoryProvider)),
+      transactionRepository: ref.read(transactionRepositoryProvider),
+      accountRepository: ref.read(accountRepositoryProvider),
     );
     _controller.addListener(_onController);
     _loadDefaults();
   }
 
   Future<void> _loadDefaults() async {
-    final repo = TransactionRepository(ref.read(databaseProvider));
+    final repo = ref.read(transactionRepositoryProvider);
     for (final type in [TransactionType.expense, TransactionType.income]) {
       final defaults = await repo.lastDefaults(type);
       if (defaults == null) continue;

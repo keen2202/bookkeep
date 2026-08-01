@@ -6,15 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/repository_exceptions.dart';
 import '../../data/local/database.dart';
-import '../../data/local/database_provider.dart';
-import '../../data/repositories/category_repository.dart';
 import '../../domain/models/category_seed.dart';
 import '../../shared/utils/category_icon.dart';
+import '../books/books_providers.dart' show categoryRepositoryProvider;
 import 'category_edit_sheet.dart';
-
-final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
-  return CategoryRepository(ref.watch(databaseProvider));
-});
 
 /// 系统分类 seed（从 assets 加载；测试可 override）
 final categorySeedProvider = FutureProvider<CategorySeed>((ref) async {

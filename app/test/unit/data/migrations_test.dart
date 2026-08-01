@@ -143,7 +143,7 @@ void main() {
     await db1.close();
 
     final db2 = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db2.schemaVersion, 3);
+    expect(db2.schemaVersion, 6);
     await db2.close();
   });
 
