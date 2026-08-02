@@ -1,0 +1,163 @@
+# Flutter 自动化打包：Android（APK + AAB）+ iOS（IPA）
+# 触发：推送 main/master + 手动触发（workflow_dispatch）
+#
+# 签名配置说明（占位）：
+#   Android：在仓库 Secrets 中配置 KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD，
+#     工作流会生成 android/key.properties 并解码密钥库；未配置时回退 debug 签名。
+#     注意：需在 android/app/build.gradle.kts 中接入 release signingConfig 引用 key.properties。
+#   iOS：在仓库 Secrets 中配置 CERTIFICATE_P12_BASE64 / P12_PASSWORD / KEYCHAIN_PASSWORD /
+#     PROVISIONING_PROFILE_BASE64 / EXPORT_METHOD，工作流会创建钥匙串并导入证书与描述文件；
+#     未配置时以 --no-codesign 生成未签名 IPA。
+
+name: Flutter Release Build
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Build Android (APK + AAB)
+    runs-on: ubuntu-latest
+    # ---- Android 签名占位（对应仓库 Secrets；为空则 release 使用 debug 签名）----
+    # KEYSTORE_BASE64:  base64 编码的 .jks 密钥库（生成：base64 -w0 android/app/upload-keystore.jks）
+    # KEYSTORE_PASSWORD: 密钥库口令
+    # KEY_ALIAS:         密钥别名
+    # KEY_PASSWORD:      密钥口令
+    env:
+      KEYSTORE_BASE64: ''
+      KEYSTORE_PASSWORD: ''
+      KEY_ALIAS: ''
+      KEY_PASSWORD: ''
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      # Java 17：Flutter/AGP 8.x 构建要求
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5' # 指定 Flutter SDK 版本（按项目需要调整）
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Configure signing (key.properties)
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::未配置 Android 签名（KEYSTORE_BASE64 为空），release 产物将使用 debug 签名"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Build release App Bundle
+        run: flutter build appbundle --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: Build iOS (IPA)
+    runs-on: macos-latest
+    # ---- iOS 签名占位（对应仓库 Secrets；为空则以 --no-codesign 构建）----
+    # CERTIFICATE_P12_BASE64:       base64 编码的发布证书 .p12（生成：base64 -w0 cert.p12）
+    # P12_PASSWORD:                 p12 证书口令
+    # KEYCHAIN_PASSWORD:            临时钥匙串口令（任意字符串，仅构建期使用）
+    # PROVISIONING_PROFILE_BASE64:  base64 编码的描述文件 .mobileprovision
+    # EXPORT_METHOD:                导出方式：app-store（TestFlight/上架）或 ad-hoc（内测）
+    env:
+      CERTIFICATE_P12_BASE64: ''
+      P12_PASSWORD: ''
+      KEYCHAIN_PASSWORD: ''
+      PROVISIONING_PROFILE_BASE64: ''
+      EXPORT_METHOD: app-store
+      # iOS 部署目标（写入 ios/Podfile 的 platform 行；Podfile 由 Flutter 首次构建自动生成）
+      IOS_DEPLOYMENT_TARGET: '13.0'
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5' # 指定 Flutter SDK 版本（按项目需要调整）
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # CocoaPods 已预装在 GitHub macOS runner；此处兜底安装
+      - name: Ensure CocoaPods
+        run: which pod || gem install cocoapods --no-document
+
+      - name: Apply iOS deployment target
+        run: |
+          if [ -f ios/Podfile ]; then
+            sed -i '' "s/platform :ios, '.*'/platform :ios, '${IOS_DEPLOYMENT_TARGET}'/" ios/Podfile
+          fi
+
+      - name: Import signing certificate (keychain)
+        run: |
+          if [ -z "$CERTIFICATE_P12_BASE64" ]; then
+            echo "No iOS signing configured - skip certificate import"
+            exit 0
+          fi
+          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+          echo "$CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Install provisioning profile
+        run: |
+          if [ -z "$PROVISIONING_PROFILE_BASE64" ]; then
+            echo "No provisioning profile configured - skip"
+            exit 0
+          fi
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode \
+            > "$HOME/Library/MobileDevice/Provisioning Profiles/bookkeep.mobileprovision"
+
+      - name: Build release IPA
+        run: |
+          if [ -n "$CERTIFICATE_P12_BASE64" ]; then
+            flutter build ipa --release --export-method "$EXPORT_METHOD"
+          else
+            echo "::warning::未配置 iOS 签名（CERTIFICATE_P12_BASE64 为空），生成未签名 IPA"
+            flutter build ipa --release --no-codesign
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-release
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 14
