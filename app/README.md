@@ -1,17 +1,12 @@
 # bookkeep_app
 
-A new Flutter project.
+Flutter 客户端工程（bookkeep 极速记账 App）。
 
-## Getting Started
+项目整体说明（架构、功能、同步协议、快速开始、测试与质量门禁）见仓库根目录 [README.md](../README.md)。
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
+Flutter 入门资源：
 
 - [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
 - [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- [Flutter 在线文档](https://docs.flutter.dev/)（tutorials、samples、API 参考）
