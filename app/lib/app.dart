@@ -9,6 +9,8 @@ import 'features/auth_lock/lock_settings.dart';
 import 'features/auto_capture/csv_import/csv_import_page.dart' show AutoCaptureSettingsEntry;
 import 'features/backup/backup_page.dart';
 import 'features/books/book_switcher.dart';
+import 'features/books/books_page.dart' show serverBooksProvider;
+import 'features/books/books_providers.dart' show currentRoleProvider;
 import 'features/budgets/budgets_page.dart';
 import 'features/calendar/calendar_page.dart';
 import 'features/categories/categories_page.dart';
@@ -50,43 +52,51 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
       builder: lockGateBuilder,
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
-        builder: (navContext) => Scaffold(
-          body: switch (_tab) {
-            0 => const CategoriesPage(),
-            1 => const AccountsPage(),
-            2 => const BudgetsPage(),
-            3 => const ReportsPage(),
-            4 => const CalendarPage(),
-            _ => const SizedBox.shrink(),
-          },
-          floatingActionButton: FloatingActionButton(
-            heroTag: 'quick_entry_fab', // 与分类页 FAB 区分，避免 Hero 标签冲突
-            onPressed: () => _openQuickEntry(navContext),
-            tooltip: '记一笔',
-            child: const Icon(Icons.add),
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _tab,
-            onDestinationSelected: (i) => setState(() => _tab = i),
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.category_outlined), label: '分类'),
-              NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: '账户'),
-              NavigationDestination(icon: Icon(Icons.pie_chart_outline), label: '预算'),
-              NavigationDestination(icon: Icon(Icons.bar_chart), label: '报表'),
-              NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: '日历'),
-            ],
-          ),
-          appBar: AppBar(
-            title: const Text('bookkeep'),
-            actions: [
-              const BookSwitcher(),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => _showSettings(navContext),
-              ),
-            ],
-          ),
-        ),
+        builder: (navContext) {
+          // 启动即拉取服务端账本角色（登录态；离线忽略，保持缓存），
+          // 驱动 viewer 写拦截（Spec §4.1 UI + 服务端双校验）
+          ref.watch(serverBooksProvider);
+          final viewer = ref.watch(currentRoleProvider) == 'viewer';
+          return Scaffold(
+            body: switch (_tab) {
+              0 => const CategoriesPage(),
+              1 => const AccountsPage(),
+              2 => const BudgetsPage(),
+              3 => const ReportsPage(),
+              4 => const CalendarPage(),
+              _ => const SizedBox.shrink(),
+            },
+            floatingActionButton: viewer
+                ? null
+                : FloatingActionButton(
+                    heroTag: 'quick_entry_fab', // 与分类页 FAB 区分，避免 Hero 标签冲突
+                    onPressed: () => _openQuickEntry(navContext),
+                    tooltip: '记一笔',
+                    child: const Icon(Icons.add),
+                  ),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _tab,
+              onDestinationSelected: (i) => setState(() => _tab = i),
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.category_outlined), label: '分类'),
+                NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: '账户'),
+                NavigationDestination(icon: Icon(Icons.pie_chart_outline), label: '预算'),
+                NavigationDestination(icon: Icon(Icons.bar_chart), label: '报表'),
+                NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: '日历'),
+              ],
+            ),
+            appBar: AppBar(
+              title: const Text('bookkeep'),
+              actions: [
+                const BookSwitcher(),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  onPressed: () => _showSettings(navContext),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

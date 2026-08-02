@@ -8,7 +8,8 @@ import '../../core/errors/repository_exceptions.dart';
 import '../../data/local/database.dart';
 import '../../domain/models/category_seed.dart';
 import '../../shared/utils/category_icon.dart';
-import '../books/books_providers.dart' show categoryRepositoryProvider;
+import '../books/books_providers.dart'
+    show categoryRepositoryProvider, currentRoleProvider;
 import 'category_edit_sheet.dart';
 
 /// 系统分类 seed（从 assets 加载；测试可 override）
@@ -32,26 +33,33 @@ class CategoriesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final categories = ref.watch(categoriesViewModelProvider);
+    final viewer = ref.watch(currentRoleProvider) == 'viewer';
     return Scaffold(
       appBar: AppBar(title: const Text('分类')),
       body: categories.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),
-        data: (list) => _CategoryList(categories: list),
+        data: (list) => _CategoryList(categories: list, viewer: viewer),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => CategoryEditSheet.show(context),
-        tooltip: '新建分类',
-        child: const Icon(Icons.add),
-      ),
+      // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
+      floatingActionButton: viewer
+          ? null
+          : FloatingActionButton(
+              onPressed: () => CategoryEditSheet.show(context),
+              tooltip: '新建分类',
+              child: const Icon(Icons.add),
+            ),
     );
   }
 }
 
 class _CategoryList extends ConsumerWidget {
-  const _CategoryList({required this.categories});
+  const _CategoryList({required this.categories, required this.viewer});
 
   final List<Category> categories;
+
+  /// viewer 只读：隐藏编辑/删除入口（Spec §4.1 权限矩阵）
+  final bool viewer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,13 +69,15 @@ class _CategoryList extends ConsumerWidget {
         for (final parent in parents) ...[
           _ParentHeader(
             parent: parent,
-            onMore: parent.isSystem ? null : () => _showActions(context, ref, parent),
+            onMore: !viewer && !parent.isSystem
+                ? () => _showActions(context, ref, parent)
+                : null,
           ),
           for (final child in categories.where((c) => c.parentId == parent.id))
             ListTile(
               leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
               title: Text(child.name),
-              trailing: child.isSystem
+              trailing: child.isSystem || viewer
                   ? null
                   : IconButton(
                       icon: const Icon(Icons.more_vert),

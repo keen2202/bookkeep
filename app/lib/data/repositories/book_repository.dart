@@ -42,6 +42,22 @@ class BookRepository {
         );
   }
 
+  /// 当前用户在该账本的角色（Spec §4.1 权限矩阵）；服务端为权威，
+  /// 此处为本地缓存（离线时保持最近一次同步值），未知默认 owner。
+  Future<String> roleOf(String bookId) async {
+    final rows = await (db.select(db.appMeta)
+          ..where((t) => t.key.equals('book_role_$bookId')))
+        .get();
+    return rows.isEmpty ? 'owner' : rows.single.value;
+  }
+
+  Future<void> setRole(String bookId, String role) async {
+    await db.into(db.appMeta).insert(
+          AppMetaCompanion.insert(key: 'book_role_$bookId', value: role),
+          onConflict: DoUpdate((_) => AppMetaCompanion(value: Value(role))),
+        );
+  }
+
   /// 确保默认账本在 books 表中存在（v4 迁移后必存在，防御性回填）
   Future<String> ensureDefaultBook() async {
     var id = await db.currentBookId();

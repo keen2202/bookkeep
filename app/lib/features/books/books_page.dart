@@ -55,6 +55,10 @@ class BooksPage extends ConsumerWidget {
                       ? null
                       : () async {
                           await ref.read(bookRepositoryProvider).switchBook(book.id);
+                          // 同步新账本角色到写拦截（离线用本地缓存）
+                          final role =
+                              await ref.read(bookRepositoryProvider).roleOf(book.id);
+                          ref.read(currentRoleProvider.notifier).state = role;
                           ref.invalidate(booksViewModelProvider);
                           ref.invalidate(currentBookProvider);
                           if (!context.mounted) return;
@@ -129,7 +133,10 @@ class BooksPage extends ConsumerWidget {
 }
 
 /// 账本级操作（邀请/成员）统一入口：账本页右上角
+/// 权限矩阵（Spec §4.1）：viewer 不可发邀请；成员管理任何成员可查看。
 Future<void> showBookActions(BuildContext context, {required String bookId}) async {
+  final role = ProviderScope.containerOf(context).read(currentRoleProvider);
+  final viewer = role == 'viewer';
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -138,20 +145,21 @@ Future<void> showBookActions(BuildContext context, {required String bookId}) asy
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('邀请成员'),
-              onTap: () {
-                Navigator.pop(context);
-                ShareInviteSheet.show(context, bookId: bookId);
-              },
-            ),
+            if (!viewer)
+              ListTile(
+                leading: const Icon(Icons.share),
+                title: const Text('邀请成员'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ShareInviteSheet.show(context, bookId: bookId);
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.group_outlined),
               title: const Text('成员管理'),
               onTap: () {
                 Navigator.pop(context);
-                MemberManagerSheet.show(context, bookId: bookId);
+                MemberManagerSheet.show(context, bookId: bookId, callerRole: role);
               },
             ),
           ],
@@ -162,6 +170,35 @@ Future<void> showBookActions(BuildContext context, {required String bookId}) asy
 }
 
 /// 云端 API 与登录态（baseUrl 见 constants；token 来自安全存储）
-BooksApi booksApi() => BooksApi(baseUrl: kServerBaseUrl);
+/// 工厂与登录态读取经可覆盖钩子暴露，widget 测试注入内存实现。
+BooksApi booksApi() => booksApiFactory();
 
-Future<String?> accessToken() => SecureTokenStore().read().then((t) => t?.accessToken);
+Future<String?> accessToken() => accessTokenHook();
+
+@visibleForTesting
+BooksApi Function() booksApiFactory = () => BooksApi(baseUrl: kServerBaseUrl);
+
+@visibleForTesting
+Future<String?> Function() accessTokenHook =
+    () => SecureTokenStore().read().then((t) => t?.accessToken);
+
+/// 服务端账本与成员角色（Spec §4.1）：登录后拉取，角色持久化到本地缓存
+/// （BookRepository.roleOf/setRole），并同步当前账本角色到 currentRoleProvider；
+/// 未登录/离线保持缓存（默认 owner），服务端始终为权威校验。
+final serverBooksProvider = FutureProvider<List<BookDto>>((ref) async {
+  final token = await accessToken();
+  if (token == null) return const [];
+  final books = await booksApi().listBooks(accessToken: token);
+  final repo = ref.read(bookRepositoryProvider);
+  for (final book in books) {
+    await repo.setRole(book.id, book.role);
+  }
+  final currentId = ref.read(currentBookIdProvider);
+  for (final book in books) {
+    if (book.id == currentId) {
+      ref.read(currentRoleProvider.notifier).state = book.role;
+      break;
+    }
+  }
+  return books;
+});

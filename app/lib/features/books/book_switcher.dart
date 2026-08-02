@@ -26,6 +26,9 @@ class BookSwitcher extends ConsumerWidget {
         }
         if (value == currentId) return;
         await ref.read(bookRepositoryProvider).switchBook(value);
+        // 同步新账本角色到写拦截（离线用本地缓存）
+        final role = await ref.read(bookRepositoryProvider).roleOf(value);
+        ref.read(currentRoleProvider.notifier).state = role;
         ref.invalidate(booksViewModelProvider);
         ref.invalidate(currentBookProvider);
         if (context.mounted) {

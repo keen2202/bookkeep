@@ -18,6 +18,11 @@ final bookRepositoryProvider = Provider<BookRepository>((ref) {
 /// （Spec §4.1：查询层强制 book 过滤，杜绝越权读取）
 final currentBookIdProvider = StateProvider<String>((ref) => kDefaultBookId);
 
+/// 当前用户在当前账本的角色（Spec §4.1 权限矩阵）。未知时默认 owner——
+/// 拦截只做收紧（viewer 禁写），服务端始终为权威校验；值来自
+/// serverBooksProvider（登录拉取）与本地缓存（离线）。
+final currentRoleProvider = StateProvider<String>((ref) => 'owner');
+
 final booksViewModelProvider = FutureProvider<List<Book>>((ref) {
   return ref.watch(bookRepositoryProvider).listBooks();
 });

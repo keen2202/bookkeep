@@ -60,6 +60,9 @@ class BooksApi {
         'DELETE' => await _client
             .delete(uri, headers: headers)
             .timeout(const Duration(seconds: 15)),
+        'PATCH' => await _client
+            .patch(uri, headers: headers, body: body == null ? null : jsonEncode(body))
+            .timeout(const Duration(seconds: 15)),
         _ => await _client
             .post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
             .timeout(const Duration(seconds: 15)),
@@ -130,6 +133,20 @@ class BooksApi {
     final res =
         await _request('DELETE', '/books/$bookId/members/$userId', accessToken: accessToken);
     if (res.statusCode != 204) {
+      throw SyncApiException(res.statusCode, '/books/$bookId/members/$userId');
+    }
+  }
+
+  /// 变更成员角色（仅 owner；服务端 PATCH /books/:id/members/:userId）
+  Future<void> updateMemberRole(
+    String bookId,
+    String userId,
+    String role, {
+    required String accessToken,
+  }) async {
+    final res = await _request('PATCH', '/books/$bookId/members/$userId',
+        accessToken: accessToken, body: {'role': role});
+    if (res.statusCode != 200) {
       throw SyncApiException(res.statusCode, '/books/$bookId/members/$userId');
     }
   }

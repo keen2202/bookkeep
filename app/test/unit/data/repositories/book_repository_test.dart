@@ -50,6 +50,22 @@ void main() {
       expect((await repo.currentBook())!.name, '生意账本');
     });
 
+    test('角色持久化按账本独立，未知默认 owner，可覆盖更新', () async {
+      await repo.createLocalBook(id: bookA, name: 'A');
+      await repo.createLocalBook(id: bookB, name: 'B');
+
+      expect(await repo.roleOf(bookA), 'owner');
+      await repo.setRole(bookA, 'viewer');
+      await repo.setRole(bookB, 'editor');
+      expect(await repo.roleOf(bookA), 'viewer');
+      expect(await repo.roleOf(bookB), 'editor');
+
+      // 覆盖更新（角色变更后重新同步）
+      await repo.setRole(bookA, 'editor');
+      expect(await repo.roleOf(bookA), 'editor');
+      expect(await repo.roleOf(bookB), 'editor');
+    });
+
     test('账本间数据完全隔离（账户/流水/op 队列）', () async {
       await repo.createLocalBook(id: bookA, name: 'A');
       await repo.createLocalBook(id: bookB, name: 'B');

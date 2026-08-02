@@ -5,7 +5,8 @@ import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../../domain/services/budget_progress_calculator.dart';
 import '../auth_lock/lock_controller.dart';
-import '../books/books_providers.dart' show budgetRepositoryProvider;
+import '../books/books_providers.dart'
+    show budgetRepositoryProvider, currentRoleProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'budget_edit_sheet.dart';
 import 'budget_progress_bar.dart';
@@ -52,6 +53,7 @@ class BudgetsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final budgets = ref.watch(budgetsViewModelProvider);
     final categoriesAsync = ref.watch(categoriesViewModelProvider);
+    final viewer = ref.watch(currentRoleProvider) == 'viewer';
     return Scaffold(
       appBar: AppBar(title: const Text('预算')),
       body: budgets.when(
@@ -77,11 +79,14 @@ class BudgetsPage extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => BudgetEditSheet.show(context),
-        tooltip: '新建预算',
-        child: const Icon(Icons.add),
-      ),
+      // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
+      floatingActionButton: viewer
+          ? null
+          : FloatingActionButton(
+              onPressed: () => BudgetEditSheet.show(context),
+              tooltip: '新建预算',
+              child: const Icon(Icons.add),
+            ),
     );
   }
 }

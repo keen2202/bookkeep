@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../auth_lock/lock_controller.dart';
-import '../books/books_providers.dart' show accountRepositoryProvider;
+import '../books/books_providers.dart'
+    show accountRepositoryProvider, currentRoleProvider;
 import 'account_card.dart';
 import 'account_edit_sheet.dart';
 import 'accounts_providers.dart';
@@ -16,6 +17,7 @@ class AccountsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final viewModel = ref.watch(accountsViewModelProvider);
+    final viewer = ref.watch(currentRoleProvider) == 'viewer';
     return Scaffold(
       appBar: AppBar(title: const Text('账户')),
       body: viewModel.when(
@@ -58,11 +60,14 @@ class AccountsPage extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => AccountEditSheet.show(context),
-        tooltip: '新建账户',
-        child: const Icon(Icons.add),
-      ),
+      // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
+      floatingActionButton: viewer
+          ? null
+          : FloatingActionButton(
+              onPressed: () => AccountEditSheet.show(context),
+              tooltip: '新建账户',
+              child: const Icon(Icons.add),
+            ),
     );
   }
 }
@@ -82,6 +87,7 @@ class _AccountTile extends ConsumerWidget {
   }
 
   Future<void> _showActions(BuildContext context, WidgetRef ref) async {
+    if (ref.read(currentRoleProvider) == 'viewer') return;
     final repo = ref.read(accountRepositoryProvider);
     final action = await showModalBottomSheet<String>(
       context: context,

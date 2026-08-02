@@ -4,16 +4,21 @@ import '../sync/sync_api.dart';
 import 'books_api.dart';
 import 'books_page.dart' show accessToken, booksApi;
 
-/// 成员管理（Spec §4.1 / BK-T-010）：列表 + 移除（owner）；
+/// 成员管理（Spec §4.1 / BK-T-010）：列表 + 移除/改角色（仅 owner）；
 /// 未登录/不可达时优雅提示。
 class MemberManagerSheet extends StatefulWidget {
-  const MemberManagerSheet({super.key, required this.bookId});
+  const MemberManagerSheet({super.key, required this.bookId, this.callerRole = 'owner'});
 
   final String bookId;
 
-  static Future<void> show(BuildContext context, {required String bookId}) {
+  /// 当前调用者角色（Spec §4.1：仅 owner 可移除/改角色；由入口注入）
+  final String callerRole;
+
+  static Future<void> show(BuildContext context,
+      {required String bookId, String callerRole = 'owner'}) {
     return Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => MemberManagerSheet(bookId: bookId)),
+      MaterialPageRoute(
+          builder: (_) => MemberManagerSheet(bookId: bookId, callerRole: callerRole)),
     );
   }
 
@@ -61,6 +66,27 @@ class _MemberManagerSheetState extends State<MemberManagerSheet> {
         _busy = false;
         _error = '加载失败（${e.statusCode}）';
       });
+    }
+  }
+
+  Future<void> _changeRole(MemberDto member, String role) async {
+    try {
+      final token = await accessToken();
+      if (token == null) return;
+      await booksApi().updateMemberRole(widget.bookId, member.userId, role,
+          accessToken: token);
+      if (!mounted) return;
+      setState(() {
+        final i = _members?.indexWhere((m) => m.userId == member.userId);
+        if (i != null && i >= 0) {
+          _members![i] = MemberDto(userId: member.userId, email: member.email, role: role);
+        }
+      });
+    } on SyncApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.statusCode == 403 ? '仅 owner 可变更角色' : '变更失败')),
+      );
     }
   }
 
@@ -116,11 +142,31 @@ class _MemberManagerSheetState extends State<MemberManagerSheet> {
                             subtitle: Text(_roleLabel(member.role)),
                             trailing: member.role == 'owner'
                                 ? const Icon(Icons.admin_panel_settings)
-                                : IconButton(
-                                    icon: const Icon(Icons.person_remove_outlined),
-                                    tooltip: '移除',
-                                    onPressed: () => _remove(member),
-                                  ),
+                                : widget.callerRole == 'owner'
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          PopupMenuButton<String>(
+                                            icon: const Icon(Icons.swap_horiz),
+                                            tooltip: '变更角色',
+                                            onSelected: (role) => _changeRole(member, role),
+                                            itemBuilder: (context) => [
+                                              if (member.role != 'editor')
+                                                const PopupMenuItem(
+                                                    value: 'editor', child: Text('设为编辑者')),
+                                              if (member.role != 'viewer')
+                                                const PopupMenuItem(
+                                                    value: 'viewer', child: Text('设为查看者')),
+                                            ],
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.person_remove_outlined),
+                                            tooltip: '移除',
+                                            onPressed: () => _remove(member),
+                                          ),
+                                        ],
+                                      )
+                                    : null,
                           ),
                       ],
                     ),
