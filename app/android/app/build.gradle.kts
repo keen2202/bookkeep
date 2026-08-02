@@ -1,8 +1,24 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// 读取签名配置 android/key.properties（CI 构建前由工作流生成；本地签名时手动放置）
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+// 四项配置齐全才启用正式签名；缺失时回退 debug 签名，保证本地/CI 无密钥也可构建
+val useReleaseSigning = keystorePropertiesFile.exists() &&
+    keystoreProperties["storeFile"] != null &&
+    keystoreProperties["keyAlias"] != null &&
+    keystoreProperties["storePassword"] != null &&
+    keystoreProperties["keyPassword"] != null
 
 android {
     namespace = "com.bookkeep.bookkeep_app"
@@ -25,11 +41,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        // storeFile 用 file() 相对本模块（android/app/）解析，与 CI 解码到的 upload-keystore.jks 同目录
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as? String
+            keyPassword = keystoreProperties["keyPassword"] as? String
+            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as? String
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (useReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                // 无签名配置时回退 debug 签名（否则 AGP 会因缺 storeFile 直接构建失败）
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

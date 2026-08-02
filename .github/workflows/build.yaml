@@ -1,10 +1,10 @@
 # Flutter 自动化打包：Android（APK + AAB）+ iOS（IPA）
 # 触发：推送 main/master + 手动触发（workflow_dispatch）
 #
-# 签名配置说明（占位）：
+# 签名配置说明：
 #   Android：在仓库 Secrets 中配置 KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD，
-#     工作流会生成 android/key.properties 并解码密钥库；未配置时回退 debug 签名。
-#     注意：需在 android/app/build.gradle.kts 中接入 release signingConfig 引用 key.properties。
+#     工作流会生成 android/key.properties 并解码密钥库；未配置时回退 debug 签名
+#     （android/app/build.gradle.kts 已接入 release signingConfig，四项齐全即走正式签名）。
 #   iOS：在仓库 Secrets 中配置 CERTIFICATE_P12_BASE64 / P12_PASSWORD / KEYCHAIN_PASSWORD /
 #     PROVISIONING_PROFILE_BASE64 / EXPORT_METHOD，工作流会创建钥匙串并导入证书与描述文件；
 #     未配置时以 --no-codesign 生成未签名 IPA。
@@ -20,16 +20,16 @@ jobs:
   android:
     name: Build Android (APK + AAB)
     runs-on: ubuntu-latest
-    # ---- Android 签名占位（对应仓库 Secrets；为空则 release 使用 debug 签名）----
+    # ---- Android 签名（对应仓库 Secrets；未配置则为空串，release 回退 debug 签名）----
     # KEYSTORE_BASE64:  base64 编码的 .jks 密钥库（生成：base64 -w0 android/app/upload-keystore.jks）
     # KEYSTORE_PASSWORD: 密钥库口令
     # KEY_ALIAS:         密钥别名
     # KEY_PASSWORD:      密钥口令
     env:
-      KEYSTORE_BASE64: ''
-      KEYSTORE_PASSWORD: ''
-      KEY_ALIAS: ''
-      KEY_PASSWORD: ''
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     defaults:
       run:
         working-directory: app
@@ -82,19 +82,19 @@ jobs:
   ios:
     name: Build iOS (IPA)
     runs-on: macos-latest
-    # ---- iOS 签名占位（对应仓库 Secrets；为空则以 --no-codesign 构建）----
+    # ---- iOS 签名（对应仓库 Secrets；未配置则为空串，以 --no-codesign 构建）----
     # CERTIFICATE_P12_BASE64:       base64 编码的发布证书 .p12（生成：base64 -w0 cert.p12）
     # P12_PASSWORD:                 p12 证书口令
     # KEYCHAIN_PASSWORD:            临时钥匙串口令（任意字符串，仅构建期使用）
     # PROVISIONING_PROFILE_BASE64:  base64 编码的描述文件 .mobileprovision
-    # EXPORT_METHOD:                导出方式：app-store（TestFlight/上架）或 ad-hoc（内测）
+    # EXPORT_METHOD:                导出方式：app-store（TestFlight/上架）或 ad-hoc（内测），默认 app-store
     env:
-      CERTIFICATE_P12_BASE64: ''
-      P12_PASSWORD: ''
-      KEYCHAIN_PASSWORD: ''
-      PROVISIONING_PROFILE_BASE64: ''
-      EXPORT_METHOD: app-store
-      # iOS 部署目标（写入 ios/Podfile 的 platform 行；Podfile 由 Flutter 首次构建自动生成）
+      CERTIFICATE_P12_BASE64: ${{ secrets.CERTIFICATE_P12_BASE64 }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+      EXPORT_METHOD: ${{ secrets.EXPORT_METHOD || 'app-store' }}
+      # iOS 部署目标（Podfile 已提交至仓库，platform 行为 13.0；此 sed 仅作兜底对齐）
       IOS_DEPLOYMENT_TARGET: '13.0'
     defaults:
       run:
@@ -116,9 +116,11 @@ jobs:
 
       - name: Apply iOS deployment target
         run: |
-          if [ -f ios/Podfile ]; then
-            sed -i '' "s/platform :ios, '.*'/platform :ios, '${IOS_DEPLOYMENT_TARGET}'/" ios/Podfile
+          # Podfile 已提交；若缺失则用 flutter create 重新生成（仅补缺失文件，不覆盖现有代码）
+          if [ ! -f ios/Podfile ]; then
+            flutter create --platforms=ios .
           fi
+          sed -i '' "s/platform :ios, '.*'/platform :ios, '${IOS_DEPLOYMENT_TARGET}'/" ios/Podfile
 
       - name: Import signing certificate (keychain)
         run: |
