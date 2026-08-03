@@ -1,5 +1,9 @@
 # Flutter 自动化打包：Android（APK + AAB）+ iOS（IPA）
-# 触发：推送 main/master + 手动触发（workflow_dispatch）
+# 触发：
+#   - 推送 main/master 分支：质量检查 + 构建（不上架）
+#   - 推送 v* 标签：质量检查 + 构建 + 自动发布 GitHub Release
+#   - 提交 PR 到 main/master：仅运行质量检查（analyze + test），不构建产物
+#   - 手动触发（workflow_dispatch）
 #
 # 签名配置说明：
 #   Android：在仓库 Secrets 中配置 KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD，
@@ -8,17 +12,80 @@
 #   iOS：在仓库 Secrets 中配置 CERTIFICATE_P12_BASE64 / P12_PASSWORD / KEYCHAIN_PASSWORD /
 #     PROVISIONING_PROFILE_BASE64 / EXPORT_METHOD，工作流会创建钥匙串并导入证书与描述文件；
 #     未配置时以 --no-codesign 生成未签名 IPA。
+#
+# --dart-define 环境变量注入（Android + iOS 通用）：
+#   通过仓库变量（Variables）与 Secrets 注入，构建期组装为 --dart-define=KEY=VALUE 列表
+#   应用到所有 flutter build 命令。可配置项：
+#     vars.APP_ENV       —— 应用环境（dev/staging/prod）；未配置时按触发场景自动选择：
+#                          tag=v* → prod，push 到 main/master → staging，PR → dev
+#     vars.API_BASE_URL  —— 同步服务端 Base URL（明文，写入 Variables）
+#     secrets.SYNC_API_KEY —— 同步接口密钥等敏感值（写入 Secrets）
+#   应用代码通过 String.fromEnvironment('APP_ENV') / .fromEnvironment('API_BASE_URL') 读取。
+#   注意：dart-define 中的空值会被自动跳过；新增字段只需在「组装 dart-define」步骤追加一行。
 
 name: Flutter Release Build
 
 on:
   push:
     branches: [main, master]
+    tags: ['v*'] # 新增：v* 标签自动触发 release 构建（见 release 作业）
+  pull_request: # 新增：PR 触发质量检查（不构建产物）
+    branches: [main, master]
   workflow_dispatch:
 
+# 同一 ref 的并发构建只保留最新一次（tag 互不冲突，PR/分支推送会取消旧运行）
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# 默认只读权限；release 作业单独提升 contents: write
+permissions:
+  contents: read
+
 jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # 质量门禁：flutter analyze + flutter test（PR 必跑；构建作业 needs: quality）
+  # ─────────────────────────────────────────────────────────────────────────
+  quality:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5' # 与构建作业保持一致
+          cache: true
+
+      # Flutter pub 缓存（key 基于 pubspec.lock；subosito 已内置 cache，此处显式声明便于排查）
+      - name: Cache Flutter pub
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('app/pubspec.lock', 'app/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Android 构建：APK + AAB（PR 不触发；push 分支 / v* 标签 / 手动均触发）
+  # ─────────────────────────────────────────────────────────────────────────
   android:
     name: Build Android (APK + AAB)
+    needs: quality
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # ---- Android 签名（对应仓库 Secrets；未配置则为空串，release 回退 debug 签名）----
     # KEYSTORE_BASE64:  base64 编码的 .jks 密钥库（生成：base64 -w0 android/app/upload-keystore.jks）
@@ -30,6 +97,9 @@ jobs:
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
       KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      # ---- --dart-define 输入（明文走 vars，敏感走 secrets）----
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      SYNC_API_KEY: ${{ secrets.SYNC_API_KEY }}
     defaults:
       run:
         working-directory: app
@@ -47,8 +117,55 @@ jobs:
           flutter-version: '3.24.5' # 指定 Flutter SDK 版本（按项目需要调整）
           cache: true
 
+      # Gradle 缓存（Android）
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('app/android/**/*.gradle*', 'app/android/**/gradle-wrapper.properties', 'app/android/**/gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Flutter pub 缓存（Android）
+      - name: Cache Flutter pub
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('app/pubspec.lock', 'app/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
       - name: Install dependencies
         run: flutter pub get
+
+      # 解析 APP_ENV：tag=v* → prod，push 到 main/master → staging，其他 → dev
+      # 仓库 vars.APP_ENV 可强制覆盖
+      - name: Resolve APP_ENV
+        id: env
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            DEFAULT_ENV=prod
+          elif [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            DEFAULT_ENV=dev
+          else
+            DEFAULT_ENV=staging
+          fi
+          echo "app_env=${DEFAULT_ENV}" >> "$GITHUB_OUTPUT"
+
+      # 组装 --dart-define 字符串（空值跳过；输出到 DART_DEFINES 供后续步骤使用）
+      - name: Compose dart-define flags
+        run: |
+          APP_ENV="${{ vars.APP_ENV || steps.env.outputs.app_env }}"
+          DF=""
+          [ -n "$APP_ENV" ]       && DF="$DF --dart-define=APP_ENV=$APP_ENV"
+          [ -n "$API_BASE_URL" ]  && DF="$DF --dart-define=API_BASE_URL=$API_BASE_URL"
+          [ -n "$SYNC_API_KEY" ]  && DF="$DF --dart-define=SYNC_API_KEY=$SYNC_API_KEY"
+          echo "DART_DEFINES=$DF" >> "$GITHUB_ENV"
+          # 打印非敏感摘要，便于排查（不打印 SYNC_API_KEY）
+          echo "::notice::APP_ENV=$APP_ENV, API_BASE_URL set: $([ -n "$API_BASE_URL" ] && echo yes || echo no), SYNC_API_KEY set: $([ -n "$SYNC_API_KEY" ] && echo yes || echo no)"
 
       - name: Configure signing (key.properties)
         run: |
@@ -65,10 +182,10 @@ jobs:
           EOF
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --release $DART_DEFINES
 
       - name: Build release App Bundle
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release $DART_DEFINES
 
       - uses: actions/upload-artifact@v4
         with:
@@ -79,8 +196,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # iOS 构建：IPA（PR 不触发；push 分支 / v* 标签 / 手动均触发）
+  # ─────────────────────────────────────────────────────────────────────────
   ios:
     name: Build iOS (IPA)
+    needs: quality
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     # ---- iOS 签名（对应仓库 Secrets；未配置则为空串，以 --no-codesign 构建）----
     # CERTIFICATE_P12_BASE64:       base64 编码的发布证书 .p12（生成：base64 -w0 cert.p12）
@@ -96,6 +218,9 @@ jobs:
       EXPORT_METHOD: ${{ secrets.EXPORT_METHOD || 'app-store' }}
       # iOS 部署目标（Podfile 已提交至仓库，platform 行为 13.0；此 sed 仅作兜底对齐）
       IOS_DEPLOYMENT_TARGET: '13.0'
+      # ---- --dart-define 输入（明文走 vars，敏感走 secrets）----
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      SYNC_API_KEY: ${{ secrets.SYNC_API_KEY }}
     defaults:
       run:
         working-directory: app
@@ -106,6 +231,27 @@ jobs:
         with:
           flutter-version: '3.24.5' # 指定 Flutter SDK 版本（按项目需要调整）
           cache: true
+
+      # Flutter pub 缓存（iOS）
+      - name: Cache Flutter pub
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('app/pubspec.lock', 'app/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      # CocoaPods 缓存（iOS，配合 Gradle 缓存的等价物）
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('app/ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
 
       - name: Install dependencies
         run: flutter pub get
@@ -121,6 +267,30 @@ jobs:
             flutter create --platforms=ios .
           fi
           sed -i '' "s/platform :ios, '.*'/platform :ios, '${IOS_DEPLOYMENT_TARGET}'/" ios/Podfile
+
+      # 解析 APP_ENV：tag=v* → prod，push 到 main/master → staging，其他 → dev
+      - name: Resolve APP_ENV
+        id: env
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            DEFAULT_ENV=prod
+          elif [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            DEFAULT_ENV=dev
+          else
+            DEFAULT_ENV=staging
+          fi
+          echo "app_env=${DEFAULT_ENV}" >> "$GITHUB_OUTPUT"
+
+      # 组装 --dart-define 字符串（空值跳过；输出到 DART_DEFINES 供后续步骤使用）
+      - name: Compose dart-define flags
+        run: |
+          APP_ENV="${{ vars.APP_ENV || steps.env.outputs.app_env }}"
+          DF=""
+          [ -n "$APP_ENV" ]       && DF="$DF --dart-define=APP_ENV=$APP_ENV"
+          [ -n "$API_BASE_URL" ]  && DF="$DF --dart-define=API_BASE_URL=$API_BASE_URL"
+          [ -n "$SYNC_API_KEY" ]  && DF="$DF --dart-define=SYNC_API_KEY=$SYNC_API_KEY"
+          echo "DART_DEFINES=$DF" >> "$GITHUB_ENV"
+          echo "::notice::APP_ENV=$APP_ENV, API_BASE_URL set: $([ -n "$API_BASE_URL" ] && echo yes || echo no), SYNC_API_KEY set: $([ -n "$SYNC_API_KEY" ] && echo yes || echo no)"
 
       - name: Import signing certificate (keychain)
         run: |
@@ -151,10 +321,10 @@ jobs:
       - name: Build release IPA
         run: |
           if [ -n "$CERTIFICATE_P12_BASE64" ]; then
-            flutter build ipa --release --export-method "$EXPORT_METHOD"
+            flutter build ipa --release --export-method "$EXPORT_METHOD" $DART_DEFINES
           else
             echo "::warning::未配置 iOS 签名（CERTIFICATE_P12_BASE64 为空），生成未签名 IPA"
-            flutter build ipa --release --no-codesign
+            flutter build ipa --release --no-codesign $DART_DEFINES
           fi
 
       - uses: actions/upload-artifact@v4
@@ -163,3 +333,51 @@ jobs:
           path: build/ios/ipa/*.ipa
           if-no-files-found: error
           retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 发布：仅在 v* 标签推送时触发，聚合 Android + iOS 产物，创建 GitHub Release
+  # ─────────────────────────────────────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # softprops/action-gh-release 创建 Release 所需
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: artifacts/android
+
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-release
+          path: artifacts/ios
+
+      # 重命名为带版本号的文件名（TAG 形如 v1.2.3）
+      - name: Rename artifacts with tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          mkdir -p dist
+          cd artifacts
+          for f in android/*.apk android/*.aab ios/*.ipa; do
+            [ -f "$f" ] || continue
+            ext="${f##*.}"
+            base=$(basename "$f" ".$ext")
+            cp "$f" "../dist/${base}-${TAG}.$ext"
+          done
+          ls -la ../dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true # 从 commits 自动生成 Release Notes
+          tag_name: ${{ env.TAG }}
+          files: |
+            dist/*
