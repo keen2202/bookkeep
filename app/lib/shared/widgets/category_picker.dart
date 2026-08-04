@@ -115,7 +115,7 @@ class _CategoryChip extends StatelessWidget {
       avatar: Icon(categoryIcon(category.icon), size: 18, color: color),
       selected: selected,
       onSelected: (_) => onTap(),
-      selectedColor: color.withOpacity(0.2),
+      selectedColor: color.withValues(alpha: 0.2),
       checkmarkColor: color,
       labelStyle: TextStyle(color: selected ? color : null),
     );

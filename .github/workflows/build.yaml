@@ -57,7 +57,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5' # 与构建作业保持一致
+          flutter-version: '3.44.8' # 与构建作业保持一致
           cache: true
 
       # Flutter pub 缓存（key 基于 pubspec.lock；subosito 已内置 cache，此处显式声明便于排查）
@@ -114,7 +114,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5' # 指定 Flutter SDK 版本（按项目需要调整）
+          flutter-version: '3.44.8' # 指定 Flutter SDK 版本（按项目需要调整）
           cache: true
 
       # Gradle 缓存（Android）
@@ -229,7 +229,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5' # 指定 Flutter SDK 版本（按项目需要调整）
+          flutter-version: '3.44.8' # 指定 Flutter SDK 版本（按项目需要调整）
           cache: true
 
       # Flutter pub 缓存（iOS）

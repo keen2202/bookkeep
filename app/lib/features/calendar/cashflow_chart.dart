@@ -71,7 +71,7 @@ class CashflowChart extends ConsumerWidget {
                             color: Theme.of(context)
                                 .colorScheme
                                 .primary
-                                .withOpacity(0.12),
+                                .withValues(alpha: 0.12),
                           ),
                         ),
                       ],

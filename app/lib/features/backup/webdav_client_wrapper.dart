@@ -10,12 +10,10 @@ import 'package:http/http.dart' as http;
 class WebDavClient {
   WebDavClient({
     required String endpoint,
-    String? username,
-    String? password,
+    this._username,
+    this._password,
     http.Client? client,
   })  : _endpoint = endpoint.endsWith('/') ? endpoint.substring(0, endpoint.length - 1) : endpoint,
-        _username = username,
-        _password = password,
         _client = client ?? http.Client();
 
   final String _endpoint;

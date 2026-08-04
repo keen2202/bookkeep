@@ -106,7 +106,8 @@ class _CaptureConfirmPageState extends ConsumerState<CaptureConfirmPage> {
               builder: (context, snapshot) {
                 final accounts = snapshot.data ?? const <Account>[];
                 return DropdownButtonFormField<int>(
-                  value: _accountId,
+                  key: ValueKey(_accountId),
+                  initialValue: _accountId,
                   items: [
                     for (final a in accounts)
                       DropdownMenuItem(value: a.id, child: Text(a.name)),

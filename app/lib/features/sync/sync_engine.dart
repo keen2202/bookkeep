@@ -16,15 +16,13 @@ import 'token_store.dart';
 class SyncEngine {
   SyncEngine({
     required this.opLogger,
-    required SyncApi api,
-    required TokenStore tokenStore,
+    required this._api,
+    required this._tokenStore,
     SyncMerger? merger,
     this.email,
     this.password,
     this.bookId,
-  })  : _api = api,
-        _tokenStore = tokenStore,
-        // 合并归属本引擎账本（Spec §4.1 / BK-T-010）
+  })  : // 合并归属本引擎账本（Spec §4.1 / BK-T-010）
         _merger = merger ?? SyncMerger(opLogger.db, bookId: bookId ?? kDefaultBookId);
 
   final OpLogger opLogger;
