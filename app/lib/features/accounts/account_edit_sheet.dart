@@ -105,7 +105,7 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<AccountType>(
-              initialValue: _type,
+              value: _type,
               decoration: const InputDecoration(labelText: '账户类型'),
               items: [
                 for (final t in [

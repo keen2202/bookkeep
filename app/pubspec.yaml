@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   flutter_riverpod: ^2.6.1
   drift: ^2.20.0
-  drift_flutter: ^0.2.0
+  drift_flutter: 0.2.6 # 0.2.7 要求 drift >=2.24 的 isolateDebugLog，而 Dart 3.5.4 解析到 drift 2.23.1
   sqlcipher_flutter_libs: ^0.6.0
   sqlite3_flutter_libs: ^0.5.24
   flutter_secure_storage: ^9.2.2

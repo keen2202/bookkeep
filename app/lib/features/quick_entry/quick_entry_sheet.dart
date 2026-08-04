@@ -214,7 +214,7 @@ class _AccountDropdown extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: DropdownButtonFormField<int>(
-        initialValue: value,
+        value: value,
         decoration: InputDecoration(labelText: label),
         items: [
           for (final a in accounts)

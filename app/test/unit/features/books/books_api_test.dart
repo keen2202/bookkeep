@@ -29,6 +29,7 @@ void main() {
             ],
           }),
           200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
         );
       });
 
@@ -63,6 +64,7 @@ void main() {
             'role': 'owner',
           }),
           201,
+          headers: {'content-type': 'application/json; charset=utf-8'},
         );
       });
 
@@ -120,6 +122,7 @@ void main() {
             'role': 'editor',
           }),
           200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
         );
       });
 

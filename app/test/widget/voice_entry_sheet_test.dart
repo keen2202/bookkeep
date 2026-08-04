@@ -42,7 +42,7 @@ void main() {
 
     test('无金额或方向不明返回 null', () {
       expect(engine.extract('随便写的备注'), isNull);
-      expect(engine.extract('消费 100 元（无方向词）'), isNull);
+      expect(engine.extract('100 元'), isNull);
     });
   });
 

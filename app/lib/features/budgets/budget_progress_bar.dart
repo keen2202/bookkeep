@@ -21,7 +21,7 @@ class BudgetProgressBar extends StatelessWidget {
         value: (progress.percent / 100).clamp(0.0, 1.0),
         minHeight: 6,
         color: color,
-        backgroundColor: color.withValues(alpha: 0.15),
+        backgroundColor: color.withOpacity(0.15),
       ),
     );
   }

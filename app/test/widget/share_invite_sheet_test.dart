@@ -12,6 +12,15 @@ import 'package:bookkeep_app/features/books/share_invite_sheet.dart';
 
 const bookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
+/// FilledButton.icon/tonalIcon 返回私有子类，find.byType(FilledButton) 精确匹配不到，
+/// 需按基类 ButtonStyleButton 匹配
+Future<void> tapGenerateButton(WidgetTester tester) async {
+  await tester.tap(
+    find.ancestor(of: find.text('生成邀请链接'), matching: find.bySubtype<ButtonStyleButton>()),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late BooksApi Function() origFactory;
   late Future<String?> Function() origHook;
@@ -42,11 +51,15 @@ void main() {
 
     expect(find.text('共享账本'), findsOneWidget);
     expect(find.text('邀请链接 72 小时内有效，且仅可使用一次。成员角色：'), findsOneWidget);
-    expect(find.text('编辑者（可记账）'), findsOneWidget);
-    expect(find.text('查看者（只读）'), findsOneWidget);
+    expect(find.text('编辑者（可记账）'), findsOneWidget); // 默认选中 editor
     expect(find.text('加入共享账本'), findsOneWidget);
     expect(find.text('粘贴他人分享的 token'), findsOneWidget);
     expect(find.text('加入'), findsOneWidget);
+
+    // 打开角色下拉后两个选项均可见
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('查看者（只读）'), findsOneWidget);
   });
 
   testWidgets('生成邀请链接并显示 token（携带 role 参数）', (tester) async {
@@ -61,8 +74,7 @@ void main() {
       return http.Response('not found', 404);
     });
 
-    await tester.tap(find.widgetWithText(FilledButton, '生成邀请链接'));
-    await tester.pumpAndSettle();
+    await tapGenerateButton(tester);
 
     expect(inviteCalled, isTrue);
     expect(find.text('邀请 token'), findsOneWidget);
@@ -82,8 +94,7 @@ void main() {
     await pumpSheet(tester, handler: (_) async {
       return http.Response(jsonEncode({'token': 'copy-me'}), 201);
     });
-    await tester.tap(find.widgetWithText(FilledButton, '生成邀请链接'));
-    await tester.pumpAndSettle();
+    await tapGenerateButton(tester);
 
     await tester.tap(find.byIcon(Icons.copy));
     await tester.pumpAndSettle();
@@ -96,8 +107,7 @@ void main() {
     await pumpSheet(tester,
         handler: (_) async => http.Response(jsonEncode({'error': 'forbidden'}), 403));
 
-    await tester.tap(find.widgetWithText(FilledButton, '生成邀请链接'));
-    await tester.pumpAndSettle();
+    await tapGenerateButton(tester);
 
     expect(find.text('当前角色无权限邀请成员'), findsOneWidget);
   });
@@ -105,8 +115,7 @@ void main() {
   testWidgets('网络错误提示无法连接同步服务', (tester) async {
     await pumpSheet(tester, handler: (_) async => throw http.ClientException('refused'));
 
-    await tester.tap(find.widgetWithText(FilledButton, '生成邀请链接'));
-    await tester.pumpAndSettle();
+    await tapGenerateButton(tester);
 
     expect(find.text('无法连接同步服务'), findsOneWidget);
   });
@@ -115,8 +124,7 @@ void main() {
     await pumpSheet(tester, handler: (_) async => http.Response('', 500),
         tokenHook: () async => null);
 
-    await tester.tap(find.widgetWithText(FilledButton, '生成邀请链接'));
-    await tester.pumpAndSettle();
+    await tapGenerateButton(tester);
 
     expect(
       find.text('尚未登录，无法生成邀请链接（可先在下方输入他人分享的 token 加入账本）'),
@@ -135,6 +143,7 @@ void main() {
             'role': 'editor',
           }),
           200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
         );
       }
       return http.Response('not found', 404);

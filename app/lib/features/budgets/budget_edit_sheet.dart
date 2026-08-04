@@ -106,7 +106,7 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
             const SizedBox(height: 12),
             if (!_isTotal)
               DropdownButtonFormField<int>(
-                initialValue: _categoryId,
+                value: _categoryId,
                 decoration: const InputDecoration(labelText: '分类'),
                 items: [
                   for (final c in parents)

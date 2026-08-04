@@ -112,7 +112,7 @@ class _ShareInviteSheetState extends State<ShareInviteSheet> {
           const SizedBox(height: 8),
           const Text('邀请链接 72 小时内有效，且仅可使用一次。成员角色：'),
           DropdownButtonFormField<String>(
-            initialValue: _role,
+            value: _role,
             items: const [
               DropdownMenuItem(value: 'editor', child: Text('编辑者（可记账）')),
               DropdownMenuItem(value: 'viewer', child: Text('查看者（只读）')),

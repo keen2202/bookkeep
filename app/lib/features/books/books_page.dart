@@ -96,7 +96,7 @@ class BooksPage extends ConsumerWidget {
                 maxLength: 30,
               ),
               DropdownButtonFormField<String>(
-                initialValue: type,
+                value: type,
                 items: [
                   for (final entry in bookTemplateLabels.entries)
                     DropdownMenuItem(value: entry.key, child: Text(entry.value)),
