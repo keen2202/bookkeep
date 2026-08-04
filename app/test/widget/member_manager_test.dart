@@ -38,7 +38,7 @@ void main() {
   }) async {
     booksApiFactory = () => BooksApi(baseUrl: 'http://test', client: MockClient(handler));
     accessTokenHook = tokenHook ?? () async => 'tok';
-    await tester.pumpWidget(MaterialApp(home: MemberManagerSheet(bookId: bookId)));
+    await tester.pumpWidget(const MaterialApp(home: MemberManagerSheet(bookId: bookId)));
     await tester.pumpAndSettle();
   }
 

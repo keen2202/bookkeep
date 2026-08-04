@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android signing keystore (base64-encoded, for local/CI secret use only)
+/android/app/keystore_base64.txt
