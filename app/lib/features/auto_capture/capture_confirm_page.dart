@@ -106,6 +106,7 @@ class _CaptureConfirmPageState extends ConsumerState<CaptureConfirmPage> {
               builder: (context, snapshot) {
                 final accounts = snapshot.data ?? const <Account>[];
                 return DropdownButtonFormField<int>(
+                  // initialValue 只在 FormField 首次建树时生效，异步回填默认账户后需换 key 重建 State 才能回显
                   key: ValueKey(_accountId),
                   initialValue: _accountId,
                   items: [

@@ -214,6 +214,7 @@ class _AccountDropdown extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: DropdownButtonFormField<int>(
+        // initialValue 只在 FormField 首次建树时生效，异步回填默认账户后需换 key 重建 State 才能回显
         key: ValueKey(value),
         initialValue: value,
         decoration: InputDecoration(labelText: label),
