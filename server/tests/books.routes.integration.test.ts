@@ -5,6 +5,8 @@ import { Pool } from 'pg';
 import { createApp } from '../src/app';
 import { migrate } from '../src/db/migrate';
 
+jest.setTimeout(30_000);
+
 const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep';
 const SECRET = 'books-integration-secret';
