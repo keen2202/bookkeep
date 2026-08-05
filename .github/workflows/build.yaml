@@ -190,9 +190,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: android-release
+          # path 相对仓库根（不受 run.working-directory 影响）；flutter build 在 app/ 下执行，
+          # 产物实际位于 app/build/...
           path: |
-            build/app/outputs/flutter-apk/*.apk
-            build/app/outputs/bundle/release/*.aab
+            app/build/app/outputs/flutter-apk/*.apk
+            app/build/app/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
 
