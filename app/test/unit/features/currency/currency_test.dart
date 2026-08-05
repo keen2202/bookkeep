@@ -13,11 +13,7 @@ import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 import 'package:bookkeep_app/domain/services/account_balance_calculator.dart';
 import 'package:bookkeep_app/features/currency/exchange_rate_service.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
-
   group('Money 定点换算（Spec §4.5）', () {
     test('四舍五入到分：正数 half-up', () {
       // 100.00 USD × 7.1 = 710.00 CNY

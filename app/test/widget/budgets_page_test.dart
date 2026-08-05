@@ -12,12 +12,9 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/features/budgets/budgets_page.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 
-import '../helpers/sqlite.dart';
 import 'categories_page_test.dart' show testSeed;
 
 void main() {
-  ensureSqliteLoaded();
-
   Widget harness(AppDatabase db) {
     return ProviderScope(
       overrides: [

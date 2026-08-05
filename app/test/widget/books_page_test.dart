@@ -11,13 +11,10 @@ import 'package:bookkeep_app/data/repositories/book_repository.dart';
 import 'package:bookkeep_app/features/books/books_page.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 
-import '../helpers/sqlite.dart';
-
 const bookA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const bookB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late BookRepository repo;
 

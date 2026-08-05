@@ -10,11 +10,7 @@ import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/features/auto_capture/voice_entry_sheet.dart';
 
-import '../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
-
   group('VoiceRuleEngine 规则抽取', () {
     const engine = VoiceRuleEngine();
 

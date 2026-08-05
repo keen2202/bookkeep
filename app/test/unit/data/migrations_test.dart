@@ -9,8 +9,6 @@ import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 
-import '../../helpers/sqlite.dart';
-
 // v1 DDL mirrored from the v1 schema, used to simulate an existing install
 // before the v1 -> v2 example migration runs. Column storage follows drift's
 // default mappings (text -> TEXT, int -> INTEGER, dateTime -> INTEGER unix, bool -> INTEGER).
@@ -145,7 +143,6 @@ CREATE TABLE installment_schedules (
 ''';
 
 void main() {
-  ensureSqliteLoaded();
   late Directory tmp;
   late String dbPath;
 
@@ -186,7 +183,7 @@ void main() {
     raw.execute(
         "INSERT INTO accounts (account_type, name, currency, initial_balance, archived, created_at) "
         "VALUES ('cash', '旧账户', 'CNY', 500, 0, 1754064000)");
-    raw.dispose();
+    raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
 
@@ -223,7 +220,7 @@ void main() {
     raw.execute(
         "INSERT INTO sync_ops (entity, entity_id, op, payload, lamport, client_id, pushed, created_at) "
         "VALUES ('transaction', 1, 'c', '{}', 1, 'legacy-client', 0, 1754064000)");
-    raw.dispose();
+    raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
 
@@ -256,7 +253,7 @@ void main() {
         "INSERT INTO transactions (account_id, category_id, type, amount_minor, currency, occurred_at, updated_at) "
         "VALUES (1, NULL, 'expense', -100, 'CNY', 1754064000, 1754064000)");
     raw.execute("INSERT INTO app_meta (key, value) VALUES ('sync_book_id', 'legacy-book-id')");
-    raw.dispose();
+    raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
     expect(db.schemaVersion, 6);
@@ -298,7 +295,7 @@ void main() {
     raw.execute(
         "INSERT INTO books (id, name, type, created_at) "
         "VALUES ('$kDefaultBookId', '默认账本', 'default', 1754064000)");
-    raw.dispose();
+    raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
     expect(db.schemaVersion, 6);
@@ -334,7 +331,7 @@ void main() {
         "INSERT INTO recurring_rules (frequency, anchor_type, amount_minor, account_id, "
         "next_due, start_date, updated_at) "
         "VALUES ('month', 'start', 1000, 1, 1754064000, 1754064000, 1754064000)");
-    raw.dispose();
+    raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
     expect(db.schemaVersion, 6);

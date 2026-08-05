@@ -7,13 +7,10 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/repositories/op_logger.dart';
 
-import '../../../helpers/sqlite.dart';
-
 const remoteA = '11111111-1111-4111-8111-111111111111';
 const remoteB = '22222222-2222-4222-8222-222222222222';
 
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late OpLogger logger;
 

@@ -14,10 +14,7 @@ import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/domain/models/category_seed.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   TestWidgetsFlutterBinding.ensureInitialized();
   late AppDatabase db;
   late CategoryRepository repo;

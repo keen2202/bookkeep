@@ -6,10 +6,7 @@ import 'package:bookkeep_app/data/repositories/lock_repository.dart';
 import 'package:bookkeep_app/features/auth_lock/biometric.dart';
 import 'package:bookkeep_app/features/auth_lock/lock_controller.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late LockRepository repo;
   late FakeBiometricAuth bio;

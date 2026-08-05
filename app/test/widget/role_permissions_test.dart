@@ -16,14 +16,11 @@ import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/books/books_page.dart' show showBookActions;
 import 'package:bookkeep_app/features/books/books_providers.dart';
 
-import '../helpers/sqlite.dart';
 import 'categories_page_test.dart' show testSeed;
 
 /// 权限矩阵 UI 拦截（Spec §4.1）：viewer 角色隐藏全部写入口。
 /// 服务端 403 为权威校验，此处验证客户端侧双重拒绝。
 void main() {
-  ensureSqliteLoaded();
-
   Widget shellHarness(AppDatabase db, {String role = 'owner'}) {
     return ProviderScope(
       overrides: [

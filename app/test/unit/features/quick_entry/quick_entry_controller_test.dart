@@ -10,10 +10,7 @@ import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 import 'package:bookkeep_app/domain/usecases/create_transaction.dart';
 import 'package:bookkeep_app/features/quick_entry/quick_entry_controller.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late QuickEntryController controller;
   late int accountId;

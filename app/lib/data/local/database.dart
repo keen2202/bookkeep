@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   /// 打开未加密数据库（单元测试 / Linux 桌面）。
   AppDatabase(super.e);
 
-  /// 打开 SQLCipher 加密库：设备端由 sqlcipher_flutter_libs 提供实现，
+  /// 打开 SQLCipher 加密库：加密实现经 native-assets hooks 自动加载，
   /// PRAGMA key 在打开后立即执行（Spec §1.3 / BK-P0-006）。
   factory AppDatabase.openEncrypted(String path, String key) {
     return AppDatabase(NativeDatabase(File(path), setup: (db) {

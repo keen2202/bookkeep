@@ -14,11 +14,8 @@ import 'package:bookkeep_app/features/sync/sync_state.dart';
 import 'package:bookkeep_app/features/sync/token_store.dart';
 
 import '../../../helpers/fake_sync_server.dart';
-import '../../../helpers/sqlite.dart';
 
 void main() {
-  ensureSqliteLoaded();
-
   late AppDatabase db;
   late OpLogger logger;
   late FakeSyncServer server;

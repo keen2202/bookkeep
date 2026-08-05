@@ -15,14 +15,11 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/data/repositories/lock_repository.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 
-import '../helpers/sqlite.dart';
 import 'categories_page_test.dart' show testSeed;
 
 /// 黄金路径 e2e（Spec §5.2 集成测试的设备端前置；本地以 widget 级全链路验证）：
 /// 记账 → 预算 → 报表 → 同步（op 入队）→ 隐私锁
 void main() {
-  ensureSqliteLoaded();
-
   Widget harness(AppDatabase db) {
     return ProviderScope(
       overrides: [

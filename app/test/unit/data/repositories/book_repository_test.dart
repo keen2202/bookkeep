@@ -13,13 +13,10 @@ import 'package:bookkeep_app/data/repositories/book_repository.dart';
 import 'package:bookkeep_app/data/repositories/op_logger.dart';
 import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 
-import '../../../helpers/sqlite.dart';
-
 const bookA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const bookB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late BookRepository repo;
 
@@ -201,7 +198,7 @@ CREATE TABLE app_meta (
       raw.execute(
           "INSERT INTO sync_ops (entity, entity_id, op, payload, lamport, client_id, pushed, created_at) "
           "VALUES ('account', 1, 'c', '{}', 1, 'legacy', 0, 1754064000)");
-      raw.dispose();
+      raw.close();
 
       final migrated = AppDatabase(NativeDatabase(File(dbPath)));
       expect(migrated.schemaVersion, 6);
@@ -232,7 +229,7 @@ CREATE TABLE app_meta (
       raw.execute(
           "INSERT INTO accounts (account_type, name, currency, initial_balance, archived, created_at) "
           "VALUES ('cash', '旧账户', 'CNY', 500, 0, 1754064000)");
-      raw.dispose();
+      raw.close();
 
       final migrated = AppDatabase(NativeDatabase(File(dbPath)));
       final bookRepo = BookRepository(migrated);

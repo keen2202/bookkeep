@@ -10,10 +10,7 @@ import 'package:bookkeep_app/data/local/tables/categories_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/reports_repository.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late ReportsRepository repo;
   late int accountId;

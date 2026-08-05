@@ -6,10 +6,7 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/features/recurring/recurring_service.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late RecurringService service;
 

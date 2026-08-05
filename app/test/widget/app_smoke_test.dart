@@ -7,12 +7,9 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 
-import '../helpers/sqlite.dart';
 import 'categories_page_test.dart' show testSeed;
 
 void main() {
-  ensureSqliteLoaded();
-
   testWidgets('app shell boots with bottom navigation', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);

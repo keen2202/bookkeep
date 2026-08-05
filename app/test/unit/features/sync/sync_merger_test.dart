@@ -5,8 +5,6 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/domain/models/remote_op.dart';
 import 'package:bookkeep_app/features/sync/sync_merger.dart';
 
-import '../../../helpers/sqlite.dart';
-
 const client = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 // 远端实体身份（uuid 字符串，与实体表 remote_id 列一致）
@@ -14,7 +12,6 @@ var _seq = 0;
 String nextId() => '99999999-9999-4999-8999-${(_seq++).toString().padLeft(12, '0')}';
 
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late SyncMerger merger;
 

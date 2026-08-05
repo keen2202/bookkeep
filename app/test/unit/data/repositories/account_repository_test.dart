@@ -12,10 +12,7 @@ import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/domain/services/account_balance_calculator.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late AccountRepository repo;
   const calc = AccountBalanceCalculator();

@@ -11,11 +11,7 @@ import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/features/backup/backup_service.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
-
   Future<AppDatabase> seedDb() async {
     final db = AppDatabase(NativeDatabase.memory());
     await db.into(db.books).insert(BooksCompanion.insert(

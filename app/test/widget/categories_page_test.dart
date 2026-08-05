@@ -10,8 +10,6 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/domain/models/category_seed.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 
-import '../helpers/sqlite.dart';
-
 /// 测试用 seed：两级分类样例（生产 seed 的真实性由 category_repository_test 覆盖）
 const testSeed = CategorySeed(
   version: 1,
@@ -66,8 +64,6 @@ Future<void> pumpUntilGone(WidgetTester tester, Finder finder, {int maxTries = 1
 }
 
 void main() {
-  ensureSqliteLoaded();
-
   Widget harness(AppDatabase db) {
     return ProviderScope(
       overrides: [

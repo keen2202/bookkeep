@@ -8,8 +8,6 @@ import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 import 'package:bookkeep_app/domain/services/capture_candidate.dart';
 import 'package:bookkeep_app/features/auto_capture/import_service.dart';
 
-import '../../../helpers/sqlite.dart';
-
 CaptureCandidate candidate({
   required int amountMinor,
   String counterparty = '商户A',
@@ -24,7 +22,6 @@ CaptureCandidate candidate({
 }
 
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late TransactionRepository repo;
   late CsvImportService service;

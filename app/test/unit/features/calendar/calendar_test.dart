@@ -8,12 +8,9 @@ import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/reports_repository.dart';
 import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 
-import '../../../helpers/sqlite.dart';
-
 const bookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late TransactionRepository repo;
   late int accountId;

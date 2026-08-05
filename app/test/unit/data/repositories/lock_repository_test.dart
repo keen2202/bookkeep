@@ -4,10 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/repositories/lock_repository.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late LockRepository repo;
 

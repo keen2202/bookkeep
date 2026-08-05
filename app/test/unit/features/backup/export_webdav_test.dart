@@ -10,14 +10,10 @@ import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/features/backup/export_service.dart';
 import 'package:bookkeep_app/features/backup/webdav_client_wrapper.dart';
 
-import '../../../helpers/sqlite.dart';
-
 const bookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherBook = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 void main() {
-  ensureSqliteLoaded();
-
   Future<AppDatabase> seedDb() async {
     final db = AppDatabase(NativeDatabase.memory());
     final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(

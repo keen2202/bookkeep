@@ -9,8 +9,6 @@ import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/features/auto_capture/csv_import/csv_import_page.dart';
 
-import '../helpers/sqlite.dart';
-
 /// 支付宝账单样本：表头 + 2 条有效记录（可附加批内重复行）
 String alipayCsv({int duplicateCount = 0}) {
   final rows = <String>[
@@ -25,8 +23,6 @@ String alipayCsv({int duplicateCount = 0}) {
 }
 
 void main() {
-  ensureSqliteLoaded();
-
   Widget harness(AppDatabase db) {
     return ProviderScope(
       overrides: [databaseProvider.overrideWithValue(db)],

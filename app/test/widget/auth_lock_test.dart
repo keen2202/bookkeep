@@ -12,15 +12,12 @@ import 'package:bookkeep_app/features/auth_lock/biometric.dart';
 import 'package:bookkeep_app/features/auth_lock/lock_controller.dart';
 import 'package:bookkeep_app/features/auth_lock/lock_gate.dart';
 
-import '../helpers/sqlite.dart';
-
 /// 设置 PIN：PBKDF2 的 Future.delayed 让出点需真实事件循环（testWidgets 假时钟不推进），
 /// 故经 runAsync 执行（BK-T-008）。
 Future<void> setupPin(WidgetTester tester, LockRepository repo, String pin) =>
     tester.runAsync(() => repo.setPin(pin));
 
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late LockRepository repo;
   late FakeBiometricAuth bio;

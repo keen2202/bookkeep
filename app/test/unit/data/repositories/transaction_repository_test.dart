@@ -11,10 +11,7 @@ import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 
-import '../../../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
   late AppDatabase db;
   late TransactionRepository repo;
   late int accountId;

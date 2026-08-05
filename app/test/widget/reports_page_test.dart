@@ -12,11 +12,7 @@ import 'package:bookkeep_app/data/local/tables/categories_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/features/reports/reports_page.dart';
 
-import '../helpers/sqlite.dart';
-
 void main() {
-  ensureSqliteLoaded();
-
   Widget harness(AppDatabase db) {
     return ProviderScope(
       overrides: [databaseProvider.overrideWithValue(db)],
