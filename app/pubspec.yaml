@@ -12,7 +12,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   drift: ^2.34.3
   drift_flutter: ^0.3.1
-  sqlcipher_flutter_libs: ^0.7.0 # 0.7.0+eol 为 no-op 占位（drift_flutter 0.3 强制）；加密改由下方 hooks 提供
+  sqlcipher_flutter_libs: ^0.7.0 # 0.7.0+eol 为 sqlite3 3.x 迁移占位包（native-assets hooks 需要）；加密改由下方 hooks 提供
   sqlite3_flutter_libs: ^0.6.0 # 0.6.0+eol 为 no-op 占位（sqlite3 3.x 起由 native assets 提供库），drift 2.34 强制 sqlite3 ^3.4.0，0.5.x 无法共存
   flutter_secure_storage: ^10.3.1
   local_auth: ^3.0.2

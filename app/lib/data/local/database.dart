@@ -138,6 +138,7 @@ class AppDatabase extends _$AppDatabase {
           }
         },
         beforeOpen: (details) async {
+          // FK 约束（REFERENCES）由 drift 2.34.5 codegen 生成，仅对新建库生效（既有 v6 库无 REFERENCES 不约束）；删除父行在有子行时会被 RESTRICT 拒绝
           await customStatement('PRAGMA foreign_keys = ON');
         },
       );

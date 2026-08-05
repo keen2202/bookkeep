@@ -49,7 +49,7 @@ bookkeep/
 
 ### 本地存储
 
-- 数据库：Drift（SQLite）+ 设备端 SQLCipher 加密（PRAGMA key 打开后立即执行），密钥托管于 Keystore/Keychain
+- 数据库：Drift（SQLite）+ 设备端 SQLCipher 加密（PRAGMA key 打开后立即执行），密钥托管于 Keystore/Keychain；加密经 sqlite3 native-assets hooks（`hooks.user_defines.sqlite3.source: sqlcipher`）提供，勿误删 hooks 或回退旧打包方式
 - 金额一律以整数最小单位（分）存储，计算用定点整数，避免浮点误差
 - 跨设备实体身份：各业务表 `remote_id`（uuid v4），`sync_ops` 记录完整实体快照（lamport + client_id）
 

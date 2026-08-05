@@ -85,3 +85,13 @@ Server（Node.js）不涉及，完全不动。
 - `app/lib/**` — 破坏性变更修复（charts、key_store、导航、主题等）
 - `app/test/**` — 测试修复
 - 可能：`app/ios/Podfile`（platform 兜底对齐）、`app/android/**`（预期不动）
+
+## 实施结果（2026-08-05）
+
+升级完成：`flutter analyze` 0 issues、全量测试 304/304 绿（覆盖率 52.03%）。与原设计的差异与决策落地：
+
+- **drift 停在 2.34.3（2.x 最新）**：`pub upgrade` 实际解析到 2.34.3（drift 3.x 未进入解析结果），「回退最新 2.2x」的分支未触发，按最新 2.x 落地
+- **riverpod 保持 2.6.1**：riverpod 3 破坏面大，作为独立迁移项后续单独评估（`flutter pub outdated` 遗留 major 之一）
+- **sqlite3 3.x 经 native-assets hooks 提供原生库**：`sqlcipher_flutter_libs` 0.7.0+eol / `sqlite3_flutter_libs` 0.6.0+eol 变为占位包（0.7.0+eol 非「drift_flutter 0.3 强制」，实际是 sqlite3 3.x 迁移要求 hooks 占位包留在依赖图）；SQLCipher 加密改由 pubspec `hooks.user_defines.sqlite3.source: sqlcipher` 提供
+- **FK 行为变化**：drift 2.34.5 codegen 为表生成 REFERENCES 约束，`PRAGMA foreign_keys = ON` 仅对新建库生效（既有 v6 库无 REFERENCES 不约束），删除父行在有子行时被 RESTRICT 拒绝
+- **`flutter pub outdated` 遗留 major 仅**：riverpod 3（独立迁移）、sqlite 库（0.7.0+eol/0.6.0+eol 已 EOL，占位包），均为已记录项
