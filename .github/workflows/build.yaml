@@ -356,12 +356,14 @@ jobs:
           name: android-release
           path: artifacts/android
 
+      # iOS 失败时产物不存在，直接跳过下载（download-artifact 对缺失 artifact 是硬错误，
+      # 无法用 if-no-files-found 容错；Rename 步骤已兼容缺失文件）
       - name: Download iOS artifacts
+        if: needs.ios.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: ios-release
           path: artifacts/ios
-          if-no-files-found: warn # iOS 构建失败时无产物，不阻断发布
 
       # 重命名为带版本号的文件名（TAG 形如 v1.2.3）
       - name: Rename artifacts with tag
