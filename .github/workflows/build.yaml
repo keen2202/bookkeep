@@ -341,7 +341,8 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   release:
     name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    # iOS 失败不阻断发布：Android 成功即发布；iOS 产物缺失时下载容错（warn）
+    if: startsWith(github.ref, 'refs/tags/v') && !cancelled() && needs.android.result == 'success'
     needs: [android, ios]
     runs-on: ubuntu-latest
     permissions:
@@ -360,6 +361,7 @@ jobs:
         with:
           name: ios-release
           path: artifacts/ios
+          if-no-files-found: warn # iOS 构建失败时无产物，不阻断发布
 
       # 重命名为带版本号的文件名（TAG 形如 v1.2.3）
       - name: Rename artifacts with tag
