@@ -35,8 +35,9 @@ class _CategoryPickerState extends State<CategoryPicker> {
   List<Category> get _parents =>
       widget.categories.where((c) => c.parentId == null && c.kind == widget.kind).toList();
 
-  List<Category> _childrenOf(int parentId) =>
-      widget.categories.where((c) => c.parentId == parentId).toList();
+  List<Category> _childrenOf(int parentId) => widget.categories
+      .where((c) => c.parentId == parentId && c.kind == widget.kind)
+      .toList();
 
   @override
   Widget build(BuildContext context) {

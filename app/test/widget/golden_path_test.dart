@@ -44,6 +44,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> pumpUntilFound(WidgetTester tester, Finder finder) async {
+    for (var i = 0; i < 100; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (finder.evaluate().isNotEmpty) return;
+    }
+    fail('Timed out waiting for $finder');
+  }
+
   testWidgets('记账→预算→报表→同步→锁', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
@@ -71,6 +79,7 @@ void main() {
     // ── ① 记账：FAB → 快速记账 25.5 元 ──
     await tester.tap(find.byTooltip('记一笔'));
     await tester.pumpAndSettle();
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
     for (final key in ['2', '5', '.', '5']) {
       await tapKey(tester, key);
     }
@@ -78,8 +87,19 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('钱包（现金）').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('早餐'));
+    // 分类：点字段弹出两级选择器 → 选二级 → 弹层确定
+    await pumpUntilFound(tester, find.text('选择分类'));
+    await tester.tap(find.text('选择分类'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.widgetWithText(FilterChip, '早餐'),
+      ),
+    );
     await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, '确定'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();
 

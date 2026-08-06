@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/local/database_provider.dart';
@@ -17,6 +18,15 @@ import 'features/categories/categories_page.dart';
 import 'features/quick_entry/quick_entry_sheet.dart';
 import 'features/recurring/recurring_page.dart';
 import 'features/reports/reports_page.dart';
+
+/// 中文本地化配置（主入口与秒开模式的 MaterialApp 共用）
+const bookkeepLocalizationsDelegates = [
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
+
+const bookkeepSupportedLocales = [Locale('zh', 'CN')];
 
 /// App 根组件：底部导航（记账/账户/分类）+ 秒开模式入口
 class BookkeepApp extends ConsumerStatefulWidget {
@@ -45,6 +55,9 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'bookkeep',
+      locale: const Locale('zh', 'CN'),
+      localizationsDelegates: bookkeepLocalizationsDelegates,
+      supportedLocales: bookkeepSupportedLocales,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,

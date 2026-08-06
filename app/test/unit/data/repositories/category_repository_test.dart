@@ -62,6 +62,59 @@ void main() {
     expect(await repo.listCategories(includeDeleted: true), hasLength(seed.totalCount));
   });
 
+  test('seed versions are isolated per book: another book gets its own seeds', () async {
+    final raw = await rootBundle.loadString('assets/seed/categories_seed.json');
+    final seed = CategorySeed.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    final bookA = CategoryRepository(db, bookId: 'book-A');
+    final bookB = CategoryRepository(db, bookId: 'book-B');
+
+    expect(await bookA.installSeeds(seed), seed.totalCount);
+    // 回归：旧实现用全局 seed_version 守卫，账本 B 永远拿不到种子
+    expect(await bookB.installSeeds(seed), seed.totalCount);
+    // 各自幂等
+    expect(await bookA.installSeeds(seed), 0);
+    expect(await bookB.installSeeds(seed), 0);
+    expect(await bookA.listCategories(), hasLength(seed.totalCount));
+    expect(await bookB.listCategories(), hasLength(seed.totalCount));
+  });
+
+  test('legacy global seed_version migrates: book with system rows is treated as installed', () async {
+    final raw = await rootBundle.loadString('assets/seed/categories_seed.json');
+    final seed = CategorySeed.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    // 模拟 v0.2.0 存量数据：全局键 + 账本 X 已有系统分类行
+    await db.into(db.appMeta).insert(AppMetaCompanion.insert(key: 'seed_version', value: '1'));
+    final bookX = CategoryRepository(db, bookId: 'book-X');
+    await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: const Value('book-X'),
+          remoteId: const Value('legacy-uuid'),
+          name: '旧系统分类',
+          icon: 'tag',
+          color: 0xFF000000,
+          kind: CategoryKind.expense,
+          isSystem: const Value(true),
+          updatedAt: DateTime.utc(2026, 8, 1),
+        ));
+
+    expect(await bookX.installSeeds(seed), 0); // 不重复插入
+    expect(await bookX.listCategories(includeDeleted: true), hasLength(1));
+    // per-book 版本键已固化（后续判定不再依赖全局键）
+    final meta = await (db.select(db.appMeta)
+          ..where((t) => t.key.equals('seed_version_book-X')))
+        .get();
+    expect(meta.single.value, '1');
+  });
+
+  test('legacy global seed_version does not block a new book from getting seeds', () async {
+    final raw = await rootBundle.loadString('assets/seed/categories_seed.json');
+    final seed = CategorySeed.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    await db.into(db.appMeta).insert(AppMetaCompanion.insert(key: 'seed_version', value: '1'));
+    // 全局键存在但账本 Y 无系统分类行（旧用户切换过账本）→ 应补装
+    final bookY = CategoryRepository(db, bookId: 'book-Y');
+
+    expect(await bookY.installSeeds(seed), seed.totalCount);
+    expect(await bookY.listCategories(), hasLength(seed.totalCount));
+  });
+
   test('creates a custom category and updates it', () async {
     final id = await repo.createCategory(
       name: '旅行',

@@ -55,6 +55,8 @@ class BooksPage extends ConsumerWidget {
                       ? null
                       : () async {
                           await ref.read(bookRepositoryProvider).switchBook(book.id);
+                          // 同步当前账本 provider：驱动各仓库/视图模型按新账本重建
+                          ref.read(currentBookIdProvider.notifier).state = book.id;
                           // 同步新账本角色到写拦截（离线用本地缓存）
                           final role =
                               await ref.read(bookRepositoryProvider).roleOf(book.id);

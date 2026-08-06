@@ -6,6 +6,7 @@ import '../../data/local/database.dart';
 import '../../data/local/tables/categories_table.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/usecases/create_transaction.dart';
+import '../../shared/widgets/category_picker.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
 import '../accounts/accounts_providers.dart';
 import '../books/books_providers.dart' show accountRepositoryProvider, transactionRepositoryProvider;
@@ -45,11 +46,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       final defaults = await repo.lastDefaults(type);
       if (defaults == null) continue;
       if (type == TransactionType.expense && _controller.categoryId == null) {
-        _controller.categoryId = defaults.categoryId;
-        _controller.accountId = defaults.accountId;
+        _controller.selectCategory(defaults.categoryId);
+        _controller.selectAccount(defaults.accountId);
       }
     }
-    if (mounted) setState(() {});
   }
 
   void _onController() {
@@ -84,11 +84,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesViewModelProvider);
     final accountsAsync = ref.watch(accountsViewModelProvider);
-    final categories =
-        categoriesAsync.maybeWhen(data: (c) => c, orElse: () => const <Category>[]);
-    final accounts = accountsAsync.maybeWhen(
-        data: (vm) => [for (final e in vm.accounts) e.account],
-        orElse: () => const <Account>[]);
+    final categories = categoriesAsync.valueOrNull ?? const <Category>[];
+    final accounts = accountsAsync.valueOrNull == null
+        ? const <Account>[]
+        : [for (final e in accountsAsync.valueOrNull!.accounts) e.account];
 
     return Scaffold(
       appBar: AppBar(title: const Text('记一笔')),
@@ -118,7 +117,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           Expanded(
             child: ListView(
               children: [
-                _buildSelections(accounts, categories),
+                _buildSelections(
+                  accounts: accounts,
+                  accountsLoading: accountsAsync.isLoading,
+                  accountsError: accountsAsync.hasError,
+                  categories: categories,
+                  categoriesLoading: categoriesAsync.isLoading,
+                  categoriesError: categoriesAsync.hasError,
+                ),
               ],
             ),
           ),
@@ -142,21 +148,34 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     return parsed == null ? '¥0.00' : formatMoney(minor);
   }
 
-  Widget _buildSelections(List<Account> accounts, List<Category> categories) {
+  Widget _buildSelections({
+    required List<Account> accounts,
+    required bool accountsLoading,
+    required bool accountsError,
+    required List<Category> categories,
+    required bool categoriesLoading,
+    required bool categoriesError,
+  }) {
     if (_controller.type == TransactionType.transfer) {
       return Column(
         children: [
-          _AccountDropdown(
+          _AccountField(
             label: '转出账户',
             accounts: accounts,
+            loading: accountsLoading,
+            error: accountsError,
+            onRetry: () => ref.invalidate(accountsViewModelProvider),
             value: _controller.accountId,
-            onChanged: (v) => _controller.accountId = v,
+            onChanged: _controller.selectAccount,
           ),
-          _AccountDropdown(
+          _AccountField(
             label: '转入账户',
             accounts: accounts,
+            loading: accountsLoading,
+            error: accountsError,
+            onRetry: () => ref.invalidate(accountsViewModelProvider),
             value: _controller.toAccountId,
-            onChanged: (v) => _controller.toAccountId = v,
+            onChanged: _controller.selectToAccount,
           ),
         ],
       );
@@ -164,30 +183,32 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     final kind = _controller.type == TransactionType.income
         ? CategoryKind.income
         : CategoryKind.expense;
-    final expenseCategories =
-        categories.where((c) => c.kind == kind).toList();
+    final kindCategories = categories.where((c) => c.kind == kind).toList();
     return Column(
       children: [
-        _AccountDropdown(
+        _AccountField(
           label: '账户',
           accounts: accounts,
+          loading: accountsLoading,
+          error: accountsError,
+          onRetry: () => ref.invalidate(accountsViewModelProvider),
           value: _controller.accountId,
-          onChanged: (v) => _controller.accountId = v,
+          onChanged: _controller.selectAccount,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('分类', style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 8),
-              for (final parent in expenseCategories.where((c) => c.parentId == null))
-                _CategoryGroup(
-                  parent: parent,
-                  categories: expenseCategories,
-                  selectedId: _controller.categoryId,
-                  onSelected: (id) => _controller.categoryId = id,
-                ),
+              _CategoryField(
+                categories: kindCategories,
+                kind: kind,
+                loading: categoriesLoading,
+                error: categoriesError,
+                onRetry: () => ref.invalidate(categoriesViewModelProvider),
+                selectedId: _controller.categoryId,
+                onSelected: _controller.selectCategory,
+              ),
             ],
           ),
         ),
@@ -196,27 +217,44 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   }
 }
 
-class _AccountDropdown extends StatelessWidget {
-  const _AccountDropdown({
+/// 账户选择字段：加载/错误/空态有明确占位，避免空 items 时下拉被禁用而无反馈
+class _AccountField extends StatelessWidget {
+  const _AccountField({
     required this.label,
     required this.accounts,
+    required this.loading,
+    required this.error,
+    required this.onRetry,
     required this.value,
     required this.onChanged,
   });
 
   final String label;
   final List<Account> accounts;
+  final bool loading;
+  final bool error;
+  final VoidCallback onRetry;
   final int? value;
   final ValueChanged<int?> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return _LoadingField(label: label);
+    }
+    if (error) {
+      return _MessageField(label: label, message: '账户加载失败，点按重试', onTap: onRetry);
+    }
+    if (accounts.isEmpty) {
+      return const _MessageField(label: '账户', message: '暂无账户，请先在账户页创建');
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: DropdownButtonFormField<int>(
         // initialValue 只在 FormField 首次建树时生效，异步回填默认账户后需换 key 重建 State 才能回显
         key: ValueKey(value),
-        initialValue: value,
+        // 默认账户可能来自其他账本（不在当前下拉 items 中），此时置空避免 debug assert
+        initialValue: accounts.any((a) => a.id == value) ? value : null,
         decoration: InputDecoration(labelText: label),
         items: [
           for (final a in accounts)
@@ -228,40 +266,156 @@ class _AccountDropdown extends StatelessWidget {
   }
 }
 
-class _CategoryGroup extends StatelessWidget {
-  const _CategoryGroup({
-    required this.parent,
+/// 分类选择字段：点击弹出两级分类选择器（底部弹层）
+class _CategoryField extends StatelessWidget {
+  const _CategoryField({
     required this.categories,
+    required this.kind,
+    required this.loading,
+    required this.error,
+    required this.onRetry,
     required this.selectedId,
     required this.onSelected,
   });
 
-  final Category parent;
   final List<Category> categories;
+  final CategoryKind kind;
+  final bool loading;
+  final bool error;
+  final VoidCallback onRetry;
   final int? selectedId;
   final ValueChanged<int> onSelected;
 
+  String? get _selectedLabel {
+    final id = selectedId;
+    if (id == null) return null;
+    for (final c in categories) {
+      if (c.id != id) continue;
+      final parent = c.parentId == null
+          ? null
+          : categories.where((x) => x.id == c.parentId).firstOrNull;
+      return parent == null ? c.name : '${parent.name} / ${c.name}';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final children = categories.where((c) => c.parentId == parent.id).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(parent.name, style: Theme.of(context).textTheme.labelMedium),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final child in children)
-              ChoiceChip(
-                label: Text(child.name),
-                selected: selectedId == child.id,
-                onSelected: (_) => onSelected(child.id),
-              ),
-          ],
+    if (loading) {
+      return const _LoadingField(label: '分类');
+    }
+    if (error) {
+      return _MessageField(label: '分类', message: '分类加载失败，点按重试', onTap: onRetry);
+    }
+    if (categories.isEmpty) {
+      return const _MessageField(label: '分类', message: '暂无分类，请先创建');
+    }
+    final label = _selectedLabel;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(4),
+        onTap: () => _openPicker(context),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: '分类',
+            suffixIcon: const Icon(Icons.expand_more),
+          ),
+          child: Text(
+            label ?? '选择分类',
+            style: TextStyle(color: label == null ? Theme.of(context).hintColor : null),
+          ),
         ),
-        const SizedBox(height: 8),
-      ],
+      ),
+    );
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * 0.6,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+                  child: Row(
+                    children: [
+                      Text('选择分类', style: Theme.of(sheetContext).textTheme.titleMedium),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: CategoryPicker(
+                      categories: categories,
+                      kind: kind,
+                      initialCategoryId: selectedId,
+                      onSelected: (id) {
+                        onSelected(id);
+                        Navigator.pop(sheetContext);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 加载中占位（与 InputDecorator 视觉一致）
+class _LoadingField extends StatelessWidget {
+  const _LoadingField({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: InputDecorator(
+        decoration: InputDecoration(labelText: label),
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+    );
+  }
+}
+
+/// 错误/空态占位（可点按重试）
+class _MessageField extends StatelessWidget {
+  const _MessageField({required this.label, required this.message, this.onTap});
+
+  final String label;
+  final String message;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = InputDecorator(
+      decoration: InputDecoration(labelText: label),
+      child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: onTap == null ? content : InkWell(onTap: onTap, child: content),
     );
   }
 }

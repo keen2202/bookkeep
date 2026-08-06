@@ -81,6 +81,8 @@ class _MonthTotalsScope extends ConsumerWidget {
     return TableCalendar<DailyTotal>(
       firstDay: DateTime(2020, 1, 1),
       lastDay: DateTime(2035, 12, 31),
+      locale: 'zh_CN',
+      rowHeight: 56,
       focusedDay: focusedDay,
       selectedDayPredicate: (day) => isSameDay(day, selectedDay),
       onDaySelected: (selected, focused) {
@@ -90,10 +92,8 @@ class _MonthTotalsScope extends ConsumerWidget {
       onPageChanged: (focused) => onFocused(focused),
       calendarBuilders: CalendarBuilders<DailyTotal>(
         defaultBuilder: (context, day, _) => _dayCell(context, day, totalsByDay, masked),
-        todayBuilder: (context, day, _) =>
-            _dayCell(context, day, totalsByDay, masked, isToday: true),
-        selectedBuilder: (context, day, _) =>
-            _dayCell(context, day, totalsByDay, masked, isSelected: true),
+        todayBuilder: (context, day, _) => _dayCell(context, day, totalsByDay, masked),
+        selectedBuilder: (context, day, _) => _dayCell(context, day, totalsByDay, masked),
         outsideBuilder: (context, day, _) => const SizedBox.shrink(),
       ),
     );
@@ -103,11 +103,12 @@ class _MonthTotalsScope extends ConsumerWidget {
     BuildContext context,
     DateTime day,
     Map<String, DailyTotal> totalsByDay,
-    bool masked, {
-    bool isToday = false,
-    bool isSelected = false,
-  }) {
+    bool masked,
+  ) {
     final theme = Theme.of(context);
+    // 今天与选中态在 _dayCell 内统一判定，today/selected 两 builder 共用同一样式
+    final isToday = isSameDay(day, DateTime.now());
+    final isSelected = isSameDay(day, selectedDay);
     final key = _dayKey(day);
     final total = totalsByDay[key];
     final net = total == null ? 0 : total.incomeMinor - total.expenseMinor;
@@ -118,25 +119,34 @@ class _MonthTotalsScope extends ConsumerWidget {
             : theme.colorScheme.onSurfaceVariant;
     return Container(
       margin: const EdgeInsets.all(2),
-      decoration: isSelected
+      decoration: isToday
           ? BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
+              color: theme.colorScheme.primary,
+              shape: BoxShape.circle,
             )
-          : null,
+          : isSelected
+              ? BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                )
+              : null,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text('${day.day}',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: isToday ? 14 : 12,
                 fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                color: isToday ? theme.colorScheme.primary : null,
+                color: isToday ? Colors.white : null,
               )),
           if (net != 0)
             Text(
               masked ? '*' : _compactMoney(net),
-              style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 8,
+                color: isToday ? Colors.white : color,
+                fontWeight: FontWeight.w600,
+              ),
             ),
         ],
       ),

@@ -32,9 +32,31 @@ void main() {
     fail('Timed out waiting for $finder');
   }
 
-  testWidgets('golden path: type amount, pick account and category, save', (tester) async {
-    final db = AppDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
+  /// 弹层内选「早餐」并确认（弹层确定按钮与键盘确定用不同 finder 区分）
+  Future<void> pickBreakfast(WidgetTester tester) async {
+    await pumpUntilFound(tester, find.text('选择分类'));
+    await tester.tap(find.text('选择分类'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.widgetWithText(FilterChip, '早餐'),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, '确定'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> pickAccount(WidgetTester tester) async {
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+    await tester.tap(find.text('账户'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('钱包（现金）').last);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> seedDb(AppDatabase db) async {
     final repo = CategoryRepository(db);
     await repo.installSeeds(testSeed);
     await db.into(db.accounts).insert(AccountsCompanion.insert(
@@ -43,11 +65,17 @@ void main() {
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
-    final lunch = await repo.listCategories();
+  }
+
+  testWidgets('golden path: type amount, pick account and category, save', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+    final lunch = await CategoryRepository(db).listCategories();
     final lunchId = lunch.firstWhere((c) => c.name == '早餐').id;
 
     await tester.pumpWidget(harness(db));
-    await pumpUntilFound(tester, find.text('早餐'));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
 
     // 输入 25.5
     await tester.tap(find.text('2'));
@@ -62,16 +90,13 @@ void main() {
     expect(find.text('-¥25.50'), findsOneWidget);
 
     // 选择账户（默认空 → 需选择）
-    await tester.tap(find.text('账户'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('钱包（现金）').last);
-    await tester.pumpAndSettle();
+    await pickAccount(tester);
 
-    // 选择分类
-    await tester.tap(find.text('早餐'));
-    await tester.pump();
+    // 选择分类：点字段弹出两层选择器 → 选二级 → 确定
+    await pickBreakfast(tester);
+    expect(find.text('餐饮 / 早餐'), findsOneWidget);
 
-    // 保存
+    // 保存（键盘确定）
     await tester.tap(find.text('确定'));
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -85,23 +110,12 @@ void main() {
   testWidgets('invalid amount shows an error and does not save', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    final repo = CategoryRepository(db);
-    await repo.installSeeds(testSeed);
-    await db.into(db.accounts).insert(AccountsCompanion.insert(
-          accountType: AccountType.cash,
-          name: '钱包',
-          currency: 'CNY',
-          createdAt: DateTime.utc(2026, 8, 1),
-        ));
+    await seedDb(db);
 
     await tester.pumpWidget(harness(db));
-    await pumpUntilFound(tester, find.text('早餐'));
-    await tester.tap(find.text('账户'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('钱包（现金）').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('早餐'));
-    await tester.pump();
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+    await pickAccount(tester);
+    await pickBreakfast(tester);
 
     // 金额为空直接保存 → 无效
     await tester.tap(find.text('确定'));

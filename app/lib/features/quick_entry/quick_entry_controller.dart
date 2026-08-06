@@ -37,6 +37,24 @@ class QuickEntryController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void selectCategory(int? id) {
+    categoryId = id;
+    error = QuickEntryError.none;
+    notifyListeners();
+  }
+
+  void selectAccount(int? id) {
+    accountId = id;
+    error = QuickEntryError.none;
+    notifyListeners();
+  }
+
+  void selectToAccount(int? id) {
+    toAccountId = id;
+    error = QuickEntryError.none;
+    notifyListeners();
+  }
+
   /// 数字键盘按键（'0'-'9'、'.'、'+'、'-'）
   void pressKey(String key) {
     if (key == '.') return _pressDot();

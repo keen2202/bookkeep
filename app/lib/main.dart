@@ -1,6 +1,9 @@
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 
 import 'app.dart';
 import 'data/local/database.dart';
@@ -16,6 +19,17 @@ import 'features/quick_entry/quick_entry_sheet.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 中文本地化：TableCalendar 内部 DateFormat（月/星期）依赖 zh_CN 符号表
+  Intl.defaultLocale = 'zh_CN';
+  await initializeDateFormatting('zh_CN');
+  // 系统栏图标对比度（浅色主题深色图标）。targetSdk 36 下 Android 16 强制
+  // edge-to-edge，导航栏颜色对 API 36 不生效，本调用保证图标可辨并兜底旧设备
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  ));
   final db = AppDatabase(driftDatabase(name: 'bookkeep'));
   // 秒开模式：冷启动直达记账页（Spec §3.1 / BK-P0-001）
   final secondsOpen = await SettingsRepository(db).secondsOpenMode();
@@ -37,7 +51,13 @@ Future<void> main() async {
           )),
     ],
     child: secondsOpen
-        ? const MaterialApp(builder: lockGateBuilder, home: QuickEntrySheet())
+        ? MaterialApp(
+            locale: const Locale('zh', 'CN'),
+            localizationsDelegates: bookkeepLocalizationsDelegates,
+            supportedLocales: bookkeepSupportedLocales,
+            builder: lockGateBuilder,
+            home: const QuickEntrySheet(),
+          )
         : const BookkeepApp(),
   ));
 }

@@ -19,16 +19,34 @@ class CategoryRepository {
   final OpLogger opLogger;
   final String? bookId;
 
-  static const seedMetaKey = 'seed_version';
+  /// 种子版本按账本隔离的 meta 键（参照 sync_last_seq_$bookId 先例）；
+  /// 旧版本（v0.2.0 及更早）写入的是全局键 [legacySeedMetaKey]。
+  static String _seedKey(String bookId) => 'seed_version_$bookId';
+
+  /// 旧版本的全局种子版本键，仅用于存量数据迁移回退
+  static const legacySeedMetaKey = 'seed_version';
 
   Future<String> _bookId() async => bookId ?? kDefaultBookId;
 
-  /// 安装系统分类 seed（幂等：app_meta 记录版本，仅当版本更新时插入）。
+  /// 安装系统分类 seed（幂等：app_meta 记录各账本版本，仅当版本更新时插入）。
   /// seed 分类归属当前账本（各账本独立分类体系）。
   Future<int> installSeeds(CategorySeed seed) async {
-    final current = await currentSeedVersion();
-    if (current >= seed.version) return 0;
     final currentBookId = await _bookId();
+    var current = await currentSeedVersion();
+
+    // 存量迁移回退：旧版本种子版本是全局键。若当前账本已有系统分类行且全局版本
+    // 达标，视为已安装，并把版本固化到 per-book 键（此后判定不再依赖全局键）。
+    if (current == 0) {
+      final global = await _metaInt(legacySeedMetaKey);
+      if (global >= seed.version && await _hasSystemCategories(currentBookId)) {
+        current = global;
+        await db.into(db.appMeta).insert(
+              AppMetaCompanion.insert(key: _seedKey(currentBookId), value: '$global'),
+              onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('$global'))),
+            );
+      }
+    }
+    if (current >= seed.version) return 0;
 
     final now = DateTime.now().toUtc();
     var inserted = 0;
@@ -42,7 +60,7 @@ class CategoryRepository {
         }
       }
       await db.into(db.appMeta).insert(
-            AppMetaCompanion.insert(key: seedMetaKey, value: '${seed.version}'),
+            AppMetaCompanion.insert(key: _seedKey(currentBookId), value: '${seed.version}'),
             onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('${seed.version}'))),
           );
     });
@@ -65,11 +83,22 @@ class CategoryRepository {
   }
 
   Future<int> currentSeedVersion() async {
-    final rows = await (db.select(db.appMeta)
-          ..where((t) => t.key.equals(seedMetaKey)))
-        .get();
+    return _metaInt(_seedKey(await _bookId()));
+  }
+
+  Future<int> _metaInt(String key) async {
+    final rows = await (db.select(db.appMeta)..where((t) => t.key.equals(key))).get();
     if (rows.isEmpty) return 0;
     return int.tryParse(rows.single.value) ?? 0;
+  }
+
+  /// 账本是否已存在系统分类（软删行也计入：曾安装过即视为已安装）
+  Future<bool> _hasSystemCategories(String bookId) async {
+    final rows = await (db.select(db.categories)
+          ..where((t) => t.bookId.equals(bookId) & t.isSystem.equals(true))
+          ..limit(1))
+        .get();
+    return rows.isNotEmpty;
   }
 
   Future<List<Category>> listCategories({
