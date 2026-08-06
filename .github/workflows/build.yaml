@@ -311,10 +311,11 @@ jobs:
         with:
           name: ios-release
           # path 相对仓库根；flutter build 在 app/ 下执行，产物位于 app/build/...
-          # 有签名时产物为 .ipa；无签名（--no-codesign）时仅生成 .app（无法导出 IPA）
+          # 有签名时产物为 .ipa；无签名（--no-codesign）时仅生成 xcarchive，
+          # 未签名 .app 位于 archive 的 Products/Applications/ 内（无法导出 IPA）
           path: |
             app/build/ios/ipa/*.ipa
-            app/build/ios/iphoneos/Runner.app
+            app/build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app
           if-no-files-found: error
           retention-days: 14
 
