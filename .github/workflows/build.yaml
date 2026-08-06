@@ -218,8 +218,6 @@ jobs:
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
       EXPORT_METHOD: ${{ secrets.EXPORT_METHOD || 'app-store' }}
-      # iOS 部署目标（Podfile 已提交至仓库，platform 行为 13.0；此 sed 仅作兜底对齐）
-      IOS_DEPLOYMENT_TARGET: '13.0'
       # ---- --dart-define 输入（明文走 vars，敏感走 secrets）----
       API_BASE_URL: ${{ vars.API_BASE_URL }}
       SYNC_API_KEY: ${{ secrets.SYNC_API_KEY }}
@@ -244,31 +242,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
-      # CocoaPods 缓存（iOS，配合 Gradle 缓存的等价物）
-      - name: Cache CocoaPods
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/ios/Pods
-            ~/Library/Caches/CocoaPods
-          key: ${{ runner.os }}-pods-${{ hashFiles('app/ios/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
-
       - name: Install dependencies
         run: flutter pub get
 
-      # CocoaPods 已预装在 GitHub macOS runner；此处兜底安装
-      - name: Ensure CocoaPods
-        run: which pod || gem install cocoapods --no-document
-
-      - name: Apply iOS deployment target
-        run: |
-          # Podfile 已提交；若缺失则用 flutter create 重新生成（仅补缺失文件，不覆盖现有代码）
-          if [ ! -f ios/Podfile ]; then
-            flutter create --platforms=ios .
-          fi
-          sed -i '' "s/platform :ios, '.*'/platform :ios, '${IOS_DEPLOYMENT_TARGET}'/" ios/Podfile
+      # iOS 部署目标 13.0 已配置在 Runner.xcodeproj（IPHONEOS_DEPLOYMENT_TARGET）；
+      # Flutter 3.44+ 插件以 SPM 集成（FlutterGeneratedPluginSwiftPackage），无需 CocoaPods/Podfile
 
       # 解析 APP_ENV：tag=v* → prod，push 到 main/master → staging，其他 → dev
       - name: Resolve APP_ENV
