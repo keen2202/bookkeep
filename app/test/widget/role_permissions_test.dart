@@ -14,6 +14,7 @@ import 'package:bookkeep_app/features/accounts/accounts_page.dart';
 import 'package:bookkeep_app/features/budgets/budgets_page.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/books/books_page.dart' show showBookActions;
+import 'package:bookkeep_app/features/recurring/recurring_page.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 
 import 'categories_page_test.dart' show testSeed;
@@ -97,6 +98,26 @@ void main() {
     await tester.pumpWidget(pageHarness(db, const BudgetsPage(), role: 'viewer'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('新建预算'), findsNothing);
+  });
+
+  testWidgets('viewer 隐藏周期记账页「新建规则/立即补跑」按钮', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(pageHarness(db, const RecurringPage(), role: 'viewer'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('新建规则'), findsNothing);
+    expect(find.byTooltip('立即补跑'), findsNothing);
+  });
+
+  testWidgets('owner 周期记账页可新建规则与补跑', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(pageHarness(db, const RecurringPage()));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('新建规则'), findsOneWidget);
+    expect(find.byTooltip('立即补跑'), findsOneWidget);
   });
 
   testWidgets('viewer 隐藏分类页新建 FAB 与自定义分类编辑入口', (tester) async {

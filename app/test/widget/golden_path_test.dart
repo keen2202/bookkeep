@@ -83,11 +83,9 @@ void main() {
     for (final key in ['2', '5', '.', '5']) {
       await tapKey(tester, key);
     }
-    await tester.tap(find.text('账户'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('钱包（现金）').last);
-    await tester.pumpAndSettle();
-    // 分类：点字段弹出两级选择器 → 选二级 → 弹层确定
+    // 账户自动回填（无需手动选择）
+    await pumpUntilFound(tester, find.text('钱包（现金）'));
+    // 分类：点字段弹出两级选择器 → 点 chip 即选中并关闭弹层
     await pumpUntilFound(tester, find.text('选择分类'));
     await tester.tap(find.text('选择分类'));
     await tester.pumpAndSettle();
@@ -97,8 +95,6 @@ void main() {
         matching: find.widgetWithText(FilterChip, '早餐'),
       ),
     );
-    await tester.pump();
-    await tester.tap(find.widgetWithText(FilledButton, '确定'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();

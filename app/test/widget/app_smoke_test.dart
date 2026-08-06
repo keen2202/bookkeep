@@ -26,6 +26,6 @@ void main() {
     expect(find.byType(BookkeepApp), findsOneWidget);
     expect(find.text('bookkeep'), findsOneWidget);
     expect(find.text('分类'), findsWidgets);
-    expect(find.text('账户'), findsWidgets);
+    expect(find.text('周期记账'), findsWidgets);
   });
 }

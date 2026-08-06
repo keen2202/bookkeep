@@ -73,7 +73,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
           return Scaffold(
             body: switch (_tab) {
               0 => const CategoriesPage(),
-              1 => const AccountsPage(),
+              1 => const RecurringPage(),
               2 => const BudgetsPage(),
               3 => const ReportsPage(),
               4 => const CalendarPage(),
@@ -92,7 +92,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
               onDestinationSelected: (i) => setState(() => _tab = i),
               destinations: const [
                 NavigationDestination(icon: Icon(Icons.category_outlined), label: '分类'),
-                NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: '账户'),
+                NavigationDestination(icon: Icon(Icons.repeat), label: '周期记账'),
                 NavigationDestination(icon: Icon(Icons.pie_chart_outline), label: '预算'),
                 NavigationDestination(icon: Icon(Icons.bar_chart), label: '报表'),
                 NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: '日历'),
@@ -159,11 +159,11 @@ class _SettingsSheet extends ConsumerWidget {
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.repeat),
-                title: const Text('周期记账'),
-                subtitle: const Text('日/周/月/季/年 + 时间锚点 + 补跑'),
+                leading: const Icon(Icons.account_balance_wallet_outlined),
+                title: const Text('账户管理'),
+                subtitle: const Text('新增 / 编辑 / 归档账户'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RecurringPage()),
+                  MaterialPageRoute(builder: (_) => const AccountsPage()),
                 ),
               ),
               const Divider(),

@@ -26,20 +26,65 @@ class CalendarPage extends ConsumerStatefulWidget {
 class _CalendarPageState extends ConsumerState<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
+  CalendarFormat _format = CalendarFormat.month;
+
+  /// 当前视图的按日聚合取数窗口：
+  /// month = 聚焦月；twoWeeks = 聚焦日所在周（周日起点，与 table_calendar
+  /// 默认 startingDayOfWeek 一致）起的 14 天（可能跨月）。
+  ReportWindow get _window {
+    if (_format == CalendarFormat.month) {
+      return (
+        start: DateTime(_focusedDay.year, _focusedDay.month),
+        end: DateTime(_focusedDay.year, _focusedDay.month + 1),
+      );
+    }
+    final weekStart = DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day)
+        .subtract(Duration(days: _focusedDay.weekday % 7));
+    return (
+      start: weekStart,
+      end: weekStart.add(const Duration(days: 14)),
+    );
+  }
+
+  Future<void> _pickYear(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _focusedDay,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+      initialDatePickerMode: DatePickerMode.year,
+    );
+    if (picked != null && mounted) {
+      setState(() => _focusedDay = picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final window = _window;
     return Scaffold(
-      appBar: AppBar(title: const Text('日历')),
+      appBar: AppBar(
+        title: const Text('日历'),
+        actions: [
+          TextButton(
+            onPressed: () => _pickYear(context),
+            child: Text('${_focusedDay.year}年'),
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          // 月份懒加载：仅请求聚焦月份的按日聚合
+          // 懒加载：仅请求当前视图窗口的按日聚合
           _MonthTotalsScope(
-            key: ValueKey('${_focusedDay.year}-${_focusedDay.month}'),
+            key: ValueKey(
+                '${_format.name}|${window.start.year}-${window.start.month}-${window.start.day}'),
+            window: window,
+            format: _format,
             focusedDay: _focusedDay,
             selectedDay: _selectedDay,
             onSelected: (day) => setState(() => _selectedDay = day),
             onFocused: (day) => setState(() => _focusedDay = day),
+            onFormatChanged: (f) => setState(() => _format = f),
           ),
           Expanded(
             child: CashflowChart(day: _selectedDay),
@@ -53,25 +98,26 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 class _MonthTotalsScope extends ConsumerWidget {
   const _MonthTotalsScope({
     super.key,
+    required this.window,
+    required this.format,
     required this.focusedDay,
     required this.selectedDay,
     required this.onSelected,
     required this.onFocused,
+    required this.onFormatChanged,
   });
 
+  final ReportWindow window;
+  final CalendarFormat format;
   final DateTime focusedDay;
   final DateTime selectedDay;
   final ValueChanged<DateTime> onSelected;
   final ValueChanged<DateTime> onFocused;
+  final ValueChanged<CalendarFormat> onFormatChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final monthStart = DateTime(focusedDay.year, focusedDay.month);
-    final monthEnd = DateTime(focusedDay.year, focusedDay.month + 1);
-    final totals = ref.watch(calendarDailyTotalsProvider((
-      start: monthStart,
-      end: monthEnd,
-    )));
+    final totals = ref.watch(calendarDailyTotalsProvider((start: window.start, end: window.end)));
     final totalsByDay = totals.maybeWhen(
       data: (list) => {for (final t in list) t.date: t},
       orElse: () => <String, DailyTotal>{},
@@ -83,6 +129,12 @@ class _MonthTotalsScope extends ConsumerWidget {
       lastDay: DateTime(2035, 12, 31),
       locale: 'zh_CN',
       rowHeight: 56,
+      calendarFormat: format,
+      availableCalendarFormats: const {
+        CalendarFormat.month: '月',
+        CalendarFormat.twoWeeks: '双周',
+      },
+      onFormatChanged: onFormatChanged,
       focusedDay: focusedDay,
       selectedDayPredicate: (day) => isSameDay(day, selectedDay),
       onDaySelected: (selected, focused) {

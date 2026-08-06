@@ -61,12 +61,17 @@ class AccountsPage extends ConsumerWidget {
         ),
       ),
       // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
+      // HeroMode 禁用：避免页面 FAB 与全局 FAB 在切换/重建时触发 Hero flight 出现多个 + 按钮
       floatingActionButton: viewer
           ? null
-          : FloatingActionButton(
-              onPressed: () => AccountEditSheet.show(context),
-              tooltip: '新建账户',
-              child: const Icon(Icons.add),
+          : HeroMode(
+              enabled: false,
+              child: FloatingActionButton(
+                heroTag: 'accounts_fab',
+                onPressed: () => AccountEditSheet.show(context),
+                tooltip: '新建账户',
+                child: const Icon(Icons.add),
+              ),
             ),
     );
   }

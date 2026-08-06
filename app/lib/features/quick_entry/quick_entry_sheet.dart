@@ -50,6 +50,22 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         _controller.selectAccount(defaults.accountId);
       }
     }
+    // 账户自动回填（需求：无需手动选账户）：
+    // 1) 清理跨账本残留默认（lastDefaults 全局存储，切账本后可能指向他账本账户）
+    // 2) 无有效默认 → 自动选当前账本第一个账户
+    // 所有判断在 await 之后执行：若用户已手动选择则跳过，不覆盖用户操作
+    try {
+      final vm = await ref.read(accountsViewModelProvider.future);
+      final ids = {for (final e in vm.accounts) e.account.id};
+      if (_controller.accountId != null && !ids.contains(_controller.accountId)) {
+        _controller.selectAccount(null);
+      }
+      if (_controller.accountId == null && vm.accounts.isNotEmpty) {
+        _controller.selectAccount(vm.accounts.first.account.id);
+      }
+    } catch (_) {
+      // 账户加载失败由页面错误态提示，此处静默
+    }
   }
 
   void _onController() {

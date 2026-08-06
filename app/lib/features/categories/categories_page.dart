@@ -42,12 +42,17 @@ class CategoriesPage extends ConsumerWidget {
         data: (list) => _CategoryList(categories: list, viewer: viewer),
       ),
       // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
+      // HeroMode 禁用：避免页面 FAB 与全局 FAB 在切换/重建时触发 Hero flight 出现多个 + 按钮
       floatingActionButton: viewer
           ? null
-          : FloatingActionButton(
-              onPressed: () => CategoryEditSheet.show(context),
-              tooltip: '新建分类',
-              child: const Icon(Icons.add),
+          : HeroMode(
+              enabled: false,
+              child: FloatingActionButton(
+                heroTag: 'categories_fab',
+                onPressed: () => CategoryEditSheet.show(context),
+                tooltip: '新建分类',
+                child: const Icon(Icons.add),
+              ),
             ),
     );
   }

@@ -59,9 +59,13 @@ class RecurringService {
     return generated;
   }
 
-  /// 全部规则补跑（App 启动调用）；返回生成总数
-  Future<int> runAll({DateTime? now}) async {
-    final rules = await (db.select(db.recurringRules)).get();
+  /// 全部规则补跑（App 启动调用）；可按账本过滤；返回生成总数
+  Future<int> runAll({DateTime? now, String? bookId}) async {
+    final query = db.select(db.recurringRules);
+    if (bookId != null) {
+      query.where((t) => t.bookId.equals(bookId));
+    }
+    final rules = await query.get();
     var total = 0;
     for (final rule in rules) {
       total += await runRule(rule, now: now);

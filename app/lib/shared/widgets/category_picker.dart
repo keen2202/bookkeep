@@ -45,7 +45,14 @@ class _CategoryPickerState extends State<CategoryPicker> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final parent in _parents) ...[
-          _ParentTile(parent: parent, expanded: _childrenOf(parent.id).isNotEmpty),
+          // 无子级的父分类（自建顶层分类）点击直接选中，有子级则仅作分组标题
+          _ParentTile(
+            parent: parent,
+            expanded: _childrenOf(parent.id).isNotEmpty,
+            onTap: _childrenOf(parent.id).isEmpty
+                ? () => widget.onSelected?.call(parent.id)
+                : null,
+          ),
           if (_childrenOf(parent.id).isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: 16),
@@ -57,33 +64,23 @@ class _CategoryPickerState extends State<CategoryPicker> {
                     _CategoryChip(
                       category: child,
                       selected: _selectedId == child.id,
-                      onTap: () => setState(() => _selectedId = child.id),
+                      onTap: () => widget.onSelected?.call(child.id),
                     ),
                 ],
               ),
             ),
         ],
-        if (_selectedId != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.tonal(
-                onPressed: () => widget.onSelected?.call(_selectedId!),
-                child: const Text('确定'),
-              ),
-            ),
-          ),
       ],
     );
   }
 }
 
 class _ParentTile extends StatelessWidget {
-  const _ParentTile({required this.parent, required this.expanded});
+  const _ParentTile({required this.parent, required this.expanded, this.onTap});
 
   final Category parent;
   final bool expanded;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +90,7 @@ class _ParentTile extends StatelessWidget {
       leading: Icon(categoryIcon(parent.icon), color: Color(parent.color)),
       title: Text(parent.name),
       trailing: expanded ? const Icon(Icons.expand_more, size: 18) : null,
+      onTap: onTap,
     );
   }
 }

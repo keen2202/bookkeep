@@ -32,7 +32,7 @@ void main() {
     fail('Timed out waiting for $finder');
   }
 
-  /// 弹层内选「早餐」并确认（弹层确定按钮与键盘确定用不同 finder 区分）
+  /// 弹层内点「早餐」chip：选中即关闭弹层并回填（无确定按钮）
   Future<void> pickBreakfast(WidgetTester tester) async {
     await pumpUntilFound(tester, find.text('选择分类'));
     await tester.tap(find.text('选择分类'));
@@ -43,11 +43,10 @@ void main() {
         matching: find.widgetWithText(FilterChip, '早餐'),
       ),
     );
-    await tester.pump();
-    await tester.tap(find.widgetWithText(FilledButton, '确定'));
     await tester.pumpAndSettle();
   }
 
+  /// 手动重新选择账户（覆盖自动回填）
   Future<void> pickAccount(WidgetTester tester) async {
     await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
     await tester.tap(find.text('账户'));
@@ -89,10 +88,11 @@ void main() {
 
     expect(find.text('-¥25.50'), findsOneWidget);
 
-    // 选择账户（默认空 → 需选择）
-    await pickAccount(tester);
+    // 账户自动回填（无需手动选择）
+    await pumpUntilFound(tester, find.text('钱包（现金）'));
+    expect(find.text('钱包（现金）'), findsOneWidget);
 
-    // 选择分类：点字段弹出两层选择器 → 选二级 → 确定
+    // 选择分类：点字段弹出两层选择器 → 点 chip 即选中并关闭弹层
     await pickBreakfast(tester);
     expect(find.text('餐饮 / 早餐'), findsOneWidget);
 

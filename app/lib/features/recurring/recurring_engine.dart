@@ -67,6 +67,14 @@ class RecurringEngine {
   List<DateTime> catchUp(RecurringRuleSpec spec, DateTime nextDue, DateTime now) {
     return expandDates(spec, nextDue, now.add(const Duration(days: 1)));
   }
+
+  /// [now, now + horizonDays) 内第一个到期日（严格不早于 now，含时刻比较）；
+  /// 无则返回 null（规则已过 endDate 等）。窗口 400 天覆盖 interval=1 时
+  /// 年频率相邻到期日最大间隔（约 366 天）。
+  DateTime? firstDueAfter(RecurringRuleSpec spec, DateTime now, {int horizonDays = 400}) {
+    final dues = expandDates(spec, now, now.add(Duration(days: horizonDays)));
+    return dues.isEmpty ? null : dues.first;
+  }
 }
 
 /// 等额分期（Spec §4.4）：总额按期数均分，舍入误差由末笔补差，分期合计 = 总额（误差 0）。

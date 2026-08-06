@@ -80,12 +80,18 @@ class BudgetsPage extends ConsumerWidget {
         },
       ),
       // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
+      // HeroMode 禁用：避免页面 FAB 与全局 FAB 在切换/重建时触发 Hero flight 出现多个 + 按钮
       floatingActionButton: viewer
           ? null
-          : FloatingActionButton(
-              onPressed: () => BudgetEditSheet.show(context),
-              tooltip: '新建预算',
-              child: const Icon(Icons.add),
+          : HeroMode(
+              enabled: false,
+              child: FloatingActionButton.extended(
+                heroTag: 'budgets_fab',
+                onPressed: () => BudgetEditSheet.show(context),
+                tooltip: '新建预算',
+                icon: const Icon(Icons.add),
+                label: const Text('新增预算'),
+              ),
             ),
     );
   }
