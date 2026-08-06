@@ -311,7 +311,10 @@ jobs:
         with:
           name: ios-release
           # path 相对仓库根；flutter build 在 app/ 下执行，产物位于 app/build/...
-          path: app/build/ios/ipa/*.ipa
+          # 有签名时产物为 .ipa；无签名（--no-codesign）时仅生成 .app（无法导出 IPA）
+          path: |
+            app/build/ios/ipa/*.ipa
+            app/build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 14
 
@@ -351,12 +354,17 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           mkdir -p dist
           cd artifacts
-          # download-artifact@v4 保留 artifact 内目录结构，需递归查找产物
+          # download-artifact@v4 保留 artifact 内目录结构，需递归查找产物；
+          # 无签名 iOS 产物是 .app 目录（非文件），需要 -type d 与 cp -r
           while IFS= read -r f; do
-            ext="${f##*.}"
-            base=$(basename "$f" ".$ext")
-            cp "$f" "../dist/${base}-${TAG}.$ext"
-          done < <(find android ios -type f \( -name "*.apk" -o -name "*.aab" -o -name "*.ipa" \) 2>/dev/null)
+            if [ -d "$f" ]; then
+              cp -r "$f" "../dist/$(basename "$f" .app)-${TAG}.app"
+            else
+              ext="${f##*.}"
+              base=$(basename "$f" ".$ext")
+              cp "$f" "../dist/${base}-${TAG}.$ext"
+            fi
+          done < <(find android ios \( -type f \( -name "*.apk" -o -name "*.aab" -o -name "*.ipa" \) -o -type d -name "*.app" \) 2>/dev/null)
           ls -la ../dist
 
       - name: Create GitHub Release
