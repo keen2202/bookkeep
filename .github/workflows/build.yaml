@@ -310,7 +310,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ios-release
-          path: build/ios/ipa/*.ipa
+          # path 相对仓库根；flutter build 在 app/ 下执行，产物位于 app/build/...
+          path: app/build/ios/ipa/*.ipa
           if-no-files-found: error
           retention-days: 14
 
