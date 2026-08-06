@@ -372,12 +372,12 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           mkdir -p dist
           cd artifacts
-          for f in android/*.apk android/*.aab ios/*.ipa; do
-            [ -f "$f" ] || continue
+          # download-artifact@v4 保留 artifact 内目录结构，需递归查找产物
+          while IFS= read -r f; do
             ext="${f##*.}"
             base=$(basename "$f" ".$ext")
             cp "$f" "../dist/${base}-${TAG}.$ext"
-          done
+          done < <(find android ios -type f \( -name "*.apk" -o -name "*.aab" -o -name "*.ipa" \) 2>/dev/null)
           ls -la ../dist
 
       - name: Create GitHub Release
