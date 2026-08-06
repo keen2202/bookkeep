@@ -356,10 +356,12 @@ jobs:
           mkdir -p dist
           cd artifacts
           # download-artifact@v4 保留 artifact 内目录结构，需递归查找产物；
-          # 无签名 iOS 产物是 .app 目录（非文件），需要 -type d 与 cp -r
+          # 无签名 iOS 产物是 .app 目录（非文件），GitHub Release 资产只能上传文件，
+          # 因此将 .app 打包为 .app.zip（zip 内路径以 Runner.app/ 开头）
           while IFS= read -r f; do
             if [ -d "$f" ]; then
-              cp -r "$f" "../dist/$(basename "$f" .app)-${TAG}.app"
+              appdir="$(basename "$f" .app)-${TAG}.app"
+              (cd "$(dirname "$f")" && zip -rq "$GITHUB_WORKSPACE/dist/${appdir}.zip" "$(basename "$f")")
             else
               ext="${f##*.}"
               base=$(basename "$f" ".$ext")
