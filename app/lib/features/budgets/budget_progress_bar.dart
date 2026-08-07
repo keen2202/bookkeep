@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/services/budget_progress_calculator.dart';
+import '../../shared/theme/app_theme.dart';
 
 /// 预算进度条（Spec §3.4）：80% 预警 / 100% 超支
 class BudgetProgressBar extends StatelessWidget {
@@ -13,7 +14,7 @@ class BudgetProgressBar extends StatelessWidget {
     final color = progress.exceeded
         ? Theme.of(context).colorScheme.error
         : progress.overThreshold
-            ? Colors.orange
+            ? context.appColors.warning
             : Theme.of(context).colorScheme.primary;
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),

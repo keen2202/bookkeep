@@ -11,10 +11,8 @@ import 'package:bookkeep_app/data/local/tables/categories_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/features/accounts/accounts_page.dart';
-import 'package:bookkeep_app/features/budgets/budgets_page.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/books/books_page.dart' show showBookActions;
-import 'package:bookkeep_app/features/recurring/recurring_page.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 
 import 'categories_page_test.dart' show testSeed;
@@ -27,6 +25,7 @@ void main() {
       overrides: [
         databaseProvider.overrideWithValue(db),
         currentRoleProvider.overrideWith((ref) => role),
+        categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
       child: const BookkeepApp(),
     );
@@ -39,8 +38,13 @@ void main() {
         currentRoleProvider.overrideWith((ref) => role),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
-      child: MaterialApp(home: page),
+      child: MaterialApp(home: Scaffold(body: page)),
     );
+  }
+
+  Future<void> switchTab(WidgetTester tester, String label) async {
+    await tester.tap(find.text(label).last);
+    await tester.pump(const Duration(milliseconds: 400));
   }
 
   testWidgets('viewer 隐藏主界面「记一笔」FAB', (tester) async {
@@ -91,20 +95,22 @@ void main() {
     expect(find.text('归档'), findsOneWidget);
   });
 
-  testWidgets('viewer 隐藏预算页「新建预算」FAB', (tester) async {
+  testWidgets('viewer 隐藏预算页「新建预算」动作', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
-    await tester.pumpWidget(pageHarness(db, const BudgetsPage(), role: 'viewer'));
+    await tester.pumpWidget(shellHarness(db, role: 'viewer'));
+    await switchTab(tester, '预算');
     await tester.pumpAndSettle();
     expect(find.byTooltip('新建预算'), findsNothing);
   });
 
-  testWidgets('viewer 隐藏周期记账页「新建规则/立即补跑」按钮', (tester) async {
+  testWidgets('viewer 隐藏周期记账页「新建规则/立即补跑」动作', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
-    await tester.pumpWidget(pageHarness(db, const RecurringPage(), role: 'viewer'));
+    await tester.pumpWidget(shellHarness(db, role: 'viewer'));
+    await switchTab(tester, '周期记账');
     await tester.pumpAndSettle();
     expect(find.byTooltip('新建规则'), findsNothing);
     expect(find.byTooltip('立即补跑'), findsNothing);
@@ -114,13 +120,14 @@ void main() {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
-    await tester.pumpWidget(pageHarness(db, const RecurringPage()));
+    await tester.pumpWidget(shellHarness(db));
+    await switchTab(tester, '周期记账');
     await tester.pumpAndSettle();
     expect(find.byTooltip('新建规则'), findsOneWidget);
     expect(find.byTooltip('立即补跑'), findsOneWidget);
   });
 
-  testWidgets('viewer 隐藏分类页新建 FAB 与自定义分类编辑入口', (tester) async {
+  testWidgets('viewer 隐藏分类页新建动作与自定义分类编辑入口', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     await CategoryRepository(db).createCategory(
@@ -130,7 +137,7 @@ void main() {
       kind: CategoryKind.expense,
     );
 
-    await tester.pumpWidget(pageHarness(db, const CategoriesPage(), role: 'viewer'));
+    await tester.pumpWidget(shellHarness(db, role: 'viewer'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byTooltip('新建分类'), findsNothing);
     expect(find.byIcon(Icons.more_vert), findsNothing);

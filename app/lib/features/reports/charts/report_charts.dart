@@ -9,7 +9,17 @@ const _palette = [
   Color(0xFF42A5F5), Color(0xFF7E57C2), Color(0xFFEC407A), Color(0xFF8D6E63),
 ];
 
-/// 分类占比饼图（Spec §3.5）
+/// 可读刻度（审查 U-11）：大额转「x.xx万」，小额原样；负值保留符号
+String _compactTick(int minor) {
+  final abs = minor.abs();
+  final sign = minor < 0 ? '-' : '';
+  if (abs >= 10000000) return '$sign${(minor / 1000000).toStringAsFixed(1)}百万';
+  if (abs >= 100000) return '$sign${(minor / 100000).toStringAsFixed(1)}万';
+  return '$sign${formatMoney(minor).replaceAll('¥', '')}';
+}
+
+/// 分类占比饼图（Spec §3.5；审查 U-11：扇区仅百分比，金额进外置图例；
+/// 脱敏态图例金额脱敏）
 class CategoryPieChart extends StatelessWidget {
   const CategoryPieChart({super.key, required this.slices, required this.hideAmounts});
 
@@ -21,31 +31,68 @@ class CategoryPieChart extends StatelessWidget {
     if (slices.isEmpty) {
       return const Center(child: Text('暂无数据'));
     }
-    return SizedBox(
-      height: 240,
-      child: PieChart(
-        PieChartData(
-          sectionsSpace: 2,
-          centerSpaceRadius: 36,
-          sections: [
+    final total = slices.fold<int>(0, (a, b) => a + b.amountMinor);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 200,
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 36,
+              sections: [
+                for (var i = 0; i < slices.length; i++)
+                  PieChartSectionData(
+                    value: slices[i].amountMinor.toDouble(),
+                    color: _palette[i % _palette.length],
+                    title: hideAmounts
+                        ? null
+                        : total <= 0
+                            ? null
+                            : '${(slices[i].amountMinor * 100 ~/ total)}%',
+                    titleStyle: const TextStyle(fontSize: 12, color: Colors.white),
+                    radius: 64,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        // 外置图例：色块 + 分类名 + 金额（脱敏态显示 ***）
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          alignment: WrapAlignment.center,
+          children: [
             for (var i = 0; i < slices.length; i++)
-              PieChartSectionData(
-                value: slices[i].amountMinor.toDouble(),
-                color: _palette[i % _palette.length],
-                title: hideAmounts
-                    ? slices[i].categoryName
-                    : '${slices[i].categoryName}\n${formatMoney(slices[i].amountMinor)}',
-                titleStyle: const TextStyle(fontSize: 10, color: Colors.white),
-                radius: 64,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _palette[i % _palette.length],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${slices[i].categoryName} '
+                    '${hideAmounts ? '***' : formatMoney(slices[i].amountMinor)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
 
-/// 周期对比柱状图（Spec §3.5）
+/// 周期对比柱状图（Spec §3.5；审查 U-11：touch 开启 + tooltip 金额格式化 + 可读刻度）
 class PeriodBarChart extends StatelessWidget {
   const PeriodBarChart({super.key, required this.buckets, required this.hideAmounts});
 
@@ -63,9 +110,27 @@ class PeriodBarChart extends StatelessWidget {
       child: BarChart(
         BarChartData(
           maxY: maxAmount.toDouble() * 1.2,
-          barTouchData: BarTouchData(enabled: false),
+          barTouchData: BarTouchData(
+            enabled: !hideAmounts,
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipItem: (group, groupIndex, rod, rodIndex) =>
+                  BarTooltipItem(formatMoney(rod.toY.round()), const TextStyle()),
+            ),
+          ),
           titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: hideAmounts
+                ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
+                : AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 52,
+                      getTitlesWidget: (value, meta) {
+                        if (value <= 0) return const SizedBox.shrink();
+                        return Text(_compactTick(value.toInt()),
+                            style: const TextStyle(fontSize: 12));
+                      },
+                    ),
+                  ),
             rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             bottomTitles: AxisTitles(
@@ -76,7 +141,7 @@ class PeriodBarChart extends StatelessWidget {
                   if (index < 0 || index >= buckets.length) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(buckets[index].label, style: const TextStyle(fontSize: 9)),
+                    child: Text(buckets[index].label, style: const TextStyle(fontSize: 12)),
                   );
                 },
               ),
@@ -99,7 +164,7 @@ class PeriodBarChart extends StatelessWidget {
   }
 }
 
-/// 收支趋势折线图（Spec §3.5）
+/// 收支趋势折线图（Spec §3.5；审查 U-11：tooltip 金额格式化 + 可读刻度）
 class TrendLineChart extends StatelessWidget {
   const TrendLineChart({
     super.key,
@@ -142,13 +207,41 @@ class TrendLineChart extends StatelessWidget {
         LineChartData(
           maxY: maxY,
           minY: 0,
-          lineTouchData: LineTouchData(enabled: !hideAmounts),
+          lineTouchData: LineTouchData(
+            enabled: !hideAmounts,
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (spots) => [
+                for (final s in spots)
+                  LineTooltipItem(
+                    formatMoney(s.y.round()),
+                    TextStyle(
+                      color: s.barIndex == 0
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+          ),
           gridData: const FlGridData(show: true, drawVerticalLine: false),
-          titlesData: const FlTitlesData(
-            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          titlesData: FlTitlesData(
+            leftTitles: hideAmounts
+                ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
+                : AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 52,
+                      getTitlesWidget: (value, meta) {
+                        if (value <= 0) return const SizedBox.shrink();
+                        return Text(_compactTick(value.toInt()),
+                            style: const TextStyle(fontSize: 12));
+                      },
+                    ),
+                  ),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
           lineBarsData: [
             LineChartBarData(

@@ -14,10 +14,11 @@ declare global {
 }
 
 /**
- * book 粒度鉴权（Spec §1.3）：账本不存在时自动建账并授权调用者为 owner（P0 default book
- * 客户端自选 book_id 语义）；账本存在但非成员 → 403；viewer 不可写 → 403。
+ * book 粒度鉴权（Spec §1.3）：仅 sync push 路径允许自动建账并授权调用者为 owner
+ * （P0 default book 客户端自选 book_id 语义）；其余路径（pull / 成员管理）对不存在
+ * 的账本返回 404，GET 无副作用（审查 L-1）。账本存在但非成员 → 403；viewer 不可写 → 403。
  */
-export function requireBookMember(pool: DbPool, opts: { allowWrite: boolean }) {
+export function requireBookMember(pool: DbPool, opts: { allowWrite: boolean; autoCreate?: boolean }) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user?.sub;
     if (!userId) {
@@ -38,7 +39,12 @@ export function requireBookMember(pool: DbPool, opts: { allowWrite: boolean }) {
 
     const existing = await pool.query('SELECT id FROM books WHERE id = $1', [normalized]);
     if (existing.rows.length === 0) {
-      // 并发首推同一 book_id 时 ON CONFLICT 兜底，避免唯一键冲突 500（评审 M5）
+      if (!opts.autoCreate) {
+        res.status(404).json({ error: 'book_not_found' });
+        return;
+      }
+      // 并发首推同一 book_id：ON CONFLICT 兜底 + one_owner_per_book 部分唯一索引
+      // 保证仅一人成为 owner；失败者（非成员）在此被 403 拦截（评审 M5 / L-1）
       await pool.query(
         "INSERT INTO books (id, name, type, owner_id) VALUES ($1, 'default', 'default', $2) ON CONFLICT (id) DO NOTHING",
         [normalized, userId],
@@ -47,6 +53,14 @@ export function requireBookMember(pool: DbPool, opts: { allowWrite: boolean }) {
         "INSERT INTO book_members (book_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING",
         [normalized, userId],
       );
+      const race = await pool.query<{ role: MemberRole }>(
+        'SELECT role FROM book_members WHERE book_id = $1 AND user_id = $2',
+        [normalized, userId],
+      );
+      if (race.rows.length === 0) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
       req.bookId = normalized;
       next();
       return;

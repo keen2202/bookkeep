@@ -4,12 +4,14 @@ import 'dart:math';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/core/errors/repository_exceptions.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
+import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 import 'package:bookkeep_app/domain/services/account_balance_calculator.dart';
 
 void main() {
@@ -79,7 +81,9 @@ void main() {
     final fromId = await repo.createAccount(name: 'A', type: AccountType.cash);
     final toId = await repo.createAccount(name: 'B', type: AccountType.savings);
 
-    final transferId = await repo.createTransfer(
+    // 审查 R-022：转账实现已收敛到 TransactionRepository（删除账户仓库重复版）
+    final txRepo = TransactionRepository(db, bookId: kDefaultBookId);
+    final transferId = await txRepo.createTransfer(
       fromAccountId: fromId,
       toAccountId: toId,
       amountMinor: 2500,
@@ -189,7 +193,8 @@ void main() {
 
   test('createTransfer enqueues paired transfer ops', () async {
     final toId = await repo.createAccount(name: '储蓄', type: AccountType.savings);
-    await repo.createTransfer(
+    final txRepo = TransactionRepository(db, bookId: kDefaultBookId);
+    await txRepo.createTransfer(
       fromAccountId: 1,
       toAccountId: toId,
       amountMinor: 5000,

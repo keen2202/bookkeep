@@ -44,7 +44,8 @@ class ReportsRepository {
   Future<String> _bookId() async => bookId ?? kDefaultBookId;
 
   /// 按日聚合：支出/收入（不含已删除与转账）。
-  /// 多币种：按币种分组后经 [rates] 折算到主币种（Spec §4.5）。
+  /// 多币种：按 (币种, 记账时汇率快照) 分组，以快照折算主币种（审查 F-8：
+  /// 历史报表不随当前汇率波动）；无快照的旧行回退 [rates]。
   Future<List<DailyTotal>> dailyTotals({
     required DateTime start,
     required DateTime end,
@@ -52,13 +53,13 @@ class ReportsRepository {
   }) async {
     final currentBookId = await _bookId();
     final rows = await db.customSelect(
-      "SELECT date(occurred_at, 'unixepoch') AS day, currency, "
+      "SELECT date(occurred_at, 'unixepoch') AS day, currency, rate_snapshot, "
       'COALESCE(SUM(CASE WHEN type = ? THEN -amount_minor END), 0) AS expense, '
       'COALESCE(SUM(CASE WHEN type = ? THEN amount_minor END), 0) AS income '
       'FROM transactions '
       'WHERE deleted_at IS NULL AND type IN (?, ?) AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
-      'GROUP BY day, currency ORDER BY day',
+      'GROUP BY day, currency, rate_snapshot ORDER BY day',
       variables: [
         Variable.withString('expense'),
         Variable.withString('income'),
@@ -73,8 +74,9 @@ class ReportsRepository {
     for (final row in rows) {
       final day = row.read<String>('day');
       final currency = row.read<String>('currency');
-      final expense = _convert(row.read<int>('expense'), currency, rates);
-      final income = _convert(row.read<int>('income'), currency, rates);
+      final snapshot = row.read<int?>('rate_snapshot');
+      final expense = _convertWith(row.read<int>('expense'), currency, snapshot, rates);
+      final income = _convertWith(row.read<int>('income'), currency, snapshot, rates);
       byDay.update(
         day,
         (t) => DailyTotal(
@@ -89,7 +91,7 @@ class ReportsRepository {
     return [for (final d in days) byDay[d]!];
   }
 
-  /// 分类占比（单条分组 SQL；按币种折算主币种）
+  /// 分类占比（单条分组 SQL；按 (币种, 汇率快照) 折算主币种，审查 F-8）
   Future<List<CategorySlice>> categoryBreakdown({
     required DateTime start,
     required DateTime end,
@@ -97,12 +99,12 @@ class ReportsRepository {
   }) async {
     final currentBookId = await _bookId();
     final rows = await db.customSelect(
-      'SELECT t.category_id, c.name AS category_name, t.currency, '
+      'SELECT t.category_id, c.name AS category_name, t.currency, t.rate_snapshot, '
       'COALESCE(SUM(-t.amount_minor), 0) AS amount '
       'FROM transactions t LEFT JOIN categories c ON c.id = t.category_id '
       'WHERE t.type = ? AND t.deleted_at IS NULL AND t.book_id = ? '
       'AND t.occurred_at >= ? AND t.occurred_at < ? '
-      'GROUP BY t.category_id, t.currency',
+      'GROUP BY t.category_id, t.currency, t.rate_snapshot',
       variables: [
         Variable.withString('expense'),
         Variable.withString(currentBookId),
@@ -115,7 +117,8 @@ class ReportsRepository {
       final id = row.read<int?>('category_id') ?? 0;
       final name = row.read<String?>('category_name') ?? '未分类';
       final currency = row.read<String>('currency');
-      final amount = _convert(row.read<int>('amount'), currency, rates);
+      final snapshot = row.read<int?>('rate_snapshot');
+      final amount = _convertWith(row.read<int>('amount'), currency, snapshot, rates);
       byCategory.update(
         id,
         (s) => CategorySlice(
@@ -144,12 +147,12 @@ class ReportsRepository {
         ? "%Y-W%W" // 周
         : '%Y-%m'; // 月
     final rows = await db.customSelect(
-      "SELECT strftime(?, occurred_at, 'unixepoch') AS bucket, currency, "
+      "SELECT strftime(?, occurred_at, 'unixepoch') AS bucket, currency, rate_snapshot, "
       'COALESCE(SUM(-amount_minor), 0) AS amount '
       'FROM transactions '
       'WHERE type = ? AND deleted_at IS NULL AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
-      'GROUP BY bucket, currency',
+      'GROUP BY bucket, currency, rate_snapshot',
       variables: [
         Variable.withString(format),
         Variable.withString('expense'),
@@ -162,7 +165,8 @@ class ReportsRepository {
     for (final row in rows) {
       final bucket = row.read<String>('bucket');
       final currency = row.read<String>('currency');
-      final amount = _convert(row.read<int>('amount'), currency, rates);
+      final snapshot = row.read<int?>('rate_snapshot');
+      final amount = _convertWith(row.read<int>('amount'), currency, snapshot, rates);
       byBucket.update(bucket, (v) => v + amount, ifAbsent: () => amount);
     }
     final buckets = byBucket.keys.toList()..sort();
@@ -185,13 +189,12 @@ class ReportsRepository {
     return results;
   }
 
-  /// 按汇率表折算（rates: code → kRateScale 刻度；缺失按 1:1）
-  int _convert(int amountMinor, String currency, Map<String, int> rates) {
+  /// 按记账时汇率快照折算主币种（审查 F-8）：快照优先；
+  /// 无快照的旧行回退 [rates]（缺失按 1:1）
+  int _convertWith(int amountMinor, String currency, int? snapshot, Map<String, int> rates) {
     if (amountMinor == 0 || currency == 'CNY') return amountMinor;
-    return Money.convert(
-      amountMinor: amountMinor,
-      rateScaled: rates[currency] ?? kRateScale,
-    );
+    final rate = (snapshot ?? 0) > 0 ? snapshot! : (rates[currency] ?? kRateScale);
+    return Money.convert(amountMinor: amountMinor, rateScaled: rate);
   }
 
   String _two(int v) => v.toString().padLeft(2, '0');

@@ -26,7 +26,7 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: CalendarPage(),
+        home: Scaffold(body: CalendarPage()),
       ),
     );
   }

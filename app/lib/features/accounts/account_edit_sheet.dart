@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/accounts_table.dart';
 import '../books/books_providers.dart' show accountRepositoryProvider;
+import '../currency/currency_providers.dart';
 import 'account_card.dart' show accountTypeLabel;
 import 'accounts_providers.dart';
 
@@ -34,6 +35,8 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _balanceController;
   late AccountType _type;
+  // 审查 F-8：账户币种（转账/报表按账户币种记账与折算）
+  late String _currency;
   bool _saving = false;
 
   @override
@@ -45,6 +48,7 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
       text: account == null ? '' : (account.initialBalance / 100).toStringAsFixed(2),
     );
     _type = account?.accountType ?? AccountType.cash;
+    _currency = account?.currency ?? 'CNY';
   }
 
   @override
@@ -62,9 +66,20 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
     final account = widget.account;
     try {
       if (account == null) {
-        await repo.createAccount(name: _nameController.text.trim(), type: _type, initialBalance: initialBalance);
+        await repo.createAccount(
+          name: _nameController.text.trim(),
+          type: _type,
+          currency: _currency,
+          initialBalance: initialBalance,
+        );
       } else {
-        await repo.updateAccount(account.id, name: _nameController.text.trim(), type: _type, initialBalance: initialBalance);
+        await repo.updateAccount(
+          account.id,
+          name: _nameController.text.trim(),
+          type: _type,
+          currency: _currency,
+          initialBalance: initialBalance,
+        );
       }
       ref.invalidate(accountsViewModelProvider);
       if (mounted) Navigator.pop(context);
@@ -118,6 +133,28 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
                   DropdownMenuItem(value: t, child: Text(accountTypeLabel(t))),
               ],
               onChanged: (v) => setState(() => _type = v!),
+            ),
+            const SizedBox(height: 12),
+            // 审查 F-8：账户币种选择（转账/报表按币种记账折算）
+            FutureBuilder<List<Currency>>(
+              future: ref.read(currenciesViewModelProvider.future),
+              builder: (context, snapshot) {
+                final currencies = snapshot.data ?? const <Currency>[];
+                return DropdownButtonFormField<String>(
+                  initialValue: currencies.any((c) => c.code == _currency)
+                      ? _currency
+                      : null,
+                  decoration: const InputDecoration(labelText: '币种'),
+                  items: [
+                    for (final c in currencies)
+                      DropdownMenuItem(
+                        value: c.code,
+                        child: Text('${c.name}（${c.code}）'),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _currency = v ?? 'CNY'),
+                );
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(

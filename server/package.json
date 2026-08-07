@@ -7,22 +7,26 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "jest --coverage=false",
+    "test": "jest",
     "test:coverage": "jest --coverage",
     "build": "tsc",
     "dev": "ts-node src/index.ts",
     "migrate": "ts-node src/db/migrate.ts",
-    "test:integration": "jest --coverage=false --testMatch '**/*.integration.test.ts'"
+    "test:integration": "jest --coverage=false --testPathIgnorePatterns '/node_modules/' --testMatch '**/*.integration.test.ts'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cors": "^2.8.6",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.22.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",

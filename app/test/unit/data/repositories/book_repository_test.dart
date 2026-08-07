@@ -201,7 +201,7 @@ CREATE TABLE app_meta (
       raw.close();
 
       final migrated = AppDatabase(NativeDatabase(File(dbPath)));
-      expect(migrated.schemaVersion, 6);
+      expect(migrated.schemaVersion, 7);
 
       // 老数据归默认账本（保留 legacy sync_book_id 作为默认账本 id）
       final account = await migrated.select(migrated.accounts).getSingle();

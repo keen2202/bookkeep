@@ -102,4 +102,11 @@ abstract final class AnchorResolver {
   static DateTime _lastDayOfMonth(DateTime monthStart) {
     return DateTime(monthStart.year, monthStart.month + 1, 0);
   }
+
+  /// 月初 + 第 n 月（审查 L-6 月末漂移修复）：1 月 31 日起的第 2 期
+  /// 落在 2 月 28/29，而非 Dart DateTime 溢出归一化的 3 月 3 日
+  static DateTime monthOffset(DateTime base, int months) {
+    final monthStart = DateTime(base.year, base.month + months, 1);
+    return _dayInMonth(monthStart, base.day);
+  }
 }

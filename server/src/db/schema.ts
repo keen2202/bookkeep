@@ -23,6 +23,16 @@ CREATE TABLE IF NOT EXISTS book_members (
   PRIMARY KEY (book_id, user_id)
 );
 
+-- 审查 L-1：owner 唯一性由数据库约束兜底（先清理既有双 owner，保留最早创建者）
+DELETE FROM book_members m
+USING book_members m2
+WHERE m.role = 'owner' AND m2.role = 'owner'
+  AND m.book_id = m2.book_id
+  AND m.created_at > m2.created_at;
+
+CREATE UNIQUE INDEX IF NOT EXISTS one_owner_per_book
+  ON book_members(book_id) WHERE role = 'owner';
+
 CREATE TABLE IF NOT EXISTS sync_ops (
   id BIGSERIAL PRIMARY KEY,
   book_id UUID NOT NULL REFERENCES books(id) ON DELETE CASCADE,

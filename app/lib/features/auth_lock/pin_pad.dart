@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// 自绘 PIN 数字键盘（Spec §3.6 / BK-T-008）；输入满 [length] 位自动提交
 class PinPad extends StatefulWidget {
@@ -94,16 +95,24 @@ class _Key extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(32),
-      child: SizedBox(
-        width: 72,
-        height: 64,
-        child: Center(
-          child: icon != null
-              ? Icon(icon, color: theme.colorScheme.onSurfaceVariant)
-              : Text(label!, style: theme.textTheme.titleLarge),
+    return Semantics(
+      // 审查 U-12：读屏可识别按键；触控即反馈（HapticFeedback）
+      button: true,
+      label: icon != null ? '退格' : '数字 $label',
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(32),
+        child: SizedBox(
+          width: 72,
+          height: 64,
+          child: Center(
+            child: icon != null
+                ? Icon(icon, color: theme.colorScheme.onSurfaceVariant)
+                : Text(label!, style: theme.textTheme.titleLarge),
+          ),
         ),
       ),
     );

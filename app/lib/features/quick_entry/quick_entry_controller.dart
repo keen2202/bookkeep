@@ -6,7 +6,7 @@ import '../../data/repositories/transaction_repository.dart';
 import '../../domain/usecases/create_transaction.dart';
 import 'amount_parser.dart';
 
-enum QuickEntryError { none, invalidAmount, missingSelection }
+enum QuickEntryError { none, invalidAmount, missingSelection, saveFailed }
 
 /// 极速记账控制器（Spec §3.1 / BK-P0-001）：
 /// 数字键盘输入状态机 + 乐观保存（本地落库 + sync_ops 入队）
@@ -126,13 +126,20 @@ class QuickEntryController extends ChangeNotifier {
       }
       saving = true;
       _notify();
-      await transactionRepository.createTransfer(
-        fromAccountId: accountId!,
-        toAccountId: toAccountId!,
-        amountMinor: amount,
-        occurredAt: DateTime.now(),
-      );
-      saving = false;
+      try {
+        await transactionRepository.createTransfer(
+          fromAccountId: accountId!,
+          toAccountId: toAccountId!,
+          amountMinor: amount,
+          occurredAt: DateTime.now(),
+        );
+      } catch (_) {
+        error = QuickEntryError.saveFailed;
+        return false;
+      } finally {
+        saving = false;
+        _notify();
+      }
       _reset();
       return true;
     }
@@ -144,19 +151,26 @@ class QuickEntryController extends ChangeNotifier {
     }
     saving = true;
     _notify();
-    final signed = type == TransactionType.expense ? -amount : amount;
-    await createTransaction(
-      accountId: accountId!,
-      categoryId: categoryId!,
-      type: type,
-      amountMinor: signed,
-    );
-    await transactionRepository.rememberDefaults(
-      type: type,
-      categoryId: categoryId,
-      accountId: accountId,
-    );
-    saving = false;
+    try {
+      final signed = type == TransactionType.expense ? -amount : amount;
+      await createTransaction(
+        accountId: accountId!,
+        categoryId: categoryId!,
+        type: type,
+        amountMinor: signed,
+      );
+      await transactionRepository.rememberDefaults(
+        type: type,
+        categoryId: categoryId,
+        accountId: accountId,
+      );
+    } catch (_) {
+      error = QuickEntryError.saveFailed;
+      return false;
+    } finally {
+      saving = false;
+      _notify();
+    }
     _reset();
     return true;
   }

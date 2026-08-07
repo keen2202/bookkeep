@@ -248,28 +248,28 @@
 
 | 任务 | 波次 | 状态 | 负责人 | 预计 | 完成日期 |
 |---|---|---|---|---|---|
-| BK-R-001 服务端事务封装 | 一 | **in_progress** | — | 0.5d | — |
-| BK-R-002 邀请原子化与角色收敛 | 一 | pending（blockedBy R-001） | — | 0.5d | — |
-| BK-R-003 建账竞态与 pull 只读化 | 一 | pending（blockedBy R-001） | — | 1d | — |
-| BK-R-004 Repository DI 收口 | 一 | pending | — | 1d | — |
-| BK-R-005 账本刷新总线 | 一 | pending | — | 0.5d | — |
-| BK-R-006 周期/分期自动补跑 | 一 | pending（blockedBy R-004） | — | 0.5d | — |
-| BK-R-007 启用 SQLCipher | 一 | pending | — | 2d | — |
-| BK-R-008 同步引擎接线与登录 | 一 | pending（blockedBy R-003） | — | 3d | — |
-| BK-R-009 pull 安全窗口与重放队列 | 二 | pending（blockedBy R-001, R-008） | — | 2d | — |
-| BK-R-010 同步客户端完善 | 二 | pending（blockedBy R-008） | — | 0.5d | — |
-| BK-R-011 共享账本落地 | 二 | pending（blockedBy R-008） | — | 1d | — |
-| BK-R-012 服务端安全基线 | 二 | pending | — | 1d | — |
-| BK-R-013 UI 结构重构 | 二 | pending | — | 1d | — |
-| BK-R-014 数据生命周期 | 二 | pending | — | 1.5d | — |
-| BK-R-015 体积压缩 | 三 | pending（blockedBy R-007） | — | 1d | — |
-| BK-R-016 UI 性能与记账核心路径 | 三 | pending（blockedBy R-013） | — | 2d | — |
-| BK-R-017 深色模式与设计系统 | 三 | pending | — | 2d | — |
-| BK-R-018 预算提醒闭环 | 三 | pending（blockedBy R-005） | — | 1.5d | — |
-| BK-R-019 多币种贯通 | 三 | pending | — | 2d | — |
-| BK-R-020 可访问性与交互反馈 | 四 | pending（blockedBy R-016） | — | 1d | — |
-| BK-R-021 并发测试与测试基建 | 四 | pending（blockedBy R-001, R-002, R-003, R-009） | — | 2d | — |
-| BK-R-022 技术债清偿 | 四 | pending（blockedBy R-004, R-014） | — | 1.5d | — |
+| BK-R-001 服务端事务封装 | 一 | **completed** | — | 0.5d | 2026-08-07 |
+| BK-R-002 邀请原子化与角色收敛 | 一 | completed | — | 0.5d | 2026-08-07 |
+| BK-R-003 建账竞态与 pull 只读化 | 一 | completed | — | 1d | 2026-08-07 |
+| BK-R-004 Repository DI 收口 | 一 | completed | — | 1d | 2026-08-07 |
+| BK-R-005 账本刷新总线 | 一 | completed | — | 0.5d | 2026-08-07 |
+| BK-R-006 周期/分期自动补跑 | 一 | completed | — | 0.5d | 2026-08-07 |
+| BK-R-007 启用 SQLCipher | 一 | completed（设备验证待做） | — | 2d | 2026-08-07 |
+| BK-R-008 同步引擎接线与登录 | 一 | completed（e2e 待设备） | — | 3d | 2026-08-07 |
+| BK-R-009 pull 安全窗口与重放队列 | 二 | completed | — | 2d | 2026-08-07 |
+| BK-R-010 同步客户端完善 | 二 | completed | — | 0.5d | 2026-08-07 |
+| BK-R-011 共享账本落地 | 二 | completed（e2e 待设备） | — | 1d | 2026-08-07 |
+| BK-R-012 服务端安全基线 | 二 | completed（集成用例 CI） | — | 1d | 2026-08-07 |
+| BK-R-013 UI 结构重构 | 二 | completed | — | 1d | 2026-08-07 |
+| BK-R-014 数据生命周期 | 二 | completed | — | 1.5d | 2026-08-07 |
+| BK-R-015 体积压缩 | 三 | completed（体积实测待 CI） | — | 1d | 2026-08-07 |
+| BK-R-016 UI 性能与记账核心路径 | 三 | completed（真机走查待设备） | — | 2d | 2026-08-07 |
+| BK-R-017 深色模式与设计系统 | 三 | completed（走查待真机） | — | 2d | 2026-08-07 |
+| BK-R-018 预算提醒闭环 | 三 | completed | — | 1.5d | 2026-08-07 |
+| BK-R-019 多币种贯通 | 三 | completed | — | 2d | 2026-08-07 |
+| BK-R-020 可访问性与交互反馈 | 四 | completed（读屏走查待真机） | — | 1d | 2026-08-07 |
+| BK-R-021 并发测试与测试基建 | 四 | completed | — | 2d | 2026-08-07 |
+| BK-R-022 技术债清偿 | 四 | completed | — | 1.5d | 2026-08-07 |
 
 **里程碑**：MR-1（第一波完成）= P0 流程全部闭环可发内测；MR-2（第二波）= 数据安全达标；MR-3（第三波）= 可上商店的体验与体积；MR-4（第四波）= v1.0 质量门禁。
 

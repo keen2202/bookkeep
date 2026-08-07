@@ -54,14 +54,20 @@ export async function pullOps(
   bookId: string,
   sinceSeq: number,
   limit: number,
-): Promise<{ ops: StoredOp[]; nextSeq: number }> {
+): Promise<{ ops: StoredOp[]; nextSeq: number; serverTime: string }> {
+  // 安全窗口（审查 L-3）：BIGSERIAL 在语句执行时分配、commit 时可见——
+  // 并发推送期间，先提交的 op 可能被拉到但后提交的仍不可见，客户端若推进游标
+  // 会永久丢失窗口内的 op。拉取仅暴露 commit 满 2 秒的 op，客户端按 op_id
+  // 去重容忍安全窗口内的重拉。
   const result = await pool.query<StoredOp>(
     `SELECT id, entity, entity_id, op, payload, lamport, client_id
      FROM sync_ops WHERE book_id = $1 AND id > $2
+       AND created_at < now() - interval '2 seconds'
      ORDER BY id LIMIT $3`,
     [bookId, sinceSeq, limit],
   );
+  const time = await pool.query<{ now: string }>('SELECT now() AS now');
   const ops = result.rows;
   const nextSeq = ops.length > 0 ? Number(ops[ops.length - 1].id) : sinceSeq;
-  return { ops, nextSeq };
+  return { ops, nextSeq, serverTime: time.rows[0].now };
 }

@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { createApp } from '../src/app';
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep';
+  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep_test';
 
 describe('GET /health/db (integration, real PostgreSQL)', () => {
   let pool: Pool;

@@ -60,8 +60,8 @@ void main() {
 
     tearDown(() => db.close());
 
-    test('v6 迁移回归：新库 schemaVersion 6 且币种表可写', () async {
-      expect(db.schemaVersion, 6);
+    test('v7 迁移回归：新库 schemaVersion 7 且币种表可写', () async {
+      expect(db.schemaVersion, 7);
       await repo.installSeeds();
       expect(await db.select(db.currencies).get(), isNotEmpty);
     });
@@ -197,6 +197,112 @@ void main() {
         rates: {'USD': 7100000},
       );
       expect(totals.single.expenseMinor, 1000 + 71000); // 精度到分
+    });
+
+    test('审查 F-8：报表折算读 rate_snapshot，当前汇率变化不改历史报表金额', () async {
+      final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            accountType: AccountType.cash,
+            name: '钱包',
+            currency: 'USD',
+            createdAt: DateTime.utc(2026, 8, 1),
+          ));
+      final repo = TransactionRepository(db, bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+      await repo.createTransaction(
+        accountId: accountId,
+        type: TransactionType.expense,
+        amountMinor: -10000, // 100 USD，记账时汇率 7.1
+        occurredAt: DateTime.utc(2026, 8, 1, 11),
+        currency: 'USD',
+        rateSnapshot: 7100000,
+      );
+      final reports = ReportsRepository(db, bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+      // 当前汇率已变（7.5），但历史报表仍按记账时快照 7.1 折算
+      final totals = await reports.dailyTotals(
+        start: DateTime.utc(2026, 8, 1),
+        end: DateTime.utc(2026, 8, 2),
+        rates: {'USD': 7500000},
+      );
+      expect(totals.single.expenseMinor, 71000);
+
+      final slices = await reports.categoryBreakdown(
+        start: DateTime.utc(2026, 8, 1),
+        end: DateTime.utc(2026, 8, 2),
+        rates: {'USD': 7500000},
+      );
+      expect(slices.single.amountMinor, 71000);
+
+      final buckets = await reports.periodBuckets(
+        start: DateTime.utc(2026, 8, 1),
+        end: DateTime.utc(2026, 8, 2),
+        granularity: BucketGranularity.month,
+        rates: {'USD': 7500000},
+      );
+      expect(buckets.single.amountMinor, 71000);
+    });
+
+    test('审查 F-8：转账按账户币种写汇率快照', () async {
+      final cnyId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            accountType: AccountType.cash,
+            name: '人民币钱包',
+            currency: 'CNY',
+            createdAt: DateTime.utc(2026, 8, 1),
+          ));
+      final usdId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            accountType: AccountType.cash,
+            name: '美元钱包',
+            currency: 'USD',
+            createdAt: DateTime.utc(2026, 8, 1),
+          ));
+      await db.into(db.currencies).insert(CurrenciesCompanion.insert(
+            code: 'USD',
+            name: '美元',
+            rateScaled: 7100000,
+            updatedAt: DateTime.utc(2026, 8, 1),
+          ));
+      final repo = TransactionRepository(db, bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+      await repo.createTransfer(
+        fromAccountId: usdId,
+        toAccountId: cnyId,
+        amountMinor: 10000,
+        occurredAt: DateTime.utc(2026, 8, 1, 12),
+      );
+      final txs = await db.select(db.transactions).get();
+      final fromLeg = txs.singleWhere((t) => t.amountMinor < 0);
+      final toLeg = txs.singleWhere((t) => t.amountMinor > 0);
+      expect(fromLeg.currency, 'USD');
+      expect(fromLeg.rateSnapshot, 7100000);
+      expect(toLeg.currency, 'CNY');
+      expect(toLeg.rateSnapshot, 1000000); // kRateScale
+    });
+
+    test('审查 F-8：未设置汇率的账户建流水自动继承账户币种并快照', () async {
+      final usdId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            accountType: AccountType.cash,
+            name: '美元钱包',
+            currency: 'USD',
+            createdAt: DateTime.utc(2026, 8, 1),
+          ));
+      await db.into(db.currencies).insert(CurrenciesCompanion.insert(
+            code: 'USD',
+            name: '美元',
+            rateScaled: 7100000,
+            updatedAt: DateTime.utc(2026, 8, 1),
+          ));
+      final repo = TransactionRepository(db, bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+      await repo.createTransaction(
+        accountId: usdId,
+        type: TransactionType.expense,
+        amountMinor: -1000,
+        occurredAt: DateTime.utc(2026, 8, 1, 10),
+      );
+      final tx = (await db.select(db.transactions).get()).single;
+      expect(tx.currency, 'USD');
+      expect(tx.rateSnapshot, 7100000);
     });
   });
 }

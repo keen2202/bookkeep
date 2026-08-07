@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
-import '../../core/constants/constants.dart';
+import '../../core/constants/constants.dart' show kRateScale;
 import '../local/database.dart';
 import '../local/tables/sync_ops_table.dart';
 import '../local/tables/transactions_table.dart';
@@ -10,18 +10,18 @@ import 'op_logger.dart';
 
 /// 流水仓库：本地乐观写 + OpLogger 入队（Spec §3.1 / BK-P0-001）；
 /// 查询/写入强制按账本过滤（Spec §4.1 / BK-T-010）
+///
+/// bookId 必传（审查 B-3：删除 kDefaultBookId 回退——回退会把流水写入
+/// 占位账本，生成即丢失）；经 Riverpod provider 注入当前账本上下文。
 class TransactionRepository {
-  TransactionRepository(this.db, {OpLogger? opLogger, this.bookId})
+  TransactionRepository(this.db, {OpLogger? opLogger, required this.bookId})
       : opLogger = opLogger ?? OpLogger(db);
 
   final AppDatabase db;
   final OpLogger opLogger;
-  final String? bookId;
+  final String bookId;
 
   static const _defaultsPrefix = 'last_defaults_';
-
-  /// 显式账本上下文优先，否则回退本地默认分区（kDefaultBookId）
-  Future<String> _bookId() async => bookId ?? kDefaultBookId;
 
   Future<int> createTransaction({
     required int accountId,
@@ -35,12 +35,21 @@ class TransactionRepository {
     String currency = 'CNY',
     int? rateSnapshot,
   }) async {
-    final currentBookId = await _bookId();
     return db.transaction(() async {
       final now = DateTime.now().toUtc();
       final remoteId = opLogger.newUuid();
+      // 审查 F-8：未显式指定币种时继承账户币种并写当日汇率快照
+      if (rateSnapshot == null && currency == 'CNY') {
+        final account = await (db.select(db.accounts)
+              ..where((t) => t.id.equals(accountId)))
+            .getSingleOrNull();
+        if (account != null && account.currency != 'CNY') {
+          currency = account.currency;
+          rateSnapshot = await _rateOf(account.currency);
+        }
+      }
       final id = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(currentBookId),
+            bookId: Value(bookId),
             remoteId: Value(remoteId),
             accountId: accountId,
             categoryId: Value(categoryId),
@@ -58,7 +67,7 @@ class TransactionRepository {
         entityId: id,
         remoteId: remoteId,
         op: SyncOpCode.c,
-        bookId: currentBookId,
+        bookId: bookId,
         payload: {
           'id': id,
           'account_id': await _remoteIdOf('accounts', accountId),
@@ -91,7 +100,7 @@ class TransactionRepository {
         entityId: id,
         remoteId: row.remoteId!,
         op: SyncOpCode.d,
-        bookId: await _bookId(),
+        bookId: bookId,
       );
     });
   }
@@ -102,28 +111,40 @@ class TransactionRepository {
     required int amountMinor,
     required DateTime occurredAt,
   }) async {
-    final currentBookId = await _bookId();
     return db.transaction(() async {
       final now = DateTime.now().toUtc();
       final fromRemoteId = opLogger.newUuid();
       final pairedRemoteId = opLogger.newUuid();
+      // 审查 F-8：转账按账户币种记账并写当日汇率快照（报表折算不随汇率波动）
+      final fromAccount = await (db.select(db.accounts)
+            ..where((t) => t.id.equals(fromAccountId)))
+          .getSingleOrNull();
+      final toAccount = await (db.select(db.accounts)
+            ..where((t) => t.id.equals(toAccountId)))
+          .getSingleOrNull();
+      final fromCurrency = fromAccount?.currency ?? 'CNY';
+      final toCurrency = toAccount?.currency ?? 'CNY';
+      final fromRate = await _rateOf(fromCurrency);
+      final toRate = await _rateOf(toCurrency);
       final fromId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(currentBookId),
+            bookId: Value(bookId),
             remoteId: Value(fromRemoteId),
             accountId: fromAccountId,
             type: TransactionType.transfer,
             amountMinor: -amountMinor,
-            currency: 'CNY',
+            currency: fromCurrency,
+            rateSnapshot: Value(fromRate),
             occurredAt: occurredAt,
             updatedAt: now,
           ));
       final pairedId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(currentBookId),
+            bookId: Value(bookId),
             remoteId: Value(pairedRemoteId),
             accountId: toAccountId,
             type: TransactionType.transfer,
             amountMinor: amountMinor,
-            currency: 'CNY',
+            currency: toCurrency,
+            rateSnapshot: Value(toRate),
             occurredAt: occurredAt,
             transferId: Value(fromId),
             updatedAt: now,
@@ -138,14 +159,15 @@ class TransactionRepository {
         entityId: fromId,
         remoteId: fromRemoteId,
         op: SyncOpCode.c,
-        bookId: currentBookId,
+        bookId: bookId,
         payload: {
           'id': fromId,
           'account_id': fromAccountRef,
           'transfer_id': fromRemoteId,
           'type': 'transfer',
           'amount_minor': -amountMinor,
-          'currency': 'CNY',
+          'currency': fromCurrency,
+          'rate_snapshot': fromRate,
           'occurred_at': occurredAt.toUtc().toIso8601String(),
           'updated_at': now.toIso8601String(),
         },
@@ -155,20 +177,30 @@ class TransactionRepository {
         entityId: pairedId,
         remoteId: pairedRemoteId,
         op: SyncOpCode.c,
-        bookId: currentBookId,
+        bookId: bookId,
         payload: {
           'id': pairedId,
           'account_id': toAccountRef,
           'transfer_id': fromRemoteId,
           'type': 'transfer',
           'amount_minor': amountMinor,
-          'currency': 'CNY',
+          'currency': toCurrency,
+          'rate_snapshot': toRate,
           'occurred_at': occurredAt.toUtc().toIso8601String(),
           'updated_at': now.toIso8601String(),
         },
       );
       return fromId;
     });
+  }
+
+  /// 币种当前汇率（kRateScale 刻度）；CNY/未设置回退 1:1
+  Future<int> _rateOf(String code) async {
+    if (code == 'CNY') return kRateScale;
+    final row = await (db.select(db.currencies)..where((t) => t.code.equals(code)))
+        .getSingleOrNull();
+    final rate = row?.rateScaled ?? 0;
+    return rate > 0 ? rate : kRateScale;
   }
 
   Future<String?> _remoteIdOf(String table, int id) async {
@@ -200,9 +232,8 @@ class TransactionRepository {
   }
 
   Future<List<Transaction>> listTransactions({bool includeDeleted = false}) async {
-    final currentBookId = await _bookId();
     final q = db.select(db.transactions)
-      ..where((t) => t.bookId.equals(currentBookId))
+      ..where((t) => t.bookId.equals(bookId))
       ..orderBy([(t) => OrderingTerm.desc(t.occurredAt)]);
     if (!includeDeleted) q.where((t) => t.deletedAt.isNull());
     return q.get();
@@ -214,7 +245,6 @@ class TransactionRepository {
     required DateTime occurredAt,
     String? note,
   }) async {
-    final currentBookId = await _bookId();
     final start = DateTime.utc(
       occurredAt.year,
       occurredAt.month,
@@ -225,7 +255,7 @@ class TransactionRepository {
     final end = start.add(const Duration(minutes: 1));
     final q = db.select(db.transactions)
       ..where((t) =>
-          t.bookId.equals(currentBookId) &
+          t.bookId.equals(bookId) &
           t.amountMinor.equals(amountMinor) &
           t.occurredAt.isBiggerOrEqualValue(start) &
           t.occurredAt.isSmallerThanValue(end) &

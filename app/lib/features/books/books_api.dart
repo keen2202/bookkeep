@@ -78,7 +78,17 @@ class BooksApi {
 
   Map<String, dynamic> _json(http.Response res, int expect, String path) {
     if (res.statusCode != expect) {
-      throw SyncApiException(res.statusCode, '$path -> ${res.statusCode}');
+      // 解析服务端 {error} 字段（BK-R-010）：错误信息可读、可分类
+      String message = '$path -> ${res.statusCode}';
+      try {
+        final body = jsonDecode(res.body);
+        if (body is Map<String, dynamic> && body['error'] is String) {
+          message = '${body['error']} ($path -> ${res.statusCode})';
+        }
+      } catch (_) {
+        // 非 JSON 响应体：保留状态码信息
+      }
+      throw SyncApiException(res.statusCode, message);
     }
     if (res.body.isEmpty) return const {};
     return jsonDecode(res.body) as Map<String, dynamic>;
@@ -132,9 +142,7 @@ class BooksApi {
   Future<void> removeMember(String bookId, String userId, {required String accessToken}) async {
     final res =
         await _request('DELETE', '/books/$bookId/members/$userId', accessToken: accessToken);
-    if (res.statusCode != 204) {
-      throw SyncApiException(res.statusCode, '/books/$bookId/members/$userId');
-    }
+    _json(res, 204, '/books/$bookId/members/$userId');
   }
 
   /// 变更成员角色（仅 owner；服务端 PATCH /books/:id/members/:userId）
@@ -146,8 +154,6 @@ class BooksApi {
   }) async {
     final res = await _request('PATCH', '/books/$bookId/members/$userId',
         accessToken: accessToken, body: {'role': role});
-    if (res.statusCode != 200) {
-      throw SyncApiException(res.statusCode, '/books/$bookId/members/$userId');
-    }
+    _json(res, 200, '/books/$bookId/members/$userId');
   }
 }

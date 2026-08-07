@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Router } from 'express';
 import { requireBookMember, MemberRole } from '../auth/book.middleware';
 import { DbPool } from '../db/pool';
+import { withTransaction } from '../db/tx';
 
 interface BooksDeps {
   pool: DbPool;
@@ -53,21 +54,16 @@ export function booksRouter({ pool }: BooksDeps): Router {
       return;
     }
     const bookId = randomUUID();
-    await pool.query('BEGIN');
-    try {
-      await pool.query(
+    await withTransaction(pool, async (client) => {
+      await client.query(
         'INSERT INTO books (id, name, type, owner_id) VALUES ($1, $2, $3, $4)',
         [bookId, name.trim(), type, userId],
       );
-      await pool.query(
+      await client.query(
         "INSERT INTO book_members (book_id, user_id, role) VALUES ($1, $2, 'owner')",
         [bookId, userId],
       );
-      await pool.query('COMMIT');
-    } catch (err) {
-      await pool.query('ROLLBACK');
-      throw err;
-    }
+    });
     const row = await pool.query('SELECT * FROM books WHERE id = $1', [bookId]);
     res.status(201).json({ book: row.rows[0], role: 'owner' });
   });
@@ -130,36 +126,27 @@ export function booksRouter({ pool }: BooksDeps): Router {
       return;
     }
     const hash = sha256(token);
-    const row = await pool.query(
-      `SELECT id, book_id, role, expires_at, used_at FROM invite_tokens WHERE token_hash = $1`,
-      [hash],
-    );
-    if (row.rows.length === 0) {
-      res.status(404).json({ error: 'invalid_token' });
-      return;
-    }
-    const invite = row.rows[0];
-    if (invite.used_at !== null) {
-      res.status(409).json({ error: 'token_already_used' });
-      return;
-    }
-    if (new Date(invite.expires_at).getTime() < Date.now()) {
-      res.status(410).json({ error: 'token_expired' });
-      return;
-    }
-    await pool.query('BEGIN');
-    try {
+    // 单语句原子消耗 token（L-2）：used_at 置位与条件校验在同一 UPDATE 中，
+    // 并发双请求仅一个能 RETURNING 出行，其余得到空集 → 409
+    const invite = await withTransaction(pool, async (client) => {
+      const row = await client.query<{ book_id: string; role: MemberRole }>(
+        `UPDATE invite_tokens SET used_at = now()
+         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+         RETURNING book_id, role`,
+        [hash],
+      );
+      if (row.rows.length === 0) return null;
       // 已是成员则幂等更新角色（复用邀请不重复建行）
-      await pool.query(
+      await client.query(
         `INSERT INTO book_members (book_id, user_id, role) VALUES ($1, $2, $3)
          ON CONFLICT (book_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
-        [invite.book_id, userId, invite.role],
+        [row.rows[0].book_id, userId, row.rows[0].role],
       );
-      await pool.query('UPDATE invite_tokens SET used_at = now() WHERE id = $1', [invite.id]);
-      await pool.query('COMMIT');
-    } catch (err) {
-      await pool.query('ROLLBACK');
-      throw err;
+      return row.rows[0];
+    });
+    if (invite === null) {
+      res.status(409).json({ error: 'invalid_or_used_token' });
+      return;
     }
     const book = await pool.query('SELECT id, name, type FROM books WHERE id = $1', [invite.book_id]);
     res.status(200).json({ book: book.rows[0], role: invite.role });
@@ -211,8 +198,9 @@ export function booksRouter({ pool }: BooksDeps): Router {
       const target = req.params.userId;
       const caller = req.user!.sub!;
       const role = req.body?.role as MemberRole | undefined;
-      if (!INVITE_ROLES.concat(['owner']).includes(role as MemberRole)) {
-        res.status(422).json({ error: 'invalid_role' });
+      // 目标角色白名单仅 editor/viewer（L-11：owner 不可经 API 制造/转移）
+      if (role !== 'editor' && role !== 'viewer') {
+        res.status(403).json({ error: 'owner_role_immutable' });
         return;
       }
       const callerRole = await pool.query<{ role: MemberRole }>(

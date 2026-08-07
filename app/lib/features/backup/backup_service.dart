@@ -21,15 +21,21 @@ class BackupService {
   /// 恢复时排除的 app_meta 键（设备身份/同步游标不得跨设备恢复）
   static const _excludedMetaPrefixes = ['client_id', 'sync_last_seq_'];
 
+  // 父表在前（恢复按序插入；删除取 reversed 子表先删）。
+  // 审查 F-4：补齐 currencies / recurring_rules / installment_plans / installment_schedules
   static const _tables = [
+    'app_meta',
     'books',
     'accounts',
-    'account_snapshots',
     'categories',
+    'account_snapshots',
     'transactions',
     'budgets',
     'sync_ops',
-    'app_meta',
+    'currencies',
+    'recurring_rules',
+    'installment_plans',
+    'installment_schedules',
   ];
 
   /// 创建加密备份字节

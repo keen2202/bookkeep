@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/ledger_version.dart';
 import '../../data/local/database_provider.dart';
 import '../../data/repositories/reports_repository.dart';
 import '../accounts/accounts_providers.dart' show exchangeRateServiceProvider;
@@ -25,6 +26,7 @@ final reportRatesProvider = FutureProvider<Map<String, int>>((ref) async {
 
 final dailyTotalsProvider =
     FutureProvider.family<List<DailyTotal>, ReportWindow>((ref, window) async {
+  ref.watch(ledgerVersionProvider); // 账本写操作后自动重建（审查 F-1）
   final rates = await ref.watch(reportRatesProvider.future);
   return ref
       .watch(reportsRepositoryProvider)
@@ -33,6 +35,7 @@ final dailyTotalsProvider =
 
 final categoryBreakdownProvider =
     FutureProvider.family<List<CategorySlice>, ReportWindow>((ref, window) async {
+  ref.watch(ledgerVersionProvider);
   final rates = await ref.watch(reportRatesProvider.future);
   return ref
       .watch(reportsRepositoryProvider)
@@ -42,6 +45,7 @@ final categoryBreakdownProvider =
 final periodBucketsProvider =
     FutureProvider.family<List<PeriodBucket>, ({ReportWindow window, ReportRange range})>(
         (ref, key) async {
+  ref.watch(ledgerVersionProvider);
   final rates = await ref.watch(reportRatesProvider.future);
   return ref.watch(reportsRepositoryProvider).periodBuckets(
         start: key.window.start,
@@ -100,52 +104,86 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     // 隐私锁锁定/后台态强制脱敏（Spec §3.6），叠加用户手动隐藏金额开关
     final hideAmounts = _hideAmounts || ref.watch(amountMaskProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('报表'),
-        actions: [
-          IconButton(
-            tooltip: _hideAmounts ? '显示金额' : '隐藏金额',
-            icon: Icon(_hideAmounts ? Icons.visibility_off : Icons.visibility),
-            onPressed: () => setState(() => _hideAmounts = !_hideAmounts),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          SegmentedButton<ReportRange>(
-            segments: const [
-              ButtonSegment(value: ReportRange.day, label: Text('日')),
-              ButtonSegment(value: ReportRange.week, label: Text('周')),
-              ButtonSegment(value: ReportRange.month, label: Text('月')),
-              ButtonSegment(value: ReportRange.year, label: Text('年')),
-            ],
-            selected: {_range},
-            onSelectionChanged: (s) => setState(() => _range = s.first),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(8),
-              children: [
-                _Section(
-                  title: '分类占比',
-                  child: slices.maybeWhen(data: (s) => CategoryPieChart(slices: s, hideAmounts: hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
-                ),
-                _Section(
-                  title: '周期对比',
-                  child: buckets.maybeWhen(data: (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
-                ),
-                _Section(
-                  title: '收支趋势',
-                  child: daily.maybeWhen(data: (d) => TrendLineChart(totals: d, hideAmounts: hideAmounts), orElse: () => const Center(child: CircularProgressIndicator())),
-                ),
-              ],
+    // 审查 U-1：无内层 Scaffold/AppBar；隐藏金额开关内联（IndexedStack 保持 _range/_hideAmounts）
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: SegmentedButton<ReportRange>(
+                segments: const [
+                  ButtonSegment(value: ReportRange.day, label: Text('日')),
+                  ButtonSegment(value: ReportRange.week, label: Text('周')),
+                  ButtonSegment(value: ReportRange.month, label: Text('月')),
+                  ButtonSegment(value: ReportRange.year, label: Text('年')),
+                ],
+                selected: {_range},
+                onSelectionChanged: (s) => setState(() => _range = s.first),
+              ),
             ),
+            IconButton(
+              tooltip: _hideAmounts ? '显示金额' : '隐藏金额',
+              icon: Icon(_hideAmounts ? Icons.visibility_off : Icons.visibility),
+              onPressed: () => setState(() => _hideAmounts = !_hideAmounts),
+            ),
+          ],
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(8),
+            children: [
+              // 审查 U-11：错误态带重试（invalidate 对应 provider 重建）
+              _Section(
+                title: '分类占比',
+                child: _chartOrRetry(
+                  slices,
+                  (s) => CategoryPieChart(slices: s, hideAmounts: hideAmounts),
+                  () => ref.invalidate(categoryBreakdownProvider(window)),
+                ),
+              ),
+              _Section(
+                title: '周期对比',
+                child: _chartOrRetry(
+                  buckets,
+                  (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts),
+                  () => ref.invalidate(periodBucketsProvider((window: window, range: _range))),
+                ),
+              ),
+              _Section(
+                title: '收支趋势',
+                child: _chartOrRetry(
+                  daily,
+                  (d) => TrendLineChart(totals: d, hideAmounts: hideAmounts),
+                  () => ref.invalidate(dailyTotalsProvider(window)),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
+
+/// 图表区：data/loading/error 三态；error 提供重试按钮
+Widget _chartOrRetry<T>(
+  AsyncValue<T> value,
+  Widget Function(T data) builder,
+  VoidCallback onRetry,
+) {
+  return value.when(
+    data: builder,
+    loading: () => const Center(child: CircularProgressIndicator()),
+    error: (_, _) => Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('图表加载失败'),
+          TextButton(onPressed: onRetry, child: const Text('重试')),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Section extends StatelessWidget {

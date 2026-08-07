@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/theme/app_theme.dart';
 import '../../data/local/database.dart';
 import 'books_page.dart';
 import 'books_providers.dart';
@@ -14,9 +15,11 @@ class BookSwitcher extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final books = ref.watch(booksViewModelProvider);
+    final rolesAsync = ref.watch(bookRolesProvider);
     final currentId = ref.watch(currentBookIdProvider);
     final current = ref.watch(currentBookProvider);
     final list = books.maybeWhen(data: (l) => l, orElse: () => <Book>[]);
+    final roles = rolesAsync.maybeWhen(data: (r) => r, orElse: () => <String, String>{});
     return PopupMenuButton<String>(
       tooltip: '切换账本',
       onSelected: (value) async {
@@ -51,10 +54,13 @@ class BookSwitcher extends ConsumerWidget {
                   Icon(
                     book.id == currentId ? Icons.check_circle : Icons.menu_book_outlined,
                     size: 18,
-                    color: book.id == currentId ? Colors.teal : null,
+                    color: book.id == currentId ? context.appColors.accent : null,
                   ),
                   const SizedBox(width: 8),
                   Expanded(child: Text(book.name)),
+                  const SizedBox(width: 6),
+                  // 角色角标（审查 F-3）：共享账本 editor/viewer 标记，本地账本无角标
+                  ?_roleBadge(context, roles[book.id]),
                 ],
               ),
             ),
@@ -69,6 +75,23 @@ class BookSwitcher extends ConsumerWidget {
           Text(current.value?.name ?? '账本', style: Theme.of(context).textTheme.titleSmall),
         ],
       ),
+    );
+  }
+
+  /// 共享账本角色角标（editor=可记账 / viewer=只读；本地 owner 无角标）
+  Widget? _roleBadge(BuildContext context, String? role) {
+    if (role == null || role == 'owner') return null;
+    final label = role == 'editor' ? '编辑' : '只读';
+    final color = role == 'editor'
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.outline;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 11, color: color)),
     );
   }
 }

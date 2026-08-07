@@ -2,16 +2,43 @@ import 'package:drift/drift.dart' hide Column, isNotNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/ledger_version.dart';
+import '../../core/utils/money_format.dart';
+import '../../shared/theme/app_theme.dart';
 import '../../data/local/database.dart';
 import '../../data/local/database_provider.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
 import '../accounts/accounts_providers.dart';
 import '../books/books_providers.dart' show currentBookIdProvider, currentRoleProvider;
-import '../budgets/budgets_page.dart' show budgetsViewModelProvider;
 import 'anchor_resolver.dart';
 import 'recurring_engine.dart';
 import 'recurring_providers.dart';
-import 'recurring_service.dart';
+
+/// 立即补跑全部到期规则（主 shell AppBar 动作；生成流水后 bump 刷新总线）
+Future<void> runAllRecurringRules(WidgetRef ref) async {
+  final bookId = ref.read(currentBookIdProvider);
+  await ref.read(recurringServiceProvider).runAll(bookId: bookId);
+  // 补跑生成了流水：规则 nextDue 前移 + 全页（账户/预算/报表）经总线刷新
+  ref.invalidate(recurringRulesProvider);
+  ref.read(ledgerVersionProvider.notifier).state++;
+}
+
+/// 主 shell AppBar 动作：新建规则 + 立即补跑（viewer 只读 → 空，Spec §4.1 双重拒绝）
+List<Widget> recurringPageActions(BuildContext context, WidgetRef ref) {
+  if (ref.watch(currentRoleProvider) == 'viewer') return const [];
+  return [
+    IconButton(
+      tooltip: '新建规则',
+      icon: const Icon(Icons.add),
+      onPressed: () => RuleEditSheet.show(context),
+    ),
+    IconButton(
+      tooltip: '立即补跑',
+      icon: const Icon(Icons.play_arrow),
+      onPressed: () => runAllRecurringRules(ref),
+    ),
+  ];
+}
 
 /// 周期/分期记账页（Spec §4.4 / BK-T-013）：规则列表 + 新建规则 + 立即补跑
 class RecurringPage extends ConsumerStatefulWidget {
@@ -22,70 +49,36 @@ class RecurringPage extends ConsumerStatefulWidget {
 }
 
 class _RecurringPageState extends ConsumerState<RecurringPage> {
-  String? _message;
-
-  Future<void> _runAll() async {
-    final db = ref.read(databaseProvider);
-    final bookId = ref.read(currentBookIdProvider);
-    final count = await RecurringService(db).runAll(bookId: bookId);
-    // 补跑生成了流水：刷新规则（nextDue 前移）与账户/预算余额
-    ref.invalidate(recurringRulesProvider);
-    ref.invalidate(accountsViewModelProvider);
-    ref.invalidate(budgetsViewModelProvider);
-    if (mounted) setState(() => _message = '已补跑 $count 笔');
-  }
-
   @override
   Widget build(BuildContext context) {
     final rulesAsync = ref.watch(recurringRulesProvider);
-    final viewer = ref.watch(currentRoleProvider) == 'viewer';
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('周期记账'),
-        // viewer 只读（Spec §4.1 权限矩阵）
-        actions: [
-          if (!viewer)
-            IconButton(
-              tooltip: '新建规则',
-              icon: const Icon(Icons.add),
-              onPressed: () async {
-                await RuleEditSheet.show(context);
-              },
-            ),
-          if (!viewer)
-            IconButton(
-              tooltip: '立即补跑',
-              icon: const Icon(Icons.play_arrow),
-              onPressed: _runAll,
-            ),
-        ],
-      ),
-      body: rulesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败：$e')),
-        data: (rules) => ListView(
-          children: [
-            if (rules.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: Text('还没有周期规则，点击右上角 + 新建')),
-              )
-            else
-              for (final rule in rules)
-                ListTile(
-                  leading: const Icon(Icons.repeat),
-                  title: Text('${_freqLabel(rule)} · ¥${rule.amountMinor / 100}'),
+    return rulesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('加载失败：$e')),
+      // 审查 U-10：ListTile.builder 惰性构建
+      data: (rules) => rules.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: Text('还没有周期规则，点击右上角 + 新建')),
+            )
+          : ListView.builder(
+              itemCount: rules.length,
+              itemBuilder: (context, i) {
+                final rule = rules[i];
+                return ListTile(
+                  leading: Icon(
+                    rule.type == 'income' ? Icons.trending_up : Icons.repeat,
+                    color: rule.type == 'income'
+                        ? context.appColors.income
+                        : Theme.of(context).colorScheme.primary,
+                  ),
+                  title: Text(
+                      '${_freqLabel(rule)} · ${rule.type == 'income' ? '收入' : '支出'} ${formatMoney(rule.amountMinor)}'),
                   subtitle: Text(_ruleSummary(rule)),
                   trailing: const Icon(Icons.schedule),
-                ),
-            if (_message != null)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(_message!),
-              ),
-          ],
-        ),
-      ),
+                );
+              },
+            ),
     );
   }
 
@@ -138,7 +131,11 @@ class RuleEditSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const SafeArea(child: RuleEditSheet()),
+      // 审查 U-4：键盘弹起时内容整体上移（viewInsets 补偿）
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+        child: const SafeArea(child: RuleEditSheet()),
+      ),
     );
   }
 
@@ -151,6 +148,8 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
   AnchorType _anchor = AnchorType.start;
   int _anchorDay = 1;
   int? _accountId;
+  // 审查 F-7：周期规则收支类型
+  String _type = 'expense';
   final _amountCtrl = TextEditingController();
 
   /// 各频率的锚点选项（Spec §4.4 验证标准清单）
@@ -213,6 +212,7 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
           anchorType: _anchor.name,
           anchorDay: Value(anchorDay),
           amountMinor: (amount * 100).round(),
+          type: Value(_type),
           accountId: accountId,
           categoryId: const Value(null),
           nextDue: nextDue,
@@ -240,6 +240,15 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('新建周期规则', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'expense', label: Text('支出')),
+              ButtonSegment(value: 'income', label: Text('收入')),
+            ],
+            selected: {_type},
+            onSelectionChanged: (s) => setState(() => _type = s.first),
+          ),
           const SizedBox(height: 12),
           SegmentedButton<RecurringFrequency>(
             segments: [
@@ -282,9 +291,9 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
           ],
           const SizedBox(height: 8),
           if (accounts.isEmpty)
-            const Text(
+            Text(
               '暂无账户，请先在账户管理中创建',
-              style: TextStyle(color: Colors.orange),
+              style: TextStyle(color: context.appColors.warning),
             )
           else
             DropdownButtonFormField<int>(

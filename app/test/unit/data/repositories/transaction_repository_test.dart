@@ -13,6 +13,7 @@ import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 
 void main() {
   late AppDatabase db;
+  const testBookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   late TransactionRepository repo;
   late int accountId;
   late int categoryId;
@@ -21,7 +22,7 @@ void main() {
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
-    repo = TransactionRepository(db);
+    repo = TransactionRepository(db, bookId: testBookId);
     accountRemoteId = repo.opLogger.newUuid();
     accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
           remoteId: Value(accountRemoteId),

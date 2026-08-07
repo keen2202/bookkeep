@@ -3,7 +3,7 @@ import { createApp } from '../src/app';
 
 describe('GET /health', () => {
   it('returns 200 with ok status, uptime and timestamp', async () => {
-    const app = createApp({ pool: { query: jest.fn() } });
+    const app = createApp({ pool: { query: jest.fn(), connect: jest.fn() } });
     const res = await request(app).get('/health');
 
     expect(res.status).toBe(200);
@@ -13,7 +13,7 @@ describe('GET /health', () => {
   });
 
   it('returns 200 with db connected when pool query succeeds', async () => {
-    const pool = { query: jest.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }) };
+    const pool = { query: jest.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }), connect: jest.fn() };
     const app = createApp({ pool });
     const res = await request(app).get('/health/db');
 
@@ -24,7 +24,7 @@ describe('GET /health', () => {
   });
 
   it('returns 503 with db unreachable when pool query fails', async () => {
-    const pool = { query: jest.fn().mockRejectedValue(new Error('connection refused')) };
+    const pool = { query: jest.fn().mockRejectedValue(new Error('connection refused')), connect: jest.fn() };
     const app = createApp({ pool });
     const res = await request(app).get('/health/db');
 

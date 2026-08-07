@@ -7,7 +7,7 @@ import { migrate } from '../src/db/migrate';
 jest.setTimeout(30_000);
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep';
+  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep_test';
 const SECRET = 'integration-secret';
 
 describe('auth routes (integration, real PostgreSQL)', () => {
@@ -106,4 +106,39 @@ describe('auth routes (integration, real PostgreSQL)', () => {
     const statuses = [a.status, b.status].sort();
     expect(statuses).toEqual([200, 401]);
   });
+
+  it('rate limits auth endpoints: 6th request in a minute returns 429 (L-4)', async () => {
+    const app = createApp({ pool, jwtSecret: SECRET });
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app).post('/auth/login').send({ email: email(), password: 'wrong-password' });
+      expect([400, 401]).toContain(res.status);
+    }
+    const limited = await request(app).post('/auth/login').send({ email: email(), password: 'wrong-password' });
+    expect(limited.status).toBe(429);
+    expect(limited.body).toEqual({ error: 'rate_limited' });
+  });
+
+  it('unknown email login returns 401 with equalized timing (L-4)', async () => {
+    const app = createApp({ pool, jwtSecret: SECRET });
+    const res = await request(app).post('/auth/login').send({ email: email(), password: 'password-123' });
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('invalid_credentials');
+  });
+
+  it('overlong password rejected with 400 (L-4)', async () => {
+    const app = createApp({ pool, jwtSecret: SECRET });
+    const res = await request(app)
+      .post('/auth/register')
+      .send({ email: email(), password: 'x'.repeat(129) });
+    expect(res.status).toBe(400);
+  });
+
+  it('unknown route returns JSON 404, not an HTML error page (L-10)', async () => {
+    const app = createApp({ pool, jwtSecret: SECRET });
+    const res = await request(app).get('/no/such/route');
+    expect(res.status).toBe(404);
+    expect(res.headers['content-type']).toContain('application/json');
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+});
 });

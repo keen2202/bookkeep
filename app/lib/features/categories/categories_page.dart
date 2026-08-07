@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/repository_exceptions.dart';
+import '../../core/ledger_version.dart';
 import '../../data/local/database.dart';
 import '../../domain/models/category_seed.dart';
 import '../../shared/utils/category_icon.dart';
@@ -20,13 +21,15 @@ final categorySeedProvider = FutureProvider<CategorySeed>((ref) async {
 
 /// 分类视图模型：先确保 seed 已安装（首次安装完整），再返回两级分类树
 final categoriesViewModelProvider = FutureProvider<List<Category>>((ref) async {
+  ref.watch(ledgerVersionProvider);
   final repo = ref.watch(categoryRepositoryProvider);
   final seed = await ref.watch(categorySeedProvider.future);
   await repo.installSeeds(seed);
   return repo.listCategories(includeDeleted: false);
 });
 
-/// 分类管理页（Spec §3.3 / BK-P0-003）
+/// 分类管理页（Spec §3.3 / BK-P0-003）；无内层 Scaffold/AppBar/FAB
+/// （审查 U-1：单 AppBar 单 FAB 由主 shell 组装，动作经 [categoriesPageAction] 暴露）
 class CategoriesPage extends ConsumerWidget {
   const CategoriesPage({super.key});
 
@@ -34,28 +37,22 @@ class CategoriesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categories = ref.watch(categoriesViewModelProvider);
     final viewer = ref.watch(currentRoleProvider) == 'viewer';
-    return Scaffold(
-      appBar: AppBar(title: const Text('分类')),
-      body: categories.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败：$e')),
-        data: (list) => _CategoryList(categories: list, viewer: viewer),
-      ),
-      // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
-      // HeroMode 禁用：避免页面 FAB 与全局 FAB 在切换/重建时触发 Hero flight 出现多个 + 按钮
-      floatingActionButton: viewer
-          ? null
-          : HeroMode(
-              enabled: false,
-              child: FloatingActionButton(
-                heroTag: 'categories_fab',
-                onPressed: () => CategoryEditSheet.show(context),
-                tooltip: '新建分类',
-                child: const Icon(Icons.add),
-              ),
-            ),
+    return categories.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('加载失败：$e')),
+      data: (list) => _CategoryList(categories: list, viewer: viewer),
     );
   }
+}
+
+/// 主 shell AppBar 动作：新建分类（viewer 只读 → null，Spec §4.1 双重拒绝）
+Widget? categoriesPageAction(BuildContext context, WidgetRef ref) {
+  if (ref.watch(currentRoleProvider) == 'viewer') return null;
+  return IconButton(
+    tooltip: '新建分类',
+    icon: const Icon(Icons.add),
+    onPressed: () => CategoryEditSheet.show(context),
+  );
 }
 
 class _CategoryList extends ConsumerWidget {
@@ -69,28 +66,31 @@ class _CategoryList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final parents = categories.where((c) => c.parentId == null).toList();
-    return ListView(
-      children: [
-        for (final parent in parents) ...[
-          _ParentHeader(
-            parent: parent,
-            onMore: !viewer && !parent.isSystem
-                ? () => _showActions(context, ref, parent)
-                : null,
+    // 审查 U-10：扁平化后经 ListView.builder 惰性构建（大分类数下 60fps）
+    final tiles = <Widget>[
+      for (final parent in parents) ...[
+        _ParentHeader(
+          parent: parent,
+          onMore: !viewer && !parent.isSystem
+              ? () => _showActions(context, ref, parent)
+              : null,
+        ),
+        for (final child in categories.where((c) => c.parentId == parent.id))
+          ListTile(
+            leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
+            title: Text(child.name),
+            trailing: child.isSystem || viewer
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () => _showActions(context, ref, child),
+                  ),
           ),
-          for (final child in categories.where((c) => c.parentId == parent.id))
-            ListTile(
-              leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
-              title: Text(child.name),
-              trailing: child.isSystem || viewer
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.more_vert),
-                      onPressed: () => _showActions(context, ref, child),
-                    ),
-            ),
-        ],
       ],
+    ];
+    return ListView.builder(
+      itemCount: tiles.length,
+      itemBuilder: (context, i) => tiles[i],
     );
   }
 

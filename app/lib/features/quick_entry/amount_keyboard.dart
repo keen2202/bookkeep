@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// 自绘数字键盘（Spec §3.1 / BK-P0-001：禁用系统键盘弹起延迟）
 class AmountKeyboard extends StatelessWidget {
@@ -18,17 +19,21 @@ class AmountKeyboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final row in _rows)
-            Row(
-              children: [
-                for (final key in row)
-                  Expanded(child: _Key(label: key, onKey: onKey, onConfirm: onConfirm)),
-              ],
-            ),
-        ],
+      // 审查 U-3：edge-to-edge 下「确定」键不被系统手势区遮挡（保留底部 SafeArea）
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final row in _rows)
+              Row(
+                children: [
+                  for (final key in row)
+                    Expanded(child: _Key(label: key, onKey: onKey, onConfirm: onConfirm)),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -45,21 +50,37 @@ class _Key extends StatelessWidget {
   Widget build(BuildContext context) {
     final isAction = label == '⌫' || label == 'C';
     final isConfirm = label == '确定';
-    return InkWell(
-      onTap: () => isConfirm ? onConfirm?.call() : onKey(label),
-      child: Container(
-        height: 56,
-        alignment: Alignment.center,
-        child: isAction
-            ? Icon(label == '⌫' ? Icons.backspace_outlined : Icons.clear, size: 22)
-            : Text(
-                label,
-                style: TextStyle(
-                  fontSize: isConfirm ? 16 : 22,
-                  fontWeight: isConfirm ? FontWeight.bold : FontWeight.normal,
-                  color: isConfirm ? Theme.of(context).colorScheme.primary : null,
+    // 审查 U-12：读屏可识别按键 + 触控反馈
+    return Semantics(
+      button: true,
+      label: isConfirm
+          ? '确认'
+          : isAction
+              ? (label == '⌫' ? '退格' : '清除')
+              : '数字 $label',
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          if (isConfirm) {
+            onConfirm?.call();
+          } else {
+            onKey(label);
+          }
+        },
+        child: Container(
+          height: 56,
+          alignment: Alignment.center,
+          child: isAction
+              ? Icon(label == '⌫' ? Icons.backspace_outlined : Icons.clear, size: 22)
+              : Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: isConfirm ? 16 : 22,
+                    fontWeight: isConfirm ? FontWeight.bold : FontWeight.normal,
+                    color: isConfirm ? Theme.of(context).colorScheme.primary : null,
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

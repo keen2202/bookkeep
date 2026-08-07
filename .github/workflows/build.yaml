@@ -181,11 +181,13 @@ jobs:
           keyPassword=$KEY_PASSWORD
           EOF
 
-      - name: Build release APK
-        run: flutter build apk --release $DART_DEFINES
+      # 审查体积 BK-R-015：AAB 为主分发（Play 按 ABI 下发）；APK 直发场景 --split-per-abi 兜底；
+      # --obfuscate --split-debug-info 混淆并产出符号表，崩溃可符号化（归档见下）
+      - name: Build release APK (split-per-abi)
+        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols $DART_DEFINES
 
       - name: Build release App Bundle
-        run: flutter build appbundle --release $DART_DEFINES
+        run: flutter build appbundle --release --obfuscate --split-debug-info=build/symbols $DART_DEFINES
 
       - uses: actions/upload-artifact@v4
         with:
@@ -195,6 +197,7 @@ jobs:
           path: |
             app/build/app/outputs/flutter-apk/*.apk
             app/build/app/outputs/bundle/release/*.aab
+            app/build/symbols/
           if-no-files-found: error
           retention-days: 14
 

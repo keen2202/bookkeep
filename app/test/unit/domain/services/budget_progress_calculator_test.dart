@@ -78,6 +78,31 @@ void main() {
       expect(progress.exceeded, isFalse);
     });
 
+    test('审查 F-5：自定义阈值生效（threshold=50，花费 50% 触发）', () {
+      final progress = BudgetProgressCalculator.progress(
+        budgetMinor: 100000,
+        spentMinor: 50000,
+        daysRemaining: 5,
+        thresholdPercent: 50,
+      );
+
+      expect(progress.percent, 50);
+      expect(progress.overThreshold, isTrue);
+      expect(progress.exceeded, isFalse);
+    });
+
+    test('审查 F-5：自定义阈值下默认 80 不再触发', () {
+      final progress = BudgetProgressCalculator.progress(
+        budgetMinor: 100000,
+        spentMinor: 60000,
+        daysRemaining: 5,
+        thresholdPercent: 80,
+      );
+
+      expect(progress.percent, 60);
+      expect(progress.overThreshold, isFalse);
+    });
+
     test('flags over budget at 100%', () {
       final progress = BudgetProgressCalculator.progress(
         budgetMinor: 100000,

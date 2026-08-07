@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
+import '../../shared/theme/app_theme.dart';
 import '../../data/local/database.dart';
 import '../../data/local/database_provider.dart';
 import '../../data/local/tables/transactions_table.dart';
@@ -62,35 +64,36 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     final window = _window;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('日历'),
-        actions: [
-          TextButton(
-            onPressed: () => _pickYear(context),
-            child: Text('${_focusedDay.year}年'),
+    // 审查 U-1：无内层 Scaffold/AppBar；年份切换内联头部
+    return Column(
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: TextButton.icon(
+              onPressed: () => _pickYear(context),
+              icon: const Icon(Icons.calendar_today_outlined, size: 18),
+              label: Text('${_focusedDay.year}年'),
+            ),
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 懒加载：仅请求当前视图窗口的按日聚合
-          _MonthTotalsScope(
-            key: ValueKey(
-                '${_format.name}|${window.start.year}-${window.start.month}-${window.start.day}'),
-            window: window,
-            format: _format,
-            focusedDay: _focusedDay,
-            selectedDay: _selectedDay,
-            onSelected: (day) => setState(() => _selectedDay = day),
-            onFocused: (day) => setState(() => _focusedDay = day),
-            onFormatChanged: (f) => setState(() => _format = f),
-          ),
-          Expanded(
-            child: CashflowChart(day: _selectedDay),
-          ),
-        ],
-      ),
+        ),
+        // 懒加载：仅请求当前视图窗口的按日聚合
+        _MonthTotalsScope(
+          key: ValueKey(
+              '${_format.name}|${window.start.year}-${window.start.month}-${window.start.day}'),
+          window: window,
+          format: _format,
+          focusedDay: _focusedDay,
+          selectedDay: _selectedDay,
+          onSelected: (day) => setState(() => _selectedDay = day),
+          onFocused: (day) => setState(() => _focusedDay = day),
+          onFormatChanged: (f) => setState(() => _format = f),
+        ),
+        Expanded(
+          child: CashflowChart(day: _selectedDay),
+        ),
+      ],
     );
   }
 }
@@ -165,7 +168,7 @@ class _MonthTotalsScope extends ConsumerWidget {
     final total = totalsByDay[key];
     final net = total == null ? 0 : total.incomeMinor - total.expenseMinor;
     final color = net > 0
-        ? Colors.green
+        ? context.appColors.income
         : net < 0
             ? theme.colorScheme.error
             : theme.colorScheme.onSurfaceVariant;
@@ -195,7 +198,8 @@ class _MonthTotalsScope extends ConsumerWidget {
             Text(
               masked ? '*' : _compactMoney(net),
               style: TextStyle(
-                fontSize: 8,
+                // 审查 U-8：字号下限 12sp（WCAG 可读性）
+                fontSize: 12,
                 color: isToday ? Colors.white : color,
                 fontWeight: FontWeight.w600,
               ),
@@ -218,6 +222,7 @@ class _MonthTotalsScope extends ConsumerWidget {
 /// 按日聚合（复用报表查询层；月份懒加载，Spec §4.6）
 final calendarDailyTotalsProvider = FutureProvider.family<List<DailyTotal>, ReportWindow>(
     (ref, window) async {
+  ref.watch(ledgerVersionProvider); // 账本写操作后自动重建（审查 F-1）
   final rates = await ref.watch(reportRatesProvider.future);
   return ref
       .watch(reportsRepositoryProvider)
@@ -262,30 +267,36 @@ class DayDetailSheet extends ConsumerWidget {
           return DraggableScrollableSheet(
             expand: false,
             initialChildSize: 0.6,
-            builder: (context, scrollController) => ListView(
+            // 审查 U-10：当日明细惰性构建（大流水量下滚动不卡顿）
+            builder: (context, scrollController) => ListView.builder(
               controller: scrollController,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    '${day.year}-${day.month}-${day.day}  '
-                    '净额 ${masked ? '***' : formatMoney(net)}（${txs.length} 笔）',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                for (final t in txs)
-                  ListTile(
-                    leading: Icon(
-                      t.type == TransactionType.expense
-                          ? Icons.arrow_upward
-                          : Icons.arrow_downward,
-                      color: t.type == TransactionType.expense ? Colors.red : Colors.green,
+              itemCount: txs.length + 1,
+              itemBuilder: (context, i) {
+                if (i == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      '${day.year}-${day.month}-${day.day}  '
+                      '净额 ${masked ? '***' : formatMoney(net)}（${txs.length} 笔）',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    title: Text(masked ? '***' : formatMoney(t.amountMinor)),
-                    subtitle: Text(
-                        '${t.note ?? '未命名'} · ${t.occurredAt.toLocal().hour}:${t.occurredAt.toLocal().minute.toString().padLeft(2, '0')}'),
+                  );
+                }
+                final t = txs[i - 1];
+                return ListTile(
+                  leading: Icon(
+                    t.type == TransactionType.expense
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward,
+                    color: t.type == TransactionType.expense
+                        ? context.appColors.expense
+                        : context.appColors.income,
                   ),
-              ],
+                  title: Text(masked ? '***' : formatMoney(t.amountMinor)),
+                  subtitle: Text(
+                      '${t.note ?? '未命名'} · ${t.occurredAt.toLocal().hour}:${t.occurredAt.toLocal().minute.toString().padLeft(2, '0')}'),
+                );
+              },
             ),
           );
         },

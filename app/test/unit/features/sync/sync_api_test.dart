@@ -107,4 +107,22 @@ void main() {
       throwsA(isA<SyncNetworkException>()),
     );
   });
+
+  test('server {error} body surfaces in SyncApiException message (BK-R-010)', () async {
+    final api = apiWith((_) async => http.Response(jsonEncode({'error': 'viewer_cannot_write'}), 403));
+    await expectLater(
+      api.push('book-1', const [], accessToken: token),
+      throwsA(isA<SyncApiException>()
+          .having((e) => e.statusCode, 'statusCode', 403)
+          .having((e) => e.message, 'message', contains('viewer_cannot_write'))),
+    );
+  });
+
+  test('non-JSON error body still yields status-classified exception', () async {
+    final api = apiWith((_) async => http.Response('<html>oops</html>', 500));
+    await expectLater(
+      api.push('book-1', const [], accessToken: token),
+      throwsA(isA<SyncApiException>().having((e) => e.statusCode, 'statusCode', 500)),
+    );
+  });
 }

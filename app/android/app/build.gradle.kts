@@ -39,6 +39,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // 审查体积：移除 x86_64（模拟器不在分发范围；dev 构建含 x86_64 由 debug 兜底）
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
     }
 
     signingConfigs {
@@ -59,6 +63,13 @@ android {
                 // 无签名配置时回退 debug 签名（否则 AGP 会因缺 storeFile 直接构建失败）
                 signingConfigs.getByName("debug")
             }
+            // 审查体积：R8 全量压缩 + 资源收缩（release 专用；debug 保持快速迭代）
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

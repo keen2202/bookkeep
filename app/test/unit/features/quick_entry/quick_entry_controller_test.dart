@@ -12,6 +12,7 @@ import 'package:bookkeep_app/features/quick_entry/quick_entry_controller.dart';
 
 void main() {
   late AppDatabase db;
+  const testBookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   late QuickEntryController controller;
   late int accountId;
   late int categoryId;
@@ -31,7 +32,7 @@ void main() {
           kind: CategoryKind.expense,
           updatedAt: DateTime.utc(2026, 8, 1),
         ));
-    final repo = TransactionRepository(db);
+    final repo = TransactionRepository(db, bookId: testBookId);
     controller = QuickEntryController(
       createTransaction: CreateTransaction(repo),
       transactionRepository: repo,
@@ -113,6 +114,21 @@ void main() {
       expect(ok, isTrue);
       final txs = await db.select(db.transactions).get();
       expect(txs.single.amountMinor, 1000);
+    });
+
+    test('审查 U-4：保存 busy 锁——连点不重复入账', () async {
+      controller.pressKey('2');
+      controller.pressKey('5');
+
+      // 首击进入 saving 后，第二击立即返回 false 且不产生第二条流水
+      final first = controller.save();
+      final second = await controller.save();
+      final firstResult = await first;
+
+      expect(firstResult, isTrue);
+      expect(second, isFalse);
+      final txs = await db.select(db.transactions).get();
+      expect(txs, hasLength(1));
     });
 
     test('invalid amount fails and flags the error', () async {

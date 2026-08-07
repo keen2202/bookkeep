@@ -68,10 +68,19 @@ class RecurringEngine {
     return expandDates(spec, nextDue, now.add(const Duration(days: 1)));
   }
 
-  /// [now, now + horizonDays) 内第一个到期日（严格不早于 now，含时刻比较）；
-  /// 无则返回 null（规则已过 endDate 等）。窗口 400 天覆盖 interval=1 时
-  /// 年频率相邻到期日最大间隔（约 366 天）。
-  DateTime? firstDueAfter(RecurringRuleSpec spec, DateTime now, {int horizonDays = 400}) {
+  /// [now, now + horizon) 内第一个到期日（严格不早于 now，含时刻比较）；
+  /// 无则返回 null（规则已过 endDate 等）。
+  /// 审查 R-022：窗口按频率/interval 动态化——最大相邻到期间隔 × interval + 30 天
+  /// 余量（如年频 interval=1 → 396 天），避免固定窗口对高 interval 规则漏判
+  DateTime? firstDueAfter(RecurringRuleSpec spec, DateTime now) {
+    final maxGapDays = switch (spec.frequency) {
+      RecurringFrequency.day => 1,
+      RecurringFrequency.week => 7,
+      RecurringFrequency.month => 31,
+      RecurringFrequency.quarter => 92,
+      RecurringFrequency.year => 366,
+    };
+    final horizonDays = maxGapDays * spec.interval + 30;
     final dues = expandDates(spec, now, now.add(Duration(days: horizonDays)));
     return dues.isEmpty ? null : dues.first;
   }

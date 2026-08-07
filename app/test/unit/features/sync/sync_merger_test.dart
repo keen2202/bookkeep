@@ -129,7 +129,7 @@ void main() {
     expect(tx.deletedAt, isNotNull);
   });
 
-  test('ignores ops for unmapped entities and unresolvable FKs', () async {
+  test('unmapped entities ignored; FK-unresolvable transactions are pended (F-6)', () async {
     final applied = await merger.merge([
       op('transaction', nextId(), 'c', payload: {'account_id': nextId(), 'category_id': null, 'type': 'expense', 'amount_minor': -100, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'note': null, 'auto_generated': false}),
       op('transaction', nextId(), 'd'),
@@ -138,6 +138,41 @@ void main() {
 
     expect(applied, 0);
     expect(await db.select(db.transactions).get(), isEmpty);
+    // FK 未就绪的 transaction 进入重放队列（不再"跳过即永久丢失"）
+    expect(await db.select(db.pendingReplay).get(), hasLength(1));
+  });
+
+  test('account 晚于 transaction 到达：依赖实体落库后重放，流水不丢（审查 F-6）', () async {
+    final txRemoteId = nextId();
+    final accountRemoteId = nextId();
+    final txPayload = {
+      'account_id': accountRemoteId,
+      'category_id': null,
+      'type': 'expense',
+      'amount_minor': -100,
+      'currency': 'CNY',
+      'occurred_at': '2026-08-01T12:00:00.000Z',
+      'note': null,
+      'auto_generated': false,
+    };
+    // 乱序：transaction 先到，account 未到
+    final first = await merger.merge([
+      op('transaction', txRemoteId, 'c', payload: txPayload),
+    ]);
+    expect(first, 0);
+    expect(await db.select(db.transactions).get(), isEmpty);
+    expect(await db.select(db.pendingReplay).get(), hasLength(1));
+
+    // account 随后到达 → account 落库 + 自动重放暂存 op
+    final second = await merger.merge([
+      op('account', accountRemoteId, 'c',
+          payload: {'type': 'cash', 'name': '钱包', 'currency': 'CNY', 'initial_balance': 0, 'archived': false}),
+    ]);
+    expect(second, 2);
+    final txs = await db.select(db.transactions).get();
+    expect(txs, hasLength(1));
+    expect(txs.single.amountMinor, -100);
+    expect(await db.select(db.pendingReplay).get(), isEmpty);
   });
 
   test('merges account update (archive) and category with parent resolution', () async {
@@ -220,5 +255,20 @@ void main() {
     expect(after, 1); // 字段全部非法 → 无字段生效，但 op 被消费
     final tx = await db.select(db.transactions).getSingle();
     expect(tx.amountMinor, -100);
+  });
+
+  test('merges a book entity create and is idempotent on replay (审查 F-3)', () async {
+    final bookId = nextId();
+    final payload = {'name': '共享账本', 'type': 'family', 'created_at': '2026-08-01T00:00:00.000Z'};
+    final first = await merger.merge([op('book', bookId, 'c', payload: payload)]);
+    expect(first, 1);
+    final books = await db.select(db.books).get();
+    // 内存库 onCreate 已建默认账本 → 合并后共 2 行
+    expect(books, hasLength(2));
+    expect(books.any((b) => b.name == '共享账本' && b.id == bookId), isTrue);
+    // 幂等：重复投递不建重复行
+    final again = await merger.merge([op('book', bookId, 'c', payload: payload)]);
+    expect(again, 0);
+    expect(await db.select(db.books).get(), hasLength(2));
   });
 }

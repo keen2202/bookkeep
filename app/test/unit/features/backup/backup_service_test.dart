@@ -50,6 +50,40 @@ void main() {
           clientId: 'client-A',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
+    // 审查 F-4：补录 4 张表的往返覆盖（币种/周期规则/分期计划/分期排期）
+    await db.into(db.currencies).insert(CurrenciesCompanion.insert(
+          code: 'USD',
+          name: '美元',
+          rateScaled: 7200000,
+          updatedAt: DateTime.utc(2026, 8, 1),
+        ));
+    final ruleId = await db.into(db.recurringRules).insert(RecurringRulesCompanion.insert(
+          bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+          frequency: 'month',
+          anchorType: 'start',
+          amountMinor: -1000,
+          type: const Value('expense'),
+          accountId: accountId,
+          nextDue: DateTime.utc(2026, 9, 1),
+          startDate: DateTime.utc(2026, 8, 1),
+          updatedAt: DateTime.utc(2026, 8, 1),
+        ));
+    final planId = await db.into(db.installmentPlans).insert(InstallmentPlansCompanion.insert(
+          bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+          name: '手机分期',
+          totalMinor: 12000,
+          periods: 3,
+          startDate: DateTime.utc(2026, 8, 1),
+          linkedAccountId: accountId,
+          createdAt: DateTime.utc(2026, 8, 1),
+        ));
+    await db.into(db.installmentSchedules).insert(InstallmentSchedulesCompanion.insert(
+          planId: planId,
+          dueDate: DateTime.utc(2026, 8, 1),
+          amountMinor: 4000,
+        ));
+    expect(ruleId, greaterThan(0));
+    expect(planId, greaterThan(0));
     return db;
   }
 
@@ -60,9 +94,12 @@ void main() {
     final backup = await service.createBackup('备份口令123');
     expect(backup, isNotEmpty);
 
-    // 清空数据库
+    // 清空数据库（子表先删；含审查 F-4 补录表）
     await db.transaction(() async {
-      for (final table in ['sync_ops', 'transactions', 'budgets', 'account_snapshots', 'categories', 'accounts', 'app_meta', 'books']) {
+      for (final table in [
+        'installment_schedules', 'installment_plans', 'recurring_rules', 'currencies',
+        'sync_ops', 'transactions', 'budgets', 'account_snapshots', 'categories', 'accounts', 'app_meta', 'books',
+      ]) {
         await db.customStatement('DELETE FROM $table');
       }
     });
@@ -79,6 +116,18 @@ void main() {
     expect(txs.single.note, '午餐');
     final ops = await db.select(db.syncOps).get();
     expect(ops.single.clientId, 'client-A');
+    // 审查 F-4：补录 4 表逐行一致（币种/周期规则/分期计划/分期排期）
+    final currencies = await db.select(db.currencies).get();
+    expect(currencies.single.code, 'USD');
+    expect(currencies.single.rateScaled, 7200000);
+    final rules = await db.select(db.recurringRules).get();
+    expect(rules.single.type, 'expense');
+    expect(rules.single.frequency, 'month');
+    final plans = await db.select(db.installmentPlans).get();
+    expect(plans.single.name, '手机分期');
+    expect(plans.single.totalMinor, 12000);
+    final schedules = await db.select(db.installmentSchedules).get();
+    expect(schedules.single.amountMinor, 4000);
     await db.close();
   });
 

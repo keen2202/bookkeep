@@ -42,10 +42,15 @@ export async function rotateRefreshToken(
   );
   if (rows.rows.length === 0) return null;
 
-  // 顺带清理过期/已撤销超过 7 天的令牌
-  await pool.query(
-    `DELETE FROM refresh_tokens WHERE expires_at < now() OR (revoked_at IS NOT NULL AND revoked_at < now() - interval '7 days')`,
-  );
+  // 顺带清理过期/已撤销超过 7 天的令牌（审查 L-12：清理失败不得阻断轮换）
+  try {
+    await pool.query(
+      `DELETE FROM refresh_tokens WHERE expires_at < now() OR (revoked_at IS NOT NULL AND revoked_at < now() - interval '7 days')`,
+    );
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[warn] refresh token cleanup failed:', (err as Error)?.message ?? err);
+  }
 
   const user_id = rows.rows[0].user_id;
   const nextRefresh = await issueRefreshToken(pool, user_id);

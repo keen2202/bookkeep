@@ -8,6 +8,7 @@ import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/op_logger.dart';
+import 'package:bookkeep_app/features/sync/sync_api.dart';
 import 'package:bookkeep_app/features/sync/sync_engine.dart';
 import 'package:bookkeep_app/features/sync/sync_merger.dart';
 import 'package:bookkeep_app/features/sync/sync_state.dart';
@@ -386,4 +387,131 @@ void main() {
     await dbA.close();
     await dbB.close();
   });
+
+  test('未登录（无 token 无凭据）sync() 纯本地降级：不触碰服务端（审查 B-1）', () async {
+    db = AppDatabase(NativeDatabase.memory());
+    logger = OpLogger(db);
+    server = FakeSyncServer();
+    tokens = InMemoryTokenStore();
+    engine = SyncEngine(
+      opLogger: logger,
+      api: server,
+      tokenStore: tokens,
+      merger: SyncMerger(db),
+      bookId: kDefaultBookId,
+    );
+    var serverTouched = false;
+    final proxied = _TouchCountingServer(server, () => serverTouched = true);
+    // 重建 engine 使用计数代理（先保留原 engine 引用以便 dispose）
+    final spyEngine = SyncEngine(
+      opLogger: logger,
+      api: proxied,
+      tokenStore: tokens,
+      merger: SyncMerger(db),
+      bookId: kDefaultBookId,
+    );
+    await spyEngine.sync();
+    expect(spyEngine.phase, SyncPhase.idle);
+    expect(serverTouched, isFalse);
+    await spyEngine.dispose();
+  });
+
+  test('401 触发刷新且单飞：一轮 sync 内 refresh 仅调用一次（审查 B-1）', () async {
+    db = AppDatabase(NativeDatabase.memory());
+    logger = OpLogger(db);
+    final expiring = _ExpiringServer();
+    await expiring.register(email, password);
+    tokens = InMemoryTokenStore(TokenPair(
+      accessToken: 'access-$email',
+      refreshToken: 'refresh-$email',
+    ));
+    final accountRemoteId = logger.newUuid();
+    await db.into(db.accounts).insert(AccountsCompanion.insert(
+          remoteId: Value(accountRemoteId),
+          accountType: AccountType.cash,
+          name: '钱包',
+          currency: 'CNY',
+          createdAt: DateTime.utc(2026, 8, 1),
+        ));
+    final txRemoteId = logger.newUuid();
+    final txId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          remoteId: Value(txRemoteId),
+          accountId: 1,
+          type: TransactionType.expense,
+          amountMinor: -100,
+          currency: 'CNY',
+          occurredAt: DateTime.utc(2026, 8, 1, 12),
+          updatedAt: DateTime.utc(2026, 8, 1, 12),
+        ));
+    await logger.enqueue(
+      entity: 'transaction',
+      entityId: txId,
+      remoteId: txRemoteId,
+      op: SyncOpCode.c,
+      bookId: kDefaultBookId,
+      payload: {'account_id': accountRemoteId, 'category_id': null, 'type': 'expense', 'amount_minor': -100, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'auto_generated': false},
+    );
+    engine = SyncEngine(
+      opLogger: logger,
+      api: expiring,
+      tokenStore: tokens,
+      merger: SyncMerger(db),
+      email: email,
+      password: password,
+      bookId: kDefaultBookId,
+    );
+    await engine.sync();
+    expect(expiring.refreshCalls, 1);
+    expect(engine.phase, SyncPhase.idle);
+    expect(await tokens.read(), isNotNull);
+  });
+}
+
+class _ExpiringServer extends FakeSyncServer {
+  int refreshCalls = 0;
+  bool expireNextPush = true;
+
+  @override
+  Future<TokenPair> refresh(String refreshToken) async {
+    refreshCalls++;
+    return super.refresh(refreshToken);
+  }
+
+  @override
+  Future<PushResult> push(String bookId, List<Map<String, dynamic>> ops,
+      {required String accessToken}) async {
+    if (expireNextPush) {
+      expireNextPush = false;
+      throw const SyncApiException(401, 'expired');
+    }
+    return super.push(bookId, ops, accessToken: accessToken);
+  }
+}
+
+class _TouchCountingServer extends FakeSyncServer {
+  _TouchCountingServer(this.inner, this.onTouch);
+  final FakeSyncServer inner;
+  final void Function() onTouch;
+
+  void _mark() => onTouch();
+
+  @override
+  Future<TokenPair> refresh(String refreshToken) async {
+    _mark();
+    return inner.refresh(refreshToken);
+  }
+
+  @override
+  Future<PushResult> push(String bookId, List<Map<String, dynamic>> ops,
+      {required String accessToken}) async {
+    _mark();
+    return inner.push(bookId, ops, accessToken: accessToken);
+  }
+
+  @override
+  Future<PullResult> pull(String bookId, int sinceSeq,
+      {required String accessToken, int limit = 500}) async {
+    _mark();
+    return inner.pull(bookId, sinceSeq, accessToken: accessToken, limit: limit);
+  }
 }

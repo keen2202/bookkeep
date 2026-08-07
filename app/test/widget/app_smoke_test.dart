@@ -24,7 +24,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.byType(BookkeepApp), findsOneWidget);
-    expect(find.text('bookkeep'), findsOneWidget);
+    // 审查 U-1：AppBar 标题随 Tab 变化（默认分类页）
     expect(find.text('分类'), findsWidgets);
     expect(find.text('周期记账'), findsWidgets);
   });

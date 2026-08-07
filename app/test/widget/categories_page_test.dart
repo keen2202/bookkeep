@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:bookkeep_app/app.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/data/local/tables/categories_table.dart';
@@ -70,7 +71,18 @@ void main() {
         databaseProvider.overrideWithValue(db),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
-      child: const MaterialApp(home: CategoriesPage()),
+      child: const MaterialApp(home: Scaffold(body: CategoriesPage())),
+    );
+  }
+
+  // 审查 U-1：新建分类动作已上移到主 shell AppBar
+  Widget shellHarness(AppDatabase db) {
+    return ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        categorySeedProvider.overrideWith((ref) async => testSeed),
+      ],
+      child: const BookkeepApp(),
     );
   }
 
@@ -91,10 +103,10 @@ void main() {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
-    await tester.pumpWidget(harness(db));
+    await tester.pumpWidget(shellHarness(db));
     await pumpUntil(tester, find.text('餐饮'));
 
-    await tester.tap(find.byType(FloatingActionButton));
+    await tester.tap(find.byTooltip('新建分类'));
     await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
     await tester.pump(const Duration(milliseconds: 400)); // 弹窗入场动画完成
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '旅行');

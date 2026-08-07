@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'dart:async';
+
+
+import 'core/ledger_version.dart';
 import 'data/local/database_provider.dart';
 import 'data/repositories/settings_repository.dart';
 import 'features/accounts/accounts_page.dart';
@@ -11,13 +15,17 @@ import 'features/auto_capture/csv_import/csv_import_page.dart' show AutoCaptureS
 import 'features/backup/backup_page.dart';
 import 'features/books/book_switcher.dart';
 import 'features/books/books_page.dart' show serverBooksProvider;
-import 'features/books/books_providers.dart' show currentRoleProvider;
-import 'features/budgets/budgets_page.dart';
+import 'features/books/books_providers.dart' show currentBookIdProvider, currentRoleProvider;
+import 'features/budgets/budgets_page.dart' show BudgetsPage, budgetsPageAction;
 import 'features/calendar/calendar_page.dart';
-import 'features/categories/categories_page.dart';
+import 'features/categories/categories_page.dart' show CategoriesPage, categoriesPageAction;
+import 'features/currency/currency_manage_page.dart';
 import 'features/quick_entry/quick_entry_sheet.dart';
-import 'features/recurring/recurring_page.dart';
+import 'features/recurring/recurring_page.dart' show RecurringPage, recurringPageActions;
+import 'features/recurring/recurring_providers.dart' show recurringServiceProvider;
 import 'features/reports/reports_page.dart';
+import 'features/settings/account_sync_section.dart';
+import 'shared/theme/app_theme.dart';
 
 /// 中文本地化配置（主入口与秒开模式的 MaterialApp 共用）
 const bookkeepLocalizationsDelegates = [
@@ -36,8 +44,46 @@ class BookkeepApp extends ConsumerStatefulWidget {
   ConsumerState<BookkeepApp> createState() => _BookkeepAppState();
 }
 
-class _BookkeepAppState extends ConsumerState<BookkeepApp> {
+class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingObserver {
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 同步合并落库后 bump 刷新总线（审查 F-1）：远端流水即时出现在报表/日历
+    syncMergeBus.addListener(_onSyncMerged);
+  }
+
+  @override
+  void dispose() {
+    syncMergeBus.removeListener(_onSyncMerged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void _onSyncMerged() {
+    if (mounted) ref.read(ledgerVersionProvider.notifier).state++;
+  }
+
+  /// 前台恢复时重跑周期/分期补跑（审查 F-2）；幂等 + 失败静默记日志
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_runCatchup());
+    }
+  }
+
+  Future<void> _runCatchup() async {
+    try {
+      final bookId = ref.read(currentBookIdProvider);
+      await ref.read(recurringServiceProvider).runAll(bookId: bookId);
+      await ref.read(recurringServiceProvider).runInstallmentDues(bookId: bookId);
+      ref.read(ledgerVersionProvider.notifier).state++;
+    } catch (e) {
+      debugPrint('recurring catch-up on resume failed: $e');
+    }
+  }
 
   /// 需传入 Navigator 内的 context（state.context 在 MaterialApp 之上，无法定位 Navigator）
   Future<void> _openQuickEntry(BuildContext navContext) async {
@@ -51,6 +97,8 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
     }
   }
 
+  static const _tabTitles = ['分类', '周期记账', '预算', '报表', '日历'];
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -58,10 +106,10 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
       locale: const Locale('zh', 'CN'),
       localizationsDelegates: bookkeepLocalizationsDelegates,
       supportedLocales: bookkeepSupportedLocales,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
+      // 审查 U-2：深色模式（themeMode: system 跟随系统），语义色经 AppColors 扩展
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       builder: lockGateBuilder,
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
@@ -71,18 +119,20 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
           ref.watch(serverBooksProvider);
           final viewer = ref.watch(currentRoleProvider) == 'viewer';
           return Scaffold(
-            body: switch (_tab) {
-              0 => const CategoriesPage(),
-              1 => const RecurringPage(),
-              2 => const BudgetsPage(),
-              3 => const ReportsPage(),
-              4 => const CalendarPage(),
-              _ => const SizedBox.shrink(),
-            },
+            // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range/_hideAmounts）
+            body: IndexedStack(
+              index: _tab,
+              children: const [
+                CategoriesPage(),
+                RecurringPage(),
+                BudgetsPage(),
+                ReportsPage(),
+                CalendarPage(),
+              ],
+            ),
             floatingActionButton: viewer
                 ? null
                 : FloatingActionButton(
-                    heroTag: 'quick_entry_fab', // 与分类页 FAB 区分，避免 Hero 标签冲突
                     onPressed: () => _openQuickEntry(navContext),
                     tooltip: '记一笔',
                     child: const Icon(Icons.add),
@@ -98,9 +148,11 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
                 NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: '日历'),
               ],
             ),
+            // 审查 U-1：单 AppBar，按 Tab 配置标题与动作（页面动作经顶层函数组装）
             appBar: AppBar(
-              title: const Text('bookkeep'),
+              title: Text(_tabTitles[_tab]),
               actions: [
+                ..._tabActions(navContext),
                 const BookSwitcher(),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
@@ -112,6 +164,16 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> {
         },
       ),
     );
+  }
+
+  /// 当前 Tab 的动作（viewer 只读时为空，Spec §4.1 双重拒绝）
+  List<Widget> _tabActions(BuildContext navContext) {
+    return switch (_tab) {
+      0 => [ ?categoriesPageAction(navContext, ref) ],
+      1 => recurringPageActions(navContext, ref),
+      2 => [ ?budgetsPageAction(navContext, ref) ],
+      _ => const [],
+    };
   }
 
   void _showSettings(BuildContext navContext) {
@@ -140,6 +202,7 @@ class _SettingsSheet extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const AccountSyncSection(),
               SwitchListTile(
                 title: const Text('秒开模式（冷启动直达记账页）'),
                 value: enabled,
@@ -164,6 +227,14 @@ class _SettingsSheet extends ConsumerWidget {
                 subtitle: const Text('新增 / 编辑 / 归档账户'),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AccountsPage()),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.currency_exchange),
+                title: const Text('汇率管理'),
+                subtitle: const Text('手动设置各币种汇率（未设置将显式标注）'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CurrencyManagePage()),
                 ),
               ),
               const Divider(),

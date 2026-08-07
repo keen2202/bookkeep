@@ -84,6 +84,10 @@ class HttpSyncApi implements SyncApi {
     try {
       return switch (method) {
         'GET' => await _client.get(uri, headers: headers).timeout(const Duration(seconds: 15)),
+        'DELETE' => await _client.delete(uri, headers: headers).timeout(const Duration(seconds: 15)),
+        'PATCH' => await _client
+            .patch(uri, headers: headers, body: body == null ? null : jsonEncode(body))
+            .timeout(const Duration(seconds: 15)),
         _ => await _client
             .post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
             .timeout(const Duration(seconds: 15)),
@@ -99,8 +103,19 @@ class HttpSyncApi implements SyncApi {
 
   Map<String, dynamic> _json(http.Response res, int expect, String path) {
     if (res.statusCode != expect) {
-      throw SyncApiException(res.statusCode, '$path -> ${res.statusCode}');
+      // 解析服务端 {error} 字段（审查 B-1 衍生）：错误信息可读、可分类
+      String message = '$path -> ${res.statusCode}';
+      try {
+        final body = jsonDecode(res.body);
+        if (body is Map<String, dynamic> && body['error'] is String) {
+          message = '${body['error']} ($path -> ${res.statusCode})';
+        }
+      } catch (_) {
+        // 非 JSON 响应体：保留状态码信息
+      }
+      throw SyncApiException(res.statusCode, message);
     }
+    if (res.body.isEmpty) return const {};
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
@@ -112,17 +113,34 @@ class _CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
                 onSelectionChanged: (s) => setState(() => _kind = s.first),
               ),
             const SizedBox(height: 12),
-            Row(
+            // 审查 U-7：颜色选择触控目标 ≥48dp；小屏溢出改 Wrap 自动换行
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
               children: [
                 for (var i = 0; i < _palette.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
+                  Semantics(
+                    button: true,
+                    label: '颜色 ${i + 1}',
+                    selected: _colorIndex == i,
                     child: InkWell(
-                      onTap: () => setState(() => _colorIndex = i),
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Color(_palette[i]),
-                        child: _colorIndex == i ? const Icon(Icons.check, size: 18, color: Colors.white) : null,
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _colorIndex = i);
+                      },
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Center(
+                          child: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Color(_palette[i]),
+                            child: _colorIndex == i
+                                ? const Icon(Icons.check, size: 18, color: Colors.white)
+                                : null,
+                          ),
+                        ),
                       ),
                     ),
                   ),

@@ -14,6 +14,8 @@ dependencies:
   flutter_riverpod: ^2.6.1
   drift: ^2.34.3
   drift_flutter: ^0.3.1
+  # 审查 BK-R-015 审计结论（2026-08-07）：两包均为 sqlite3 3.x 时代 no-op 占位（原生库由 native-assets
+  # hooks 提供），保留系因 drift 依赖解析需要，运行时零体积；SQLCipher 经下方 hooks source: sqlcipher 启用
   sqlcipher_flutter_libs: ^0.7.0 # 0.7.0+eol 为 sqlite3 3.x 迁移占位包（native-assets hooks 需要）；加密改由下方 hooks 提供
   sqlite3_flutter_libs: ^0.6.0 # 0.6.0+eol 为 no-op 占位（sqlite3 3.x 起由 native assets 提供库），drift 2.34 强制 sqlite3 ^3.4.0，0.5.x 无法共存
   flutter_secure_storage: ^10.3.1
@@ -25,6 +27,8 @@ dependencies:
   path_provider: ^2.1.6
   http: ^1.6.0
   uuid: ^4.6.0
+  sqlite3: ^3.5.1 # 明文检测/迁移与加密打开（SQLCipher 经 native-assets hooks 提供）
+  flutter_local_notifications: ^22.2.0
 
 dev_dependencies:
   flutter_test:
@@ -35,7 +39,6 @@ dev_dependencies:
   drift_dev: ^2.34.5
   build_runner: ^2.15.1 # 2.15.2+ 需 analyzer >=13.3.0 → meta ^1.18.3，与 flutter_test 钉死的 meta 1.18.0 冲突
   mocktail: ^1.0.5
-  sqlite3: ^3.5.1 # drift 2.34 要求 sqlite3 ^3.4.0（测试栈同步用 3.x）
 
 flutter:
   uses-material-design: true

@@ -5,7 +5,6 @@ import '../../core/errors/repository_exceptions.dart';
 import '../local/database.dart';
 import '../local/tables/accounts_table.dart';
 import '../local/tables/sync_ops_table.dart';
-import '../local/tables/transactions_table.dart';
 import 'op_logger.dart';
 
 /// 账户仓库（Spec §3.2 / BK-P0-002）：写路径统一经 OpLogger 入队；
@@ -115,88 +114,6 @@ class AccountRepository {
     await archiveAccount(id);
   }
 
-  /// 转账 = 同一事务两条流水 + transfer_id 关联（Spec §3.2 / BK-P0-002）
-  Future<int> createTransfer({
-    required int fromAccountId,
-    required int toAccountId,
-    required int amountMinor,
-    required DateTime occurredAt,
-  }) async {
-    final currentBookId = await _bookId();
-    return db.transaction(() async {
-      final now = DateTime.now().toUtc();
-      final fromRemoteId = opLogger.newUuid();
-      final pairedRemoteId = opLogger.newUuid();
-      final fromId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(currentBookId),
-            remoteId: Value(fromRemoteId),
-            accountId: fromAccountId,
-            type: TransactionType.transfer,
-            amountMinor: -amountMinor,
-            currency: 'CNY',
-            occurredAt: occurredAt,
-            updatedAt: now,
-          ));
-      final pairedId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(currentBookId),
-            remoteId: Value(pairedRemoteId),
-            accountId: toAccountId,
-            type: TransactionType.transfer,
-            amountMinor: amountMinor,
-            currency: 'CNY',
-            occurredAt: occurredAt,
-            transferId: Value(fromId),
-            updatedAt: now,
-          ));
-      // 双向关联：首条流水也回写 transfer_id，保证配对对称
-      await (db.update(db.transactions)..where((t) => t.id.equals(fromId)))
-          .write(TransactionsCompanion(transferId: Value(fromId)));
-
-      final fromAccountRef = await _remoteIdOf(fromAccountId);
-      final toAccountRef = await _remoteIdOf(toAccountId);
-      await opLogger.enqueue(
-        entity: 'transaction',
-        entityId: fromId,
-        remoteId: fromRemoteId,
-        op: SyncOpCode.c,
-        bookId: currentBookId,
-        payload: {
-          'id': fromId,
-          'account_id': fromAccountRef,
-          'transfer_id': fromRemoteId,
-          'type': 'transfer',
-          'amount_minor': -amountMinor,
-          'currency': 'CNY',
-          'occurred_at': occurredAt.toUtc().toIso8601String(),
-          'updated_at': now.toIso8601String(),
-        },
-      );
-      await opLogger.enqueue(
-        entity: 'transaction',
-        entityId: pairedId,
-        remoteId: pairedRemoteId,
-        op: SyncOpCode.c,
-        bookId: currentBookId,
-        payload: {
-          'id': pairedId,
-          'account_id': toAccountRef,
-          'transfer_id': fromRemoteId,
-          'type': 'transfer',
-          'amount_minor': amountMinor,
-          'currency': 'CNY',
-          'occurred_at': occurredAt.toUtc().toIso8601String(),
-          'updated_at': now.toIso8601String(),
-        },
-      );
-      return fromId;
-    });
-  }
-
-  Future<String?> _remoteIdOf(int accountId) async {
-    final row = await (db.select(db.accounts)..where((t) => t.id.equals(accountId))).getSingle();
-    return row.remoteId;
-  }
-
   Future<void> _enqueueSnapshot(int id, SyncOpCode op) async {
     final account = await getAccount(id);
     await opLogger.enqueue(
@@ -230,10 +147,15 @@ class AccountRepository {
 
     final day = _dayKey(date);
     await db.transaction(() async {
+      // 审查 L-6：N+1 改批量——一次读全部账户 initial_balance，循环内不再逐行查库
+      final accountIds = [for (final row in totals) row.read<int>('account_id')];
+      final accounts = accountIds.isEmpty
+          ? <Account>[]
+          : await (db.select(db.accounts)..where((t) => t.id.isIn(accountIds))).get();
+      final initialByAccount = {for (final a in accounts) a.id: a.initialBalance};
       for (final row in totals) {
         final accountId = row.read<int>('account_id');
-        final account = await getAccount(accountId);
-        final balance = account.initialBalance + row.read<int>('total');
+        final balance = (initialByAccount[accountId] ?? 0) + row.read<int>('total');
         await db.into(db.accountSnapshots).insert(
               AccountSnapshotsCompanion.insert(
                 accountId: accountId,

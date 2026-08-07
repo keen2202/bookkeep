@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/constants.dart';
+import '../../core/ledger_version.dart';
 import '../../core/utils/money.dart';
 import '../../data/local/database.dart';
 import '../../data/local/database_provider.dart';
@@ -19,6 +20,7 @@ final exchangeRateServiceProvider = Provider<ExchangeRateService>((ref) {
 /// 账户 + 余额 + 净资产视图模型（隐藏归档账户；仅当前账本，Spec §4.1；
 /// 净资产按各账户币种汇率折算到主币种，Spec §4.5）
 final accountsViewModelProvider = FutureProvider<AccountsViewModel>((ref) async {
+  ref.watch(ledgerVersionProvider); // 账本写操作后自动重建（审查 F-1）
   final repo = ref.watch(accountRepositoryProvider);
   final db = ref.watch(databaseProvider);
   final bookId = ref.watch(currentBookIdProvider);

@@ -130,6 +130,9 @@ void main() {
     // ── ⑤ 设置 → 开启隐私锁 → 立即锁定 → 锁屏覆盖 → PIN 解锁 ──
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
+    // 设置弹层可滚动（新增汇率管理入口后隐私锁可能在视口外）
+    await tester.scrollUntilVisible(find.text('隐私锁'), 100,
+        scrollable: find.byType(Scrollable).last);
     await tester.tap(find.text('隐私锁'));
     await tester.pumpAndSettle();
 

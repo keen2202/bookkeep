@@ -23,12 +23,13 @@ CaptureCandidate candidate({
 
 void main() {
   late AppDatabase db;
+  const testBookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   late TransactionRepository repo;
   late CsvImportService service;
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
-    repo = TransactionRepository(db);
+    repo = TransactionRepository(db, bookId: testBookId);
     service = CsvImportService(repo);
     await db.into(db.accounts).insert(AccountsCompanion.insert(
           accountType: AccountType.cash,

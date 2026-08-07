@@ -7,6 +7,10 @@ abstract class TokenStore {
   Future<TokenPair?> read();
   Future<void> write(TokenPair tokens);
   Future<void> clear();
+
+  /// 登录邮箱（设置页展示登录态）
+  Future<String?> readEmail();
+  Future<void> writeEmail(String email);
 }
 
 class SecureTokenStore implements TokenStore {
@@ -15,6 +19,7 @@ class SecureTokenStore implements TokenStore {
 
   static const _accessKey = 'sync_access_token';
   static const _refreshKey = 'sync_refresh_token';
+  static const _emailKey = 'sync_account_email';
 
   final FlutterSecureStorage _storage;
 
@@ -36,13 +41,21 @@ class SecureTokenStore implements TokenStore {
   Future<void> clear() async {
     await _storage.delete(key: _accessKey);
     await _storage.delete(key: _refreshKey);
+    await _storage.delete(key: _emailKey);
   }
+
+  @override
+  Future<String?> readEmail() => _storage.read(key: _emailKey);
+
+  @override
+  Future<void> writeEmail(String email) => _storage.write(key: _emailKey, value: email);
 }
 
 class InMemoryTokenStore implements TokenStore {
   InMemoryTokenStore([this._pair]);
 
   TokenPair? _pair;
+  String? _email;
 
   @override
   Future<TokenPair?> read() async => _pair;
@@ -51,5 +64,14 @@ class InMemoryTokenStore implements TokenStore {
   Future<void> write(TokenPair tokens) async => _pair = tokens;
 
   @override
-  Future<void> clear() async => _pair = null;
+  Future<void> clear() async {
+    _pair = null;
+    _email = null;
+  }
+
+  @override
+  Future<String?> readEmail() async => _email;
+
+  @override
+  Future<void> writeEmail(String email) async => _email = email;
 }

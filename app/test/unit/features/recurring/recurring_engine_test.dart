@@ -97,5 +97,16 @@ void main() {
       // 2026-08-01 是到期日，now 已到当日 12 点 → 下月 1 日
       expect(engine.firstDueAfter(s, DateTime(2026, 8, 1, 12)), DateTime(2026, 9, 1));
     });
+
+    test('审查 R-022：窗口按 interval 动态化——年频 interval=2 不因固定窗口漏判', () {
+      final s = spec(
+        frequency: RecurringFrequency.year,
+        interval: 2,
+        anchorType: AnchorType.start,
+        startDate: DateTime(2026, 1, 1),
+      );
+      // 下一个到期日 2028-01-01 距 now 约 700 天，超出旧固定窗口 400 天
+      expect(engine.firstDueAfter(s, DateTime(2026, 2, 1)), DateTime(2028, 1, 1));
+    });
   });
 }

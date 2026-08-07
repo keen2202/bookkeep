@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/categories_table.dart';
@@ -9,8 +12,10 @@ import '../../domain/usecases/create_transaction.dart';
 import '../../shared/widgets/category_picker.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
 import '../accounts/accounts_providers.dart';
-import '../books/books_providers.dart' show accountRepositoryProvider, transactionRepositoryProvider;
-import '../budgets/budgets_page.dart' show budgetsViewModelProvider;
+import '../books/books_providers.dart'
+    show accountRepositoryProvider, budgetRepositoryProvider, transactionRepositoryProvider;
+import '../budgets/budget_alert_notifier.dart';
+import '../budgets/budget_alert_service.dart';
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'amount_keyboard.dart';
 import 'amount_parser.dart';
@@ -80,19 +85,30 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   }
 
   Future<void> _save() async {
+    // 审查 U-4：保存 busy 锁——连点「确定」不重复入账（controller 内也有 saving 互斥）
+    if (_controller.saving) return;
     final ok = await _controller.save();
     if (!mounted) return;
     if (!ok) {
-      final message = _controller.error == QuickEntryError.missingSelection
-          ? '请选择账户和分类'
-          : '金额无效，请重新输入';
+      final message = switch (_controller.error) {
+        QuickEntryError.missingSelection => '请选择账户和分类',
+        QuickEntryError.saveFailed => '保存失败，请重试',
+        _ => '金额无效，请重新输入',
+      };
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
       return;
     }
-    // 记账保存后触发预算重算（Spec §3.4）
-    ref.invalidate(budgetsViewModelProvider);
-    ref.invalidate(accountsViewModelProvider);
+    // 刷新总线：报表/日历/账户/预算 provider 均 watch，自动重建（审查 F-1）
+    ref.read(ledgerVersionProvider.notifier).state++;
+    // 预算阈值提醒（审查 F-5）：异步评估，失败静默不阻断记账；
+    // 全部依赖同步捕获，pop 后 widget 销毁也不影响执行
+    final repo = ref.read(budgetRepositoryProvider);
+    final notifierFuture = ref.read(budgetAlertNotifierProvider.future);
+    unawaited(notifierFuture
+        .then((notifier) =>
+            BudgetAlertService(repo: repo, notifier: notifier).evaluate())
+        .catchError((_) => 0));
     if (mounted) Navigator.pop(context, true);
   }
 

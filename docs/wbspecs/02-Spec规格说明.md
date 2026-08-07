@@ -46,6 +46,11 @@ bookkeep/
 - `POST /sync/push`：客户端上送 op 批次；服务端按 book 校验权限后落库，返回已受理 seq。
 - `GET /sync/pull?book_id=&since=`：游标式增量拉取。
 - 冲突：同实体按 `(lamport, client_id)` 比较，LWW；删除优先于修改。
+  - **删除优先语义**（审查 R-022 澄清）：同一实体的 op 集合中任一条为删除（`op='d'`）
+    即裁决为删除，**无视其 lamport 高低**——即使删除 op 的 lamport 低于并存的
+    修改 op，也按删除收敛（防"已删流水复活"）；删除裁决的 payload 恒为 null。
+    实现于 `LwwResolver`，由 `sync_merger` 落库（测试锁定：u/d 高 lamport 修改
+    不敌低 lamport 删除、d/d 收敛为删除）。
 - 认证：JWT access 15min + refresh 30d（轮换）；所有接口鉴权到 book 粒度。
 
 ### 1.4 测试全局门禁

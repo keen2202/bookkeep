@@ -203,7 +203,7 @@ void main() {
     await db1.close();
 
     final db2 = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db2.schemaVersion, 6);
+    expect(db2.schemaVersion, 7);
     await db2.close();
   });
 
@@ -256,7 +256,7 @@ void main() {
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db.schemaVersion, 6);
+    expect(db.schemaVersion, 7);
 
     // book_id 回填到既有 sync_book_id（同步域连续），而非 kDefaultBookId
     final account = await db.select(db.accounts).getSingle();
@@ -298,7 +298,7 @@ void main() {
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db.schemaVersion, 6);
+    expect(db.schemaVersion, 7);
 
     // 无 sync_book_id → 默认账本 = kDefaultBookId，book_id 保持列默认值
     final account = await db.select(db.accounts).getSingle();
@@ -334,7 +334,7 @@ void main() {
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db.schemaVersion, 6);
+    expect(db.schemaVersion, 7);
 
     // 既有数据保留（账户 + 周期规则）
     final account = await db.select(db.accounts).getSingle();

@@ -27,6 +27,17 @@ final booksViewModelProvider = FutureProvider<List<Book>>((ref) {
   return ref.watch(bookRepositoryProvider).listBooks();
 });
 
+/// 各账本角色（共享/本地区分与写拦截驱动；服务端为权威，本地为缓存）
+final bookRolesProvider = FutureProvider<Map<String, String>>((ref) async {
+  final repo = ref.watch(bookRepositoryProvider);
+  final books = await repo.listBooks();
+  final roles = <String, String>{};
+  for (final book in books) {
+    roles[book.id] = await repo.roleOf(book.id);
+  }
+  return roles;
+});
+
 final currentBookProvider = FutureProvider<Book?>((ref) {
   return ref.watch(bookRepositoryProvider).currentBook();
 });

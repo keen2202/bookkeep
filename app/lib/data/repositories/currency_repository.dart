@@ -83,7 +83,8 @@ class CurrencyRepository {
               code: entry.key,
               name: entry.value[0],
               symbol: Value(entry.value.length > 1 ? entry.value[1] : ''),
-              rateScaled: entry.key == 'CNY' ? kRateScale : 100000, // 默认 0.1 占位
+              // 审查 F-8：废 0.1 占位——未设置汇率 = 0 标记，UI 显式提示而非静默错误折算
+              rateScaled: entry.key == 'CNY' ? kRateScale : unsetRateScaled,
               updatedAt: now,
             ));
         inserted++;
@@ -96,12 +97,24 @@ class CurrencyRepository {
     return inserted;
   }
 
-  /// 汇率（相对主币种，kRateScale 刻度）；未配置时回退默认 1:1
+  /// 未设置汇率标记（0 = 未设置；合法汇率 ≥ 1 个基点）
+  static const unsetRateScaled = 0;
+
+  /// 汇率（相对主币种，kRateScale 刻度）；未设置时回退默认 1:1（折算不因占位而失真）
   Future<int> rateScaled(String code) async {
     if (code == 'CNY') return kRateScale;
     final row = await (db.select(db.currencies)..where((t) => t.code.equals(code)))
         .getSingleOrNull();
-    return row?.rateScaled ?? kRateScale;
+    final rate = row?.rateScaled ?? unsetRateScaled;
+    return rate > 0 ? rate : kRateScale;
+  }
+
+  /// 汇率是否已显式设置（审查 F-8：未设置时 UI 提示「未设置汇率」）
+  Future<bool> isRateSet(String code) async {
+    if (code == 'CNY') return true;
+    final row = await (db.select(db.currencies)..where((t) => t.code.equals(code)))
+        .getSingleOrNull();
+    return (row?.rateScaled ?? unsetRateScaled) > 0;
   }
 
   Future<void> setManualRate(String code, double rate) async {

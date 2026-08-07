@@ -3,6 +3,7 @@
 class BudgetProgressCalculator {
   const BudgetProgressCalculator();
 
+  /// 默认预警阈值（%）——预算未自定义 threshold 时的回退值
   static const warningThresholdPercent = 80;
 
   /// 周期窗口：以 monthStartDay 为月起始日（默认 1 号）；
@@ -30,6 +31,7 @@ class BudgetProgressCalculator {
     required int budgetMinor,
     required int spentMinor,
     required int daysRemaining,
+    int thresholdPercent = warningThresholdPercent,
   }) {
     final remaining = budgetMinor - spentMinor;
     final percent = budgetMinor <= 0
@@ -43,7 +45,8 @@ class BudgetProgressCalculator {
       remainingMinor: remaining,
       dailyBudgetMinor: daily,
       percent: percent,
-      overThreshold: percent >= warningThresholdPercent,
+      // 审查 F-5：阈值读预算自带的 threshold 字段（默认 80）
+      overThreshold: percent >= thresholdPercent,
       exceeded: spentMinor >= budgetMinor && budgetMinor > 0,
     );
   }

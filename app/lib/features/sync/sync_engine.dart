@@ -22,8 +22,9 @@ class SyncEngine {
     this.email,
     this.password,
     this.bookId,
+    void Function()? onMerged,
   })  : // 合并归属本引擎账本（Spec §4.1 / BK-T-010）
-        _merger = merger ?? SyncMerger(opLogger.db, bookId: bookId ?? kDefaultBookId);
+        _merger = merger ?? SyncMerger(opLogger.db, bookId: bookId ?? kDefaultBookId, onMerged: onMerged);
 
   final OpLogger opLogger;
   final SyncApi _api;
@@ -61,9 +62,13 @@ class SyncEngine {
   }
 
   /// 完整同步一轮：推送积压 → 拉取 → 合并，直到队列清空且拉取见底。
+  /// 未登录（无 token 且无凭据）纯本地降级静默返回（审查 B-1：op-log 照常入队，
+  /// 登录后由设置页触发 sync 追平）。
   Future<void> sync() async {
     if (_syncing) return;
-    if (email == null || password == null || bookId == null) return;
+    if (bookId == null) return;
+    final stored = await _tokenStore.read();
+    if (stored == null && (email == null || password == null)) return;
     _syncing = true;
     try {
       await _ensureTokens();
@@ -116,7 +121,20 @@ class SyncEngine {
     _tokens = tokens;
   }
 
-  Future<bool> _refreshTokens() async {
+  Future<bool>? _refreshInFlight;
+
+  /// 401 刷新竞态单飞锁（审查 B-1）：并发触发只发一次刷新请求，
+  /// 其余调用共享同一结果（避免刷新令牌被并发消费后一方 401 连锁登出）。
+  Future<bool> _refreshTokens() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+    final future = _doRefreshTokens();
+    _refreshInFlight = future;
+    future.whenComplete(() => _refreshInFlight = null);
+    return future;
+  }
+
+  Future<bool> _doRefreshTokens() async {
     final current = await _tokenStore.read();
     if (current == null) return false;
     try {

@@ -4567,6 +4567,16 @@ class $RecurringRulesTable extends RecurringRules
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('expense'),
+  );
   static const VerificationMeta _accountIdMeta = const VerificationMeta(
     'accountId',
   );
@@ -4643,6 +4653,7 @@ class $RecurringRulesTable extends RecurringRules
     anchorDay,
     timeOfDay,
     amountMinor,
+    type,
     accountId,
     categoryId,
     nextDue,
@@ -4715,6 +4726,12 @@ class $RecurringRulesTable extends RecurringRules
       );
     } else if (isInserting) {
       context.missing(_amountMinorMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
     }
     if (data.containsKey('account_id')) {
       context.handle(
@@ -4801,6 +4818,10 @@ class $RecurringRulesTable extends RecurringRules
         DriftSqlType.int,
         data['${effectivePrefix}amount_minor'],
       )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
       accountId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}account_id'],
@@ -4845,6 +4866,9 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
   /// 入账时刻：自 0 点起的分钟数（默认 09:00）
   final int timeOfDay;
   final int amountMinor;
+
+  /// 收支类型：expense / income（审查 F-7：周期收入可建模）
+  final String type;
   final int accountId;
   final int? categoryId;
 
@@ -4862,6 +4886,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
     required this.anchorDay,
     required this.timeOfDay,
     required this.amountMinor,
+    required this.type,
     required this.accountId,
     this.categoryId,
     required this.nextDue,
@@ -4880,6 +4905,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
     map['anchor_day'] = Variable<int>(anchorDay);
     map['time_of_day'] = Variable<int>(timeOfDay);
     map['amount_minor'] = Variable<int>(amountMinor);
+    map['type'] = Variable<String>(type);
     map['account_id'] = Variable<int>(accountId);
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<int>(categoryId);
@@ -4903,6 +4929,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
       anchorDay: Value(anchorDay),
       timeOfDay: Value(timeOfDay),
       amountMinor: Value(amountMinor),
+      type: Value(type),
       accountId: Value(accountId),
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
@@ -4930,6 +4957,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
       anchorDay: serializer.fromJson<int>(json['anchorDay']),
       timeOfDay: serializer.fromJson<int>(json['timeOfDay']),
       amountMinor: serializer.fromJson<int>(json['amountMinor']),
+      type: serializer.fromJson<String>(json['type']),
       accountId: serializer.fromJson<int>(json['accountId']),
       categoryId: serializer.fromJson<int?>(json['categoryId']),
       nextDue: serializer.fromJson<DateTime>(json['nextDue']),
@@ -4950,6 +4978,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
       'anchorDay': serializer.toJson<int>(anchorDay),
       'timeOfDay': serializer.toJson<int>(timeOfDay),
       'amountMinor': serializer.toJson<int>(amountMinor),
+      'type': serializer.toJson<String>(type),
       'accountId': serializer.toJson<int>(accountId),
       'categoryId': serializer.toJson<int?>(categoryId),
       'nextDue': serializer.toJson<DateTime>(nextDue),
@@ -4968,6 +4997,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
     int? anchorDay,
     int? timeOfDay,
     int? amountMinor,
+    String? type,
     int? accountId,
     Value<int?> categoryId = const Value.absent(),
     DateTime? nextDue,
@@ -4983,6 +5013,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
     anchorDay: anchorDay ?? this.anchorDay,
     timeOfDay: timeOfDay ?? this.timeOfDay,
     amountMinor: amountMinor ?? this.amountMinor,
+    type: type ?? this.type,
     accountId: accountId ?? this.accountId,
     categoryId: categoryId.present ? categoryId.value : this.categoryId,
     nextDue: nextDue ?? this.nextDue,
@@ -5004,6 +5035,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
       amountMinor: data.amountMinor.present
           ? data.amountMinor.value
           : this.amountMinor,
+      type: data.type.present ? data.type.value : this.type,
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
       categoryId: data.categoryId.present
           ? data.categoryId.value
@@ -5026,6 +5058,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
           ..write('anchorDay: $anchorDay, ')
           ..write('timeOfDay: $timeOfDay, ')
           ..write('amountMinor: $amountMinor, ')
+          ..write('type: $type, ')
           ..write('accountId: $accountId, ')
           ..write('categoryId: $categoryId, ')
           ..write('nextDue: $nextDue, ')
@@ -5046,6 +5079,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
     anchorDay,
     timeOfDay,
     amountMinor,
+    type,
     accountId,
     categoryId,
     nextDue,
@@ -5065,6 +5099,7 @@ class RecurringRule extends DataClass implements Insertable<RecurringRule> {
           other.anchorDay == this.anchorDay &&
           other.timeOfDay == this.timeOfDay &&
           other.amountMinor == this.amountMinor &&
+          other.type == this.type &&
           other.accountId == this.accountId &&
           other.categoryId == this.categoryId &&
           other.nextDue == this.nextDue &&
@@ -5082,6 +5117,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
   final Value<int> anchorDay;
   final Value<int> timeOfDay;
   final Value<int> amountMinor;
+  final Value<String> type;
   final Value<int> accountId;
   final Value<int?> categoryId;
   final Value<DateTime> nextDue;
@@ -5097,6 +5133,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
     this.anchorDay = const Value.absent(),
     this.timeOfDay = const Value.absent(),
     this.amountMinor = const Value.absent(),
+    this.type = const Value.absent(),
     this.accountId = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.nextDue = const Value.absent(),
@@ -5113,6 +5150,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
     this.anchorDay = const Value.absent(),
     this.timeOfDay = const Value.absent(),
     required int amountMinor,
+    this.type = const Value.absent(),
     required int accountId,
     this.categoryId = const Value.absent(),
     required DateTime nextDue,
@@ -5135,6 +5173,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
     Expression<int>? anchorDay,
     Expression<int>? timeOfDay,
     Expression<int>? amountMinor,
+    Expression<String>? type,
     Expression<int>? accountId,
     Expression<int>? categoryId,
     Expression<DateTime>? nextDue,
@@ -5151,6 +5190,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
       if (anchorDay != null) 'anchor_day': anchorDay,
       if (timeOfDay != null) 'time_of_day': timeOfDay,
       if (amountMinor != null) 'amount_minor': amountMinor,
+      if (type != null) 'type': type,
       if (accountId != null) 'account_id': accountId,
       if (categoryId != null) 'category_id': categoryId,
       if (nextDue != null) 'next_due': nextDue,
@@ -5169,6 +5209,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
     Value<int>? anchorDay,
     Value<int>? timeOfDay,
     Value<int>? amountMinor,
+    Value<String>? type,
     Value<int>? accountId,
     Value<int?>? categoryId,
     Value<DateTime>? nextDue,
@@ -5185,6 +5226,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
       anchorDay: anchorDay ?? this.anchorDay,
       timeOfDay: timeOfDay ?? this.timeOfDay,
       amountMinor: amountMinor ?? this.amountMinor,
+      type: type ?? this.type,
       accountId: accountId ?? this.accountId,
       categoryId: categoryId ?? this.categoryId,
       nextDue: nextDue ?? this.nextDue,
@@ -5221,6 +5263,9 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
     if (amountMinor.present) {
       map['amount_minor'] = Variable<int>(amountMinor.value);
     }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
     if (accountId.present) {
       map['account_id'] = Variable<int>(accountId.value);
     }
@@ -5253,6 +5298,7 @@ class RecurringRulesCompanion extends UpdateCompanion<RecurringRule> {
           ..write('anchorDay: $anchorDay, ')
           ..write('timeOfDay: $timeOfDay, ')
           ..write('amountMinor: $amountMinor, ')
+          ..write('type: $type, ')
           ..write('accountId: $accountId, ')
           ..write('categoryId: $categoryId, ')
           ..write('nextDue: $nextDue, ')
@@ -6078,6 +6124,449 @@ class InstallmentSchedulesCompanion
   }
 }
 
+class $PendingReplayTable extends PendingReplay
+    with TableInfo<$PendingReplayTable, PendingReplayData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingReplayTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _entityMeta = const VerificationMeta('entity');
+  @override
+  late final GeneratedColumn<String> entity = GeneratedColumn<String>(
+    'entity',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entityIdMeta = const VerificationMeta(
+    'entityId',
+  );
+  @override
+  late final GeneratedColumn<String> entityId = GeneratedColumn<String>(
+    'entity_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _opMeta = const VerificationMeta('op');
+  @override
+  late final GeneratedColumn<String> op = GeneratedColumn<String>(
+    'op',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bookIdMeta = const VerificationMeta('bookId');
+  @override
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    entity,
+    entityId,
+    op,
+    payload,
+    bookId,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_replay';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingReplayData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('entity')) {
+      context.handle(
+        _entityMeta,
+        entity.isAcceptableOrUnknown(data['entity']!, _entityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entityMeta);
+    }
+    if (data.containsKey('entity_id')) {
+      context.handle(
+        _entityIdMeta,
+        entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entityIdMeta);
+    }
+    if (data.containsKey('op')) {
+      context.handle(_opMeta, op.isAcceptableOrUnknown(data['op']!, _opMeta));
+    } else if (isInserting) {
+      context.missing(_opMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('book_id')) {
+      context.handle(
+        _bookIdMeta,
+        bookId.isAcceptableOrUnknown(data['book_id']!, _bookIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {bookId, entityId},
+  ];
+  @override
+  PendingReplayData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingReplayData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      entity: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity'],
+      )!,
+      entityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_id'],
+      )!,
+      op: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}op'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingReplayTable createAlias(String alias) {
+    return $PendingReplayTable(attachedDatabase, alias);
+  }
+}
+
+class PendingReplayData extends DataClass
+    implements Insertable<PendingReplayData> {
+  final int id;
+  final String entity;
+  final String entityId;
+  final String op;
+  final String payload;
+  final String bookId;
+  final DateTime createdAt;
+  const PendingReplayData({
+    required this.id,
+    required this.entity,
+    required this.entityId,
+    required this.op,
+    required this.payload,
+    required this.bookId,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['entity'] = Variable<String>(entity);
+    map['entity_id'] = Variable<String>(entityId);
+    map['op'] = Variable<String>(op);
+    map['payload'] = Variable<String>(payload);
+    map['book_id'] = Variable<String>(bookId);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PendingReplayCompanion toCompanion(bool nullToAbsent) {
+    return PendingReplayCompanion(
+      id: Value(id),
+      entity: Value(entity),
+      entityId: Value(entityId),
+      op: Value(op),
+      payload: Value(payload),
+      bookId: Value(bookId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PendingReplayData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingReplayData(
+      id: serializer.fromJson<int>(json['id']),
+      entity: serializer.fromJson<String>(json['entity']),
+      entityId: serializer.fromJson<String>(json['entityId']),
+      op: serializer.fromJson<String>(json['op']),
+      payload: serializer.fromJson<String>(json['payload']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'entity': serializer.toJson<String>(entity),
+      'entityId': serializer.toJson<String>(entityId),
+      'op': serializer.toJson<String>(op),
+      'payload': serializer.toJson<String>(payload),
+      'bookId': serializer.toJson<String>(bookId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PendingReplayData copyWith({
+    int? id,
+    String? entity,
+    String? entityId,
+    String? op,
+    String? payload,
+    String? bookId,
+    DateTime? createdAt,
+  }) => PendingReplayData(
+    id: id ?? this.id,
+    entity: entity ?? this.entity,
+    entityId: entityId ?? this.entityId,
+    op: op ?? this.op,
+    payload: payload ?? this.payload,
+    bookId: bookId ?? this.bookId,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PendingReplayData copyWithCompanion(PendingReplayCompanion data) {
+    return PendingReplayData(
+      id: data.id.present ? data.id.value : this.id,
+      entity: data.entity.present ? data.entity.value : this.entity,
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      op: data.op.present ? data.op.value : this.op,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingReplayData(')
+          ..write('id: $id, ')
+          ..write('entity: $entity, ')
+          ..write('entityId: $entityId, ')
+          ..write('op: $op, ')
+          ..write('payload: $payload, ')
+          ..write('bookId: $bookId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, entity, entityId, op, payload, bookId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingReplayData &&
+          other.id == this.id &&
+          other.entity == this.entity &&
+          other.entityId == this.entityId &&
+          other.op == this.op &&
+          other.payload == this.payload &&
+          other.bookId == this.bookId &&
+          other.createdAt == this.createdAt);
+}
+
+class PendingReplayCompanion extends UpdateCompanion<PendingReplayData> {
+  final Value<int> id;
+  final Value<String> entity;
+  final Value<String> entityId;
+  final Value<String> op;
+  final Value<String> payload;
+  final Value<String> bookId;
+  final Value<DateTime> createdAt;
+  const PendingReplayCompanion({
+    this.id = const Value.absent(),
+    this.entity = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.op = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  PendingReplayCompanion.insert({
+    this.id = const Value.absent(),
+    required String entity,
+    required String entityId,
+    required String op,
+    required String payload,
+    required String bookId,
+    required DateTime createdAt,
+  }) : entity = Value(entity),
+       entityId = Value(entityId),
+       op = Value(op),
+       payload = Value(payload),
+       bookId = Value(bookId),
+       createdAt = Value(createdAt);
+  static Insertable<PendingReplayData> custom({
+    Expression<int>? id,
+    Expression<String>? entity,
+    Expression<String>? entityId,
+    Expression<String>? op,
+    Expression<String>? payload,
+    Expression<String>? bookId,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (entity != null) 'entity': entity,
+      if (entityId != null) 'entity_id': entityId,
+      if (op != null) 'op': op,
+      if (payload != null) 'payload': payload,
+      if (bookId != null) 'book_id': bookId,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  PendingReplayCompanion copyWith({
+    Value<int>? id,
+    Value<String>? entity,
+    Value<String>? entityId,
+    Value<String>? op,
+    Value<String>? payload,
+    Value<String>? bookId,
+    Value<DateTime>? createdAt,
+  }) {
+    return PendingReplayCompanion(
+      id: id ?? this.id,
+      entity: entity ?? this.entity,
+      entityId: entityId ?? this.entityId,
+      op: op ?? this.op,
+      payload: payload ?? this.payload,
+      bookId: bookId ?? this.bookId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (entity.present) {
+      map['entity'] = Variable<String>(entity.value);
+    }
+    if (entityId.present) {
+      map['entity_id'] = Variable<String>(entityId.value);
+    }
+    if (op.present) {
+      map['op'] = Variable<String>(op.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingReplayCompanion(')
+          ..write('id: $id, ')
+          ..write('entity: $entity, ')
+          ..write('entityId: $entityId, ')
+          ..write('op: $op, ')
+          ..write('payload: $payload, ')
+          ..write('bookId: $bookId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6098,6 +6587,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $InstallmentSchedulesTable installmentSchedules =
       $InstallmentSchedulesTable(this);
+  late final $PendingReplayTable pendingReplay = $PendingReplayTable(this);
   late final Index idxTransactionsOccurredAt = Index(
     'idx_transactions_occurred_at',
     'CREATE INDEX idx_transactions_occurred_at ON transactions (occurred_at)',
@@ -6119,6 +6609,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     recurringRules,
     installmentPlans,
     installmentSchedules,
+    pendingReplay,
     idxTransactionsOccurredAt,
   ];
 }
@@ -9329,6 +9820,7 @@ typedef $$RecurringRulesTableCreateCompanionBuilder =
       Value<int> anchorDay,
       Value<int> timeOfDay,
       required int amountMinor,
+      Value<String> type,
       required int accountId,
       Value<int?> categoryId,
       required DateTime nextDue,
@@ -9346,6 +9838,7 @@ typedef $$RecurringRulesTableUpdateCompanionBuilder =
       Value<int> anchorDay,
       Value<int> timeOfDay,
       Value<int> amountMinor,
+      Value<String> type,
       Value<int> accountId,
       Value<int?> categoryId,
       Value<DateTime> nextDue,
@@ -9400,6 +9893,11 @@ class $$RecurringRulesTableFilterComposer
 
   ColumnFilters<int> get amountMinor => $composableBuilder(
     column: $table.amountMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9483,6 +9981,11 @@ class $$RecurringRulesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get accountId => $composableBuilder(
     column: $table.accountId,
     builder: (column) => ColumnOrderings(column),
@@ -9551,6 +10054,9 @@ class $$RecurringRulesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
   GeneratedColumn<int> get accountId =>
       $composableBuilder(column: $table.accountId, builder: (column) => column);
 
@@ -9613,6 +10119,7 @@ class $$RecurringRulesTableTableManager
                 Value<int> anchorDay = const Value.absent(),
                 Value<int> timeOfDay = const Value.absent(),
                 Value<int> amountMinor = const Value.absent(),
+                Value<String> type = const Value.absent(),
                 Value<int> accountId = const Value.absent(),
                 Value<int?> categoryId = const Value.absent(),
                 Value<DateTime> nextDue = const Value.absent(),
@@ -9628,6 +10135,7 @@ class $$RecurringRulesTableTableManager
                 anchorDay: anchorDay,
                 timeOfDay: timeOfDay,
                 amountMinor: amountMinor,
+                type: type,
                 accountId: accountId,
                 categoryId: categoryId,
                 nextDue: nextDue,
@@ -9645,6 +10153,7 @@ class $$RecurringRulesTableTableManager
                 Value<int> anchorDay = const Value.absent(),
                 Value<int> timeOfDay = const Value.absent(),
                 required int amountMinor,
+                Value<String> type = const Value.absent(),
                 required int accountId,
                 Value<int?> categoryId = const Value.absent(),
                 required DateTime nextDue,
@@ -9660,6 +10169,7 @@ class $$RecurringRulesTableTableManager
                 anchorDay: anchorDay,
                 timeOfDay: timeOfDay,
                 amountMinor: amountMinor,
+                type: type,
                 accountId: accountId,
                 categoryId: categoryId,
                 nextDue: nextDue,
@@ -10146,6 +10656,242 @@ typedef $$InstallmentSchedulesTableProcessedTableManager =
       InstallmentSchedule,
       PrefetchHooks Function()
     >;
+typedef $$PendingReplayTableCreateCompanionBuilder =
+    PendingReplayCompanion Function({
+      Value<int> id,
+      required String entity,
+      required String entityId,
+      required String op,
+      required String payload,
+      required String bookId,
+      required DateTime createdAt,
+    });
+typedef $$PendingReplayTableUpdateCompanionBuilder =
+    PendingReplayCompanion Function({
+      Value<int> id,
+      Value<String> entity,
+      Value<String> entityId,
+      Value<String> op,
+      Value<String> payload,
+      Value<String> bookId,
+      Value<DateTime> createdAt,
+    });
+
+class $$PendingReplayTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingReplayTable> {
+  $$PendingReplayTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entity => $composableBuilder(
+    column: $table.entity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get op => $composableBuilder(
+    column: $table.op,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingReplayTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingReplayTable> {
+  $$PendingReplayTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entity => $composableBuilder(
+    column: $table.entity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get op => $composableBuilder(
+    column: $table.op,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingReplayTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingReplayTable> {
+  $$PendingReplayTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get entity =>
+      $composableBuilder(column: $table.entity, builder: (column) => column);
+
+  GeneratedColumn<String> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+
+  GeneratedColumn<String> get op =>
+      $composableBuilder(column: $table.op, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<String> get bookId =>
+      $composableBuilder(column: $table.bookId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$PendingReplayTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingReplayTable,
+          PendingReplayData,
+          $$PendingReplayTableFilterComposer,
+          $$PendingReplayTableOrderingComposer,
+          $$PendingReplayTableAnnotationComposer,
+          $$PendingReplayTableCreateCompanionBuilder,
+          $$PendingReplayTableUpdateCompanionBuilder,
+          (
+            PendingReplayData,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingReplayTable,
+              PendingReplayData
+            >,
+          ),
+          PendingReplayData,
+          PrefetchHooks Function()
+        > {
+  $$PendingReplayTableTableManager(_$AppDatabase db, $PendingReplayTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingReplayTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PendingReplayTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PendingReplayTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> entity = const Value.absent(),
+                Value<String> entityId = const Value.absent(),
+                Value<String> op = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<String> bookId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => PendingReplayCompanion(
+                id: id,
+                entity: entity,
+                entityId: entityId,
+                op: op,
+                payload: payload,
+                bookId: bookId,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String entity,
+                required String entityId,
+                required String op,
+                required String payload,
+                required String bookId,
+                required DateTime createdAt,
+              }) => PendingReplayCompanion.insert(
+                id: id,
+                entity: entity,
+                entityId: entityId,
+                op: op,
+                payload: payload,
+                bookId: bookId,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingReplayTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingReplayTable,
+      PendingReplayData,
+      $$PendingReplayTableFilterComposer,
+      $$PendingReplayTableOrderingComposer,
+      $$PendingReplayTableAnnotationComposer,
+      $$PendingReplayTableCreateCompanionBuilder,
+      $$PendingReplayTableUpdateCompanionBuilder,
+      (
+        PendingReplayData,
+        BaseReferences<_$AppDatabase, $PendingReplayTable, PendingReplayData>,
+      ),
+      PendingReplayData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10174,4 +10920,6 @@ class $AppDatabaseManager {
       $$InstallmentPlansTableTableManager(_db, _db.installmentPlans);
   $$InstallmentSchedulesTableTableManager get installmentSchedules =>
       $$InstallmentSchedulesTableTableManager(_db, _db.installmentSchedules);
+  $$PendingReplayTableTableManager get pendingReplay =>
+      $$PendingReplayTableTableManager(_db, _db.pendingReplay);
 }

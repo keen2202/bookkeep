@@ -151,7 +151,8 @@ class BudgetRepository {
 
   Future<void> markAlertNotified(int budgetId, {required String period, required String level}) async {
     final key = '$_alertPrefix${budgetId}_${period}_$level';
+    // 审查 F-5：并发/重复评估时幂等（onConflict 忽略重复写）
     await db.into(db.appMeta)
-        .insert(AppMetaCompanion.insert(key: key, value: 'true'));
+        .insert(AppMetaCompanion.insert(key: key, value: 'true'), onConflict: DoNothing());
   }
 }

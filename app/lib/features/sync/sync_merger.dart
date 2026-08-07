@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../../core/constants/constants.dart';
@@ -15,14 +17,17 @@ import '../../domain/services/lww_resolver.dart';
 /// 畸形 payload 单 op 跳过，不中断整批合并（评审 H1）。
 /// 合并结果归属 sync 引擎的账本（Spec §4.1 / BK-T-010）。
 class SyncMerger {
-  SyncMerger(this.db, {LwwResolver? resolver, this.bookId = kDefaultBookId})
+  SyncMerger(this.db, {LwwResolver? resolver, this.bookId = kDefaultBookId, this.onMerged})
       : _resolver = resolver ?? const LwwResolver();
 
   final AppDatabase db;
   final LwwResolver _resolver;
   final String bookId;
 
-  static const _entities = {'account', 'category', 'transaction', 'budget'};
+  /// 合并应用 ≥1 条 op 后回调（接线处 bump 刷新总线，审查 F-1）
+  final void Function()? onMerged;
+
+  static const _entities = {'account', 'category', 'transaction', 'budget', 'book'};
 
   Future<int> merge(List<RemoteOp> ops) async {
     if (ops.isEmpty) return 0;
@@ -51,8 +56,60 @@ class SyncMerger {
           // 单 op 失败（畸形 payload）不中断整批合并
         }
       }
+      // FK 未就绪而暂存的 op：本批依赖实体（account/category）可能已就绪 → 重放
+      applied += await _replayPending();
     });
+    if (applied > 0) onMerged?.call();
     return applied;
+  }
+
+  /// 重放 pending_replay 中依赖已就绪的 op（审查 F-6）：
+  /// 成功即删（流水不丢），仍缺依赖的保留等待下一批。
+  Future<int> _replayPending() async {
+    final rows = await (db.select(db.pendingReplay)
+          ..where((t) => t.bookId.equals(bookId)))
+        .get();
+    var replayed = 0;
+    for (final row in rows) {
+      // 已被其他重放路径物化 → 直接清掉暂存行
+      if (await _localIdByRemoteId(row.entity, row.entityId) != null) {
+        await (db.delete(db.pendingReplay)..where((t) => t.id.equals(row.id))).go();
+        replayed++;
+        continue;
+      }
+      final ok = await _apply(ResolvedOp(
+        entity: row.entity,
+        entityId: row.entityId,
+        op: row.op,
+        payload: row.payload.isEmpty
+            ? null
+            : jsonDecode(row.payload) as Map<String, dynamic>,
+      ));
+      if (ok) {
+        await (db.delete(db.pendingReplay)..where((t) => t.id.equals(row.id))).go();
+        replayed++;
+      }
+    }
+    return replayed;
+  }
+
+  /// 暂存 FK 未就绪的 create op（wire 格式 JSON），等待依赖实体到达后重放；
+  /// 先查重（drift DoNothing 不抑制唯一键冲突，见 2067 实测）
+  Future<void> _pendCreate(String remoteId, Map<String, dynamic> payload) async {
+    final exists = await (db.select(db.pendingReplay)
+          ..where((t) => t.bookId.equals(bookId) & t.entityId.equals(remoteId)))
+        .get();
+    if (exists.isNotEmpty) return;
+    await db.into(db.pendingReplay).insert(
+          PendingReplayCompanion.insert(
+            entity: 'transaction',
+            entityId: remoteId,
+            op: 'c',
+            payload: jsonEncode(payload),
+            bookId: bookId,
+            createdAt: DateTime.now().toUtc(),
+          ),
+        );
   }
 
   Future<bool> _apply(ResolvedOp r) async {
@@ -67,18 +124,50 @@ class SyncMerger {
     return false;
   }
 
+  /// FK 未就绪哨兵（transaction create 依赖 account/category 未达）
+  static const _fkPending = -1;
+
   Future<bool> _applyCreate(String entity, String remoteId, Map<String, dynamic>? payload) async {
     if (payload == null) return false;
     if (await _localIdByRemoteId(entity, remoteId) != null) return false; // 幂等
 
+    if (entity == 'transaction') {
+      final r = await _createTransaction(remoteId, payload);
+      if (r == _fkPending) {
+        // 依赖实体晚到：暂存重放队列而非丢弃（审查 F-6，修复"跳过即永久丢失"）
+        await _pendCreate(remoteId, payload);
+        return false;
+      }
+      return r != null;
+    }
+
     final localId = switch (entity) {
       'account' => await _createAccount(remoteId, payload),
       'category' => await _createCategory(remoteId, payload),
-      'transaction' => await _createTransaction(remoteId, payload),
+      'book' => await _createBook(remoteId, payload),
       'budget' => await _createBudget(remoteId, payload),
       _ => null,
     };
     return localId != null;
+  }
+
+  /// 账本实体（审查 F-3）：id 即同步域身份（books 表主键 = remote_id）；
+  /// 幂等：已存在（离线缓存/服务器拉取重复投递）则跳过
+  Future<int?> _createBook(String remoteId, Map<String, dynamic> p) async {
+    final name = _str(p, 'name');
+    if (name == null) return null;
+    final exists = await (db.select(db.books)..where((t) => t.id.equals(remoteId)))
+        .getSingleOrNull();
+    if (exists != null) return null;
+    await db.into(db.books).insert(
+          BooksCompanion.insert(
+            id: remoteId,
+            name: name,
+            type: Value(_str(p, 'type') ?? 'default'),
+            createdAt: _date(p, 'created_at') ?? DateTime.now().toUtc(),
+          ),
+        );
+    return 1;
   }
 
   Future<bool> _applyUpdate(String entity, String remoteId, Map<String, dynamic>? payload) async {
@@ -160,7 +249,7 @@ class SyncMerger {
   Future<int?> _createTransaction(String remoteId, Map<String, dynamic> p) async {
     final accountRef = _str(p, 'account_id');
     final accountId = accountRef == null ? null : await _localIdByRemoteId('account', accountRef);
-    if (accountId == null) return null; // FK 未就绪 → 跳过（依赖先同步）
+    if (accountId == null) return _fkPending; // FK 未就绪 → 重放队列（审查 F-6）
 
     final type = _enumFromName(p['type'], TransactionType.values);
     if (type == null) return null;
@@ -169,6 +258,7 @@ class SyncMerger {
 
     final categoryRef = _str(p, 'category_id');
     final categoryId = categoryRef == null ? null : await _localIdByRemoteId('category', categoryRef);
+    if (categoryRef != null && categoryId == null) return _fkPending;
     final transferRef = _str(p, 'transfer_id');
     final transferId = transferRef == null ? null : await _localIdByRemoteId('transaction', transferRef);
 

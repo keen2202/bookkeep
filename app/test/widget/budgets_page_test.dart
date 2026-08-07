@@ -75,9 +75,9 @@ void main() {
     await tester.pumpWidget(harness(db));
     for (var i = 0; i < 100; i++) {
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.text('还没有预算，点击右下角 + 新建').evaluate().isNotEmpty) break;
+      if (find.text('还没有预算，点击右上角 + 新建').evaluate().isNotEmpty) break;
     }
 
-    expect(find.text('还没有预算，点击右下角 + 新建'), findsOneWidget);
+    expect(find.text('还没有预算，点击右上角 + 新建'), findsOneWidget);
   });
 }

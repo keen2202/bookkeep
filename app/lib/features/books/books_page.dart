@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/constants/constants.dart';
+import '../../shared/theme/app_theme.dart';
 import '../sync/token_store.dart';
 import 'books_api.dart';
 import 'books_providers.dart';
@@ -49,7 +50,7 @@ class BooksPage extends ConsumerWidget {
                     '${book.id == currentId ? ' · 当前' : ''}',
                   ),
                   trailing: book.id == currentId
-                      ? const Icon(Icons.check_circle, color: Colors.teal)
+                      ? Icon(Icons.check_circle, color: context.appColors.accent)
                       : null,
                   onTap: book.id == currentId
                       ? null
@@ -194,6 +195,9 @@ final serverBooksProvider = FutureProvider<List<BookDto>>((ref) async {
   final repo = ref.read(bookRepositoryProvider);
   for (final book in books) {
     await repo.setRole(book.id, book.role);
+    // 共享账本本地落地（审查 F-3）：服务端账本缓存为本地行，
+    // 账本切换器即可见、可切换（离线保持）
+    await repo.createLocalBook(id: book.id, name: book.name, type: book.type);
   }
   final currentId = ref.read(currentBookIdProvider);
   for (final book in books) {

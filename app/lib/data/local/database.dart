@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/constants/constants.dart';
@@ -12,6 +9,7 @@ import 'tables/books_table.dart';
 import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
 import 'tables/currencies_table.dart';
+import 'tables/pending_replay_table.dart';
 import 'tables/recurring_tables.dart';
 import 'tables/sync_ops_table.dart';
 import 'tables/transactions_table.dart';
@@ -31,24 +29,17 @@ part 'database.g.dart';
   RecurringRules,
   InstallmentPlans,
   InstallmentSchedules,
+  PendingReplay,
 ])
 class AppDatabase extends _$AppDatabase {
   /// 打开未加密数据库（单元测试 / Linux 桌面）。
   AppDatabase(super.e);
 
-  /// 打开 SQLCipher 加密库：加密实现经 native-assets hooks 自动加载，
-  /// PRAGMA key 在打开后立即执行（Spec §1.3 / BK-P0-006）。
-  factory AppDatabase.openEncrypted(String path, String key) {
-    return AppDatabase(NativeDatabase(File(path), setup: (db) {
-      db.execute("PRAGMA key = '$key'");
-    }));
-  }
-
   static const _uuid = Uuid();
   static const _defaultBookName = '默认账本';
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -131,6 +122,18 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             // v6：币种表（Spec §4.5 / BK-T-014）；seed 由 CurrencyRepository 安装
             await m.createTable(currencies);
+          }
+          if (from < 7) {
+            // v7：FK 未就绪 op 重放队列（审查 F-6 / BK-R-009）
+            await m.createTable(pendingReplay);
+            // v7：周期规则收支类型（审查 F-7 / BK-R-014）。
+            // 表定义已含 type 列：从 v1~v4 升级时 v5 步骤按新定义建表，此处须先探测避免重复添加
+            final ruleCols =
+                await customSelect("PRAGMA table_info('recurring_rules')").get();
+            final hasType = ruleCols.any((c) => c.read<String>('name') == 'type');
+            if (!hasType) {
+              await m.addColumn(recurringRules, recurringRules.type);
+            }
           }
           // v3 回填放最后：需全部列（含 v4 book_id）已存在（迁移链 v1/v2 → v4）
           if (from < 3) {

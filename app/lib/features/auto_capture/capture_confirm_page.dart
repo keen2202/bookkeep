@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
+import '../../shared/theme/app_theme.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/services/capture_candidate.dart';
@@ -78,6 +80,7 @@ class _CaptureConfirmPageState extends ConsumerState<CaptureConfirmPage> {
         return _categoryOverrides[idx];
       },
     );
+    ref.read(ledgerVersionProvider.notifier).state++; // CSV 批量入账后全页刷新（审查 F-1）
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('已入账 $saved 笔（可在明细中追溯/撤销）')));
@@ -144,7 +147,7 @@ class _CaptureConfirmPageState extends ConsumerState<CaptureConfirmPage> {
                           : Icons.arrow_downward,
                       color: c.type == TransactionType.expense
                           ? theme.colorScheme.error
-                          : Colors.green,
+                          : context.appColors.income,
                     ),
                   ),
                 );

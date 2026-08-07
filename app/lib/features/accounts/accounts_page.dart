@@ -25,53 +25,52 @@ class AccountsPage extends ConsumerWidget {
         error: (e, _) => Center(child: Text('加载失败：$e')),
         data: (vm) => RefreshIndicator(
           onRefresh: () async => ref.invalidate(accountsViewModelProvider),
-          child: ListView(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('净资产', style: Theme.of(context).textTheme.bodyMedium),
-                        const SizedBox(height: 4),
-                        Text(
-                          ref.watch(amountMaskProvider)
-                              ? maskedMoney()
-                              : formatMoney(vm.netWorth),
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+          // 审查 U-10：净资产卡 + builder 列表（账户数多时惰性构建）
+          child: ListView.builder(
+            itemCount: vm.accounts.isEmpty ? 2 : vm.accounts.length + 1,
+            itemBuilder: (context, i) {
+              if (i == 0) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('净资产', style: Theme.of(context).textTheme.bodyMedium),
+                          const SizedBox(height: 4),
+                          Text(
+                            ref.watch(amountMaskProvider)
+                                ? maskedMoney()
+                                : formatMoney(vm.netWorth),
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-              if (vm.accounts.isEmpty)
-                const Padding(
+                );
+              }
+              if (vm.accounts.isEmpty) {
+                return const Padding(
                   padding: EdgeInsets.all(32),
                   child: Center(child: Text('还没有账户，点击右下角 + 新建')),
-                )
-              else
-                for (final entry in vm.accounts)
-                  _AccountTile(account: entry.account, balance: entry.balance),
-            ],
+                );
+              }
+              final entry = vm.accounts[i - 1];
+              return _AccountTile(account: entry.account, balance: entry.balance);
+            },
           ),
         ),
       ),
       // viewer 只读（Spec §4.1 权限矩阵：UI 与服务端双重拒绝）
-      // HeroMode 禁用：避免页面 FAB 与全局 FAB 在切换/重建时触发 Hero flight 出现多个 + 按钮
       floatingActionButton: viewer
           ? null
-          : HeroMode(
-              enabled: false,
-              child: FloatingActionButton(
-                heroTag: 'accounts_fab',
-                onPressed: () => AccountEditSheet.show(context),
-                tooltip: '新建账户',
-                child: const Icon(Icons.add),
-              ),
+          : FloatingActionButton(
+              onPressed: () => AccountEditSheet.show(context),
+              tooltip: '新建账户',
+              child: const Icon(Icons.add),
             ),
     );
   }
@@ -85,9 +84,22 @@ class _AccountTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return InkWell(
-      onLongPress: () => _showActions(context, ref),
-      child: AccountCard(account: account, balance: balance),
+    // 审查 U-12：操作入口显性化——trailing more 图标（长按手势不易发现）
+    return Row(
+      children: [
+        Expanded(
+          child: InkWell(
+            onLongPress: () => _showActions(context, ref),
+            child: AccountCard(account: account, balance: balance),
+          ),
+        ),
+        if (ref.read(currentRoleProvider) != 'viewer')
+          IconButton(
+            tooltip: '账户操作',
+            icon: const Icon(Icons.more_vert),
+            onPressed: () => _showActions(context, ref),
+          ),
+      ],
     );
   }
 

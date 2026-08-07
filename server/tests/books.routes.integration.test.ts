@@ -8,7 +8,7 @@ import { migrate } from '../src/db/migrate';
 jest.setTimeout(30_000);
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep';
+  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep_test';
 const SECRET = 'books-integration-secret';
 
 interface Tokens {
@@ -149,12 +149,12 @@ describe('books routes (integration, real PostgreSQL)', () => {
       expect(reuse.status).toBe(409);
     });
 
-    it('invalid token rejected; expired token rejected (410)', async () => {
+    it('invalid/expired/used tokens all rejected with 409 (no enumeration)', async () => {
       const invalid = await request(app)
         .post('/books/accept-invite')
         .set(authed(outsider))
         .send({ token: 'ffff'.repeat(16) });
-      expect(invalid.status).toBe(404);
+      expect(invalid.status).toBe(409);
 
       const invite = await request(app)
         .post(`/books/${bookId}/invites`)
@@ -168,7 +168,26 @@ describe('books routes (integration, real PostgreSQL)', () => {
         .post('/books/accept-invite')
         .set(authed(outsider))
         .send({ token: invite.body.token });
-      expect(expired.status).toBe(410);
+      expect(expired.status).toBe(409);
+    });
+
+    it('concurrent double-accept of the same token: exactly one 2xx', async () => {
+      const invite = await request(app)
+        .post(`/books/${bookId}/invites`)
+        .set(authed(owner))
+        .send({ role: 'viewer' });
+      const token = invite.body.token as string;
+      const [a, b] = await Promise.all([
+        request(app).post('/books/accept-invite').set(authed(outsider)).send({ token }),
+        request(app).post('/books/accept-invite').set(authed(outsider)).send({ token }),
+      ]);
+      const okCount = [a.status, b.status].filter((s) => s === 200).length;
+      expect(okCount).toBe(1);
+      const used = await pool.query<{ used_at: string | null }>(
+        'SELECT used_at FROM invite_tokens WHERE token_hash = $1',
+        [createHash('sha256').update(token).digest('hex')],
+      );
+      expect(used.rows[0].used_at).not.toBeNull();
     });
 
     it('viewer cannot create invites (403)', async () => {
@@ -219,6 +238,19 @@ describe('books routes (integration, real PostgreSQL)', () => {
       expect(after.status).toBe(403);
     });
 
+    it('PATCH promoting a member to owner is rejected (403)', async () => {
+      const res = await request(app)
+        .patch(`/books/${bookId}/members/${subOf(collaborator)}`)
+        .set(authed(owner))
+        .send({ role: 'owner' });
+      expect(res.status).toBe(403);
+      const row = await pool.query<{ role: string }>(
+        'SELECT role FROM book_members WHERE book_id = $1 AND user_id = $2',
+        [bookId, subOf(collaborator)],
+      );
+      expect(row.rows[0].role).not.toBe('owner');
+    });
+
     it('owner can change role editor -> viewer', async () => {
       const change = await request(app)
         .patch(`/books/${bookId}/members/${subOf(collaborator)}`)
@@ -262,6 +294,7 @@ describe('books routes (integration, real PostgreSQL)', () => {
             },
           ],
         });
+      await new Promise((r) => setTimeout(r, 2300)); // 安全窗口（审查 L-3）
       const pullA = await request(app).get(`/sync/pull?book_id=${bookId}&since_seq=0`).set(authed(owner));
       expect(pullA.body.ops.map((o: { entity_id: string }) => o.entity_id)).toContain(entityId);
 

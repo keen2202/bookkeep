@@ -15,6 +15,8 @@ class RecurringRules extends Table {
   /// 入账时刻：自 0 点起的分钟数（默认 09:00）
   IntColumn get timeOfDay => integer().named('time_of_day').withDefault(const Constant(9 * 60))();
   IntColumn get amountMinor => integer().named('amount_minor')();
+  /// 收支类型：expense / income（审查 F-7：周期收入可建模）
+  TextColumn get type => text().withDefault(const Constant('expense'))();
   IntColumn get accountId => integer().named('account_id')();
   IntColumn get categoryId => integer().named('category_id').nullable()();
   /// 下次待生成日期（补跑游标；幂等：生成后前移）

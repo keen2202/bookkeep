@@ -35,6 +35,9 @@ class CashflowChart extends ConsumerWidget {
           if (net.abs() > maxAbs) maxAbs = net.abs();
           points.add(FlSpot(i.toDouble(), net.toDouble()));
         }
+        // 审查 U-8：脱敏态坐标尺度固定化——maxAbs 由真实数据推出，脱敏时
+        // 若沿用会经坐标轴量级泄露真实金额，故锁定为固定尺度
+        if (masked) maxAbs = 1;
         return Card(
           margin: const EdgeInsets.all(8),
           child: Padding(

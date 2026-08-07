@@ -7,7 +7,7 @@ import { migrate } from '../src/db/migrate';
 jest.setTimeout(30_000);
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep';
+  process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep_test';
 const SECRET = 'sync-integration-secret';
 
 interface Tokens {
@@ -136,6 +136,24 @@ describe('sync routes (integration, real PostgreSQL)', () => {
       ]);
       expect(members.rows[0].role).toBe('owner');
     });
+
+    it('concurrent first-push on the same book_id: exactly one owner (unique index)', async () => {
+      const racedBook = crypto.randomUUID();
+      const payload = { book_id: racedBook, ops: [op(crypto.randomUUID())] };
+      const [a, b] = await Promise.all([
+        request(app).post('/sync/push').set(authed(userA)).send(payload),
+        request(app).post('/sync/push').set(authed(userB)).send(payload),
+      ]);
+      const owners = await pool.query<{ user_id: string }>(
+        "SELECT user_id FROM book_members WHERE book_id = $1 AND role = 'owner'",
+        [racedBook],
+      );
+      expect(owners.rows).toHaveLength(1);
+      const succeeded = [a, b].filter((r) => r.status === 200);
+      const forbidden = [a, b].filter((r) => r.status === 403);
+      expect(succeeded.length + forbidden.length).toBe(2);
+      expect(forbidden.length).toBeGreaterThanOrEqual(0);
+    });
   });
 
   describe('GET /sync/pull', () => {
@@ -157,6 +175,8 @@ describe('sync routes (integration, real PostgreSQL)', () => {
       const ids = ['99999999-9999-4999-8999-999999999990', '99999999-9999-4999-8999-999999999991', '99999999-9999-4999-8999-999999999992'];
       const batch = ids.map((entityId, i) => op(entityId, { lamport: i + 1, client_id: crypto.randomUUID() }));
       await request(app).post('/sync/push').set(authed(userA)).send({ book_id: bookId, ops: batch });
+      // 安全窗口：op 提交满 2 秒才可被拉取（审查 L-3）
+      await new Promise((r) => setTimeout(r, 2300));
 
       const page1 = await request(app).get('/sync/pull').set(authed(userA)).query({ book_id: bookId, since_seq: 0, limit: 2 });
       expect(page1.status).toBe(200);
@@ -173,6 +193,36 @@ describe('sync routes (integration, real PostgreSQL)', () => {
     it('rejects a missing or invalid since_seq with 400', async () => {
       const res = await request(app).get('/sync/pull').set(authed(userA)).query({ book_id: BOOK });
       expect(res.status).toBe(400);
+    });
+
+    it('safety window: fresh ops invisible for 2s, visible after, server_time present (L-3)', async () => {
+      const bookId = `a${crypto.randomUUID().slice(1)}`;
+      const entityId = `aaaa${crypto.randomUUID().slice(4)}`;
+      await request(app).post('/sync/push').set(authed(userA)).send({
+        book_id: bookId,
+        ops: [op(entityId, { lamport: 1 })],
+      });
+      // 提交未满 2 秒：不可见，游标不前进
+      const fresh = await request(app).get('/sync/pull').set(authed(userA)).query({ book_id: bookId, since_seq: 0 });
+      expect(fresh.status).toBe(200);
+      expect(fresh.body.ops).toHaveLength(0);
+      expect(fresh.body.next_seq).toBe(0);
+      expect(typeof fresh.body.server_time).toBe('string');
+      // 满 2 秒后可见
+      await new Promise((r) => setTimeout(r, 2300));
+      const settled = await request(app).get('/sync/pull').set(authed(userA)).query({ book_id: bookId, since_seq: 0 });
+      expect(settled.body.ops.map((o: { entity_id: string }) => o.entity_id)).toContain(entityId);
+      expect(settled.body.next_seq).toBeGreaterThan(0);
+    });
+
+    it('pulling a non-existent book returns 404 and creates nothing (GET side-effect-free)', async () => {
+      const ghost = crypto.randomUUID();
+      const res = await request(app).get('/sync/pull').set(authed(userA)).query({ book_id: ghost, since_seq: 0 });
+      expect(res.status).toBe(404);
+      const book = await pool.query('SELECT 1 FROM books WHERE id = $1', [ghost]);
+      expect(book.rows).toHaveLength(0);
+      const member = await pool.query('SELECT 1 FROM book_members WHERE book_id = $1', [ghost]);
+      expect(member.rows).toHaveLength(0);
     });
   });
 
@@ -197,6 +247,8 @@ describe('sync routes (integration, real PostgreSQL)', () => {
 
       const pushB = await request(app).post('/sync/push').set(authed(userB)).send({ book_id: bookId, ops: ops.slice(10) });
       expect(pushB.body.accepted).toBe(10);
+      // 安全窗口：等待全部 op 提交满 2 秒（审查 L-3）
+      await new Promise((r) => setTimeout(r, 2300));
 
       // 双方各自完整拉取：内容一致、无重复
       const pullA = await request(app).get('/sync/pull').set(authed(userA)).query({ book_id: bookId, since_seq: 0 });
@@ -235,6 +287,8 @@ describe('sync routes (integration, real PostgreSQL)', () => {
         accepted += res.body.accepted;
       }
       expect(accepted).toBe(total);
+      // 安全窗口：等待全部 op 提交满 2 秒（审查 L-3）
+      await new Promise((r) => setTimeout(r, 2300));
 
       const seen = new Set<string>();
       let cursor = 0;

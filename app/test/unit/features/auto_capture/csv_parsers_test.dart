@@ -145,6 +145,41 @@ void main() {
     });
   });
 
+  test('审查 L-9：表头自动定位（4-20 行元信息头），元信息行不误判', () {
+    final csv = [
+      '支付宝交易明细表',
+      '账号：test@example.com',
+      '导出时间：2026-08-01 10:00:00',
+      '交易时间,交易分类,交易对方,商品说明,收/支,金额,支付方式,交易状态',
+      alipayRow(time: '2026-07-01 10:00:00', category: '餐饮', counterparty: 'A', direction: '支出', amount: '10.00'),
+      alipayRow(time: '2026-07-01 11:00:00', category: '餐饮', counterparty: 'B', direction: '支出', amount: '12.50'),
+    ].join('\n');
+    final candidates = AlipayCsvParser().parse(csv);
+    // 元信息行（无表头标记）不产生候选，仅 2 条真实流水
+    expect(candidates, hasLength(2));
+    expect(candidates[0].amountMinor, -1000);
+    expect(candidates[1].amountMinor, -1250);
+  });
+
+  test('审查 L-9：金额整数域解析（千分位 + 一元以下小数）', () {
+    final csv = [
+      '交易时间,交易分类,交易对方,商品说明,收/支,金额,支付方式,交易状态',
+      alipayRow(time: '2026-07-01 10:00:00', category: '餐饮', counterparty: 'A', direction: '支出', amount: '"1,234.56"'),
+      alipayRow(time: '2026-07-01 11:00:00', category: '餐饮', counterparty: 'B', direction: '支出', amount: '0.05'),
+      alipayRow(time: '2026-07-01 12:00:00', category: '餐饮', counterparty: 'C', direction: '收入', amount: '3.00'),
+    ].join('\n');
+    final candidates = AlipayCsvParser().parse(csv);
+    expect(candidates[0].amountMinor, -123456);
+    expect(candidates[1].amountMinor, -5);
+    expect(candidates[2].amountMinor, 300);
+  });
+
+  test('审查 L-9：20 行内找不到表头返回空', () {
+    final csv = List.generate(25, (i) => '元信息行 $i').join('\n');
+    expect(AlipayCsvParser().parse(csv), isEmpty);
+    expect(WechatCsvParser().parse(csv), isEmpty);
+  });
+
   test('内置 CSV 解析器：引号/逗号/换行转义', () {
     const csv = 'a,"b,c","d""e",f\n"多行\n字段",g,h';
     final rows = parseCsv(csv);
