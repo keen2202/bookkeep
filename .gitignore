@@ -19,3 +19,8 @@ build/
 
 # OS
 .DS_Store
+
+# Project-internal data & build artifacts (do not commit)
+.workbuddy/
+/apk/
+/main

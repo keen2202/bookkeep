@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookkeep 记账APP 全面代码审查报告 v0.2.1</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1c2333; --sub:#5a6478; --line:#e4e8ef;
+    --p0:#d92d20; --p0bg:#fef3f2; --p1:#dc6803; --p1bg:#fffaeb; --p2:#175cd3; --p2bg:#eff8ff; --p3:#475467; --p3bg:#f2f4f7;
+    --ok:#067647; --okbg:#ecfdf3; --accent:#0e7490;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.75;padding:32px 16px}
+  .wrap{max-width:980px;margin:0 auto}
+  header{background:linear-gradient(135deg,#0e7490,#155e75);color:#fff;border-radius:16px;padding:36px 40px;margin-bottom:28px}
+  header h1{font-size:26px;margin-bottom:8px}
+  header p{opacity:.9;font-size:14px}
+  .meta{display:flex;gap:24px;flex-wrap:wrap;margin-top:16px;font-size:13px;opacity:.85}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:28px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;text-align:center}
+  .stat .n{font-size:30px;font-weight:700}
+  .stat .l{font-size:13px;color:var(--sub)}
+  .stat.b0 .n{color:var(--p0)} .stat.b1 .n{color:var(--p1)} .stat.b2 .n{color:var(--p2)} .stat.b3 .n{color:var(--p3)}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 32px;margin-bottom:24px}
+  h2{font-size:20px;margin-bottom:6px;padding-left:12px;border-left:4px solid var(--accent)}
+  h3{font-size:16px;margin:22px 0 10px;color:var(--accent)}
+  .lead{color:var(--sub);font-size:14px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:12px 0}
+  th{background:#f0f3f8;text-align:left;padding:9px 12px;border-bottom:2px solid var(--line);white-space:nowrap}
+  td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:hover td{background:#fafbfd}
+  code{font-family:"Cascadia Code",Consolas,monospace;background:#eef1f6;padding:1px 6px;border-radius:5px;font-size:12.5px;color:#b42318}
+  .tag{display:inline-block;padding:1px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+  .t0{background:var(--p0bg);color:var(--p0)} .t1{background:var(--p1bg);color:var(--p1)} .t2{background:var(--p2bg);color:var(--p2)} .t3{background:var(--p3bg);color:var(--p3)} .tok{background:var(--okbg);color:var(--ok)}
+  .issue{border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:10px 0;background:#fcfcfe}
+  .issue .hd{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
+  .issue .hd b{font-size:14.5px}
+  .issue .loc{font-size:12px;color:var(--sub);font-family:Consolas,monospace}
+  .issue p{font-size:13.5px;margin:4px 0}
+  .issue .fix{font-size:13px;color:var(--ok);background:var(--okbg);border-radius:6px;padding:6px 10px;margin-top:6px}
+  ul{padding-left:22px;font-size:14px} li{margin:5px 0}
+  .bar{height:26px;border-radius:6px;display:flex;overflow:hidden;font-size:11px;color:#fff;font-weight:600;margin:8px 0}
+  .bar div{display:flex;align-items:center;justify-content:center}
+  .note{background:#fff8e6;border:1px solid #f5dfa8;border-radius:10px;padding:12px 16px;font-size:13.5px;margin:14px 0}
+  .good{background:var(--okbg);border:1px solid #a6f4c5;border-radius:10px;padding:12px 16px;font-size:13.5px;margin:14px 0}
+  footer{text-align:center;color:var(--sub);font-size:12.5px;padding:20px}
+  .road{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .phase{border:1px solid var(--line);border-radius:10px;padding:16px;background:#fcfcfe}
+  .phase h4{font-size:14.5px;margin-bottom:8px}
+  .phase ul{font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>📒 Bookkeep 记账APP · 全面代码审查报告</h1>
+  <p>审查范围：Flutter 客户端（app/lib，93 个 Dart 文件）+ Node.js 同步服务端（server/src，23 个 TS 文件）+ Android 构建产物（app-release-v0.2.1.apk）</p>
+  <div class="meta">
+    <span>审查版本：v0.2.1</span>
+    <span>审查日期：2026-08-07</span>
+    <span>审查维度：功能完整性 / 逻辑正确性 / 体积优化 / 界面优化</span>
+    <span>审查方式：全量静态代码走读 + 构建产物解剖 + 关键问题人工复核</span>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat b0"><div class="n">4</div><div class="l">阻塞级（客户端）</div></div>
+  <div class="stat b0"><div class="n">1</div><div class="l">阻塞级（服务端）</div></div>
+  <div class="stat b1"><div class="n">14</div><div class="l">高严重度</div></div>
+  <div class="stat b2"><div class="n">22</div><div class="l">中严重度</div></div>
+  <div class="stat b3"><div class="n">15+</div><div class="l">低严重度</div></div>
+</div>
+
+<!-- ============ 总体结论 ============ -->
+<section>
+  <h2>一、总体结论</h2>
+  <p class="lead">数据层与领域算法质量高（定点金额、LWW 冲突合并、数据库迁移链、PBKDF2/AES-GCM 加密原语均扎实），<b>主要风险集中在"装配层"</b>：同步引擎、SQLCipher 加密、周期补跑、预算超额提醒四个核心特性<b>零件齐备但未接线</b>，另有报表刷新链路断点与服务端事务失效两处硬伤。APK 体积 71MB，存在约 60% 的可压缩空间。</p>
+  <div class="note">⚠️ <b>最重要的三个发现：</b>① SQLCipher 原生库已打包进 APK（每个 ABI 约 5MB）但加密从未启用——数据库明文落盘，与 Spec BK-P0-006 宣称不符；② 同步引擎完整实现但从未实例化，多设备同步实际不可用；③ 服务端用 <code>pool.query('BEGIN')</code> 跑事务，BEGIN/INSERT/COMMIT 落在不同连接上，事务完全失效。</div>
+  <div class="good">✅ <b>确认健康的模块：</b>金额全程 int 分单位定点运算（无 double 精度风险）；预算窗口计算含除零保护与月末回退；锚点解析闰年安全；PIN 采用 PBKDF2 10 万次 + 常量时间比较；备份加密 AES-256-GCM 且恢复为单事务原子切换；drift 迁移链 v1→v6 渐进正确；LWW 合并算法严谨。</div>
+</section>
+
+<!-- ============ 功能完整性 ============ -->
+<section>
+  <h2>二、功能完整性审查</h2>
+  <p class="lead">结论：单设备核心记账链路（记一笔 → 账户/预算联动）可闭环；但<b>同步、加密、共享账本、周期自动补跑、预算提醒</b>五条宣称的 P0/P1 特性未闭环，属于"代码写完但未接入"状态。</p>
+
+  <h3>🔴 阻塞级问题</h3>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t0">阻塞</span><b>B-1 同步引擎从未启动，且无登录入口</b></div>
+    <div class="loc">app/lib/features/sync/sync_engine.dart:16 · app/lib/main.dart</div>
+    <p>SyncEngine 类完整实现了 push/pull/LWW 合并/401 刷新，但全库检索无任何处实例化或调用 <code>.start()</code>；引擎需要 email/password，而 App 内没有任何登录/注册 UI。sync_ops 只进不出，多设备同步与共享账本实际不可用。</p>
+    <div class="fix">修复：main() 中构建并启动 SyncEngine；设置页增加登录/注册表单；未登录时明确降级为纯本地模式。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t0">阻塞</span><b>B-2 SQLCipher 加密未启用（安全合规风险）</b></div>
+    <div class="loc">app/lib/data/local/database_provider.dart:9 · app/lib/main.dart:33 · data/local/database.dart:41</div>
+    <p>运行时一律走 <code>AppDatabase(driftDatabase(name: 'bookkeep'))</code> 明文库；<code>AppDatabase.openEncrypted</code> 与 <code>SecureStorageKeyStore</code> 无任何调用方。数据库明文落盘，与 Spec §1.3 / BK-P0-006 宣称的加密存储不符；同时每个 ABI 仍打包约 5MB 的 libsqlcipher.so（体积浪费，见第五章）。</p>
+    <div class="fix">修复：启动时经 KeyStore 读取/生成密钥，改走 openEncrypted；提供明文库向加密库的一次性迁移路径（sqlcipher_export）。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t0">阻塞</span><b>B-3 周期记账生成的流水归属错误账本，生成即"丢失"</b></div>
+    <div class="loc">app/lib/features/recurring/recurring_service.dart:13-14 · data/local/database.dart:59 · core/constants/constants.dart:10</div>
+    <p><code>RecurringService(db)</code> 未注入 txRepo，内部自建 <code>TransactionRepository(db)</code> 的 bookId 为 null，回退到占位常量 <code>kDefaultBookId</code>；而新装设备的真实账本 id 是随机 uuid。结果：周期规则生成的流水 book_id 为占位值，所有按 currentBookId 过滤的查询均不可见——用户看到"规则执行成功"但流水消失。（已人工复核确认）</p>
+    <div class="fix">修复：RecurringService 构造时注入携带当前 bookId 的 TransactionRepository（或改为从 Provider 读取 currentBookId）。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t0">阻塞</span><b>B-4 服务端事务完全失效（pool.query 跑 BEGIN）</b></div>
+    <div class="loc">server/src/books/books.routes.ts:56-70, 150-163 · server/src/db/pool.ts</div>
+    <p>pg 的 <code>Pool.query()</code> 每次调用独立借还连接，BEGIN/INSERT/COMMIT 几乎必然落在不同客户端：INSERT 实际在事务外自动提交，ROLLBACK 在无事务连接上执行。<code>POST /books</code> 与 <code>accept-invite</code> 的"原子性"是假象，且集成测试因同一 bug 反而"测过"了错误实现。（已人工复核确认）</p>
+    <div class="fix">修复：DbPool 接口增加 <code>connect()</code>；路由层 <code>const client = await pool.connect()</code> 持有同一连接跑完整事务，finally 中 release。</div>
+  </div>
+
+  <h3>🟠 高严重度问题</h3>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>F-1 记账保存后报表/日历不刷新</b></div>
+    <div class="loc">app/lib/features/quick_entry/quick_entry_sheet.dart:94-95</div>
+    <p>保存后仅 invalidate 预算与账户两个 provider；<code>dailyTotalsProvider</code>、<code>categoryBreakdownProvider</code>、<code>calendarDailyTotalsProvider</code> 均为 FutureProvider.family 缓存，无任何失效路径——记一笔后切到报表/日历仍是旧数据，直到重启或改时间窗。这是最高频用户路径上的断点。（已人工复核确认）</p>
+    <div class="fix">修复：引入统一的 <code>ledgerVersionProvider</code> 计数器，所有报表/日历 provider watch 之，任何写操作后 +1。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>F-2 周期补跑 / 分期到期无自动触发</b></div>
+    <div class="loc">app/lib/features/recurring/recurring_service.dart:116 · recurring_page.dart:30</div>
+    <p><code>runAll</code> 仅在周期页手动点"立即补跑"触发；<code>runInstallmentDues</code> 全库无调用方——分期计划到期永远不会生成流水。</p>
+    <div class="fix">修复：App 启动及前后台切换（AppLifecycleState.resumed）时自动调用两者。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>F-3 共享账本无法落地本地</b></div>
+    <div class="loc">app/lib/features/books/books_page.dart:190-206 · sync/sync_merger.dart:25</div>
+    <p>serverBooksProvider 只把 role 写入 app_meta，从未把服务端 book 插入本地 books 表；SyncMerger 的实体清单也不含 'book'。被邀请的账本永远不会出现在本地列表/切换器。</p>
+    <div class="fix">修复：拉取服务端账本列表后 createLocalBook 缓存；SyncMerger 增加 book 实体合并。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>F-4 备份遗漏 4 张表</b></div>
+    <div class="loc">app/lib/features/backup/backup_service.dart:24-33</div>
+    <p>备份表清单缺少 <code>currencies</code>、<code>recurring_rules</code>、<code>installment_plans</code>、<code>installment_schedules</code>——恢复后备份中的周期规则、分期计划、手动汇率全部丢失，属于数据丢失级缺陷。</p>
+    <div class="fix">修复：补齐表清单；备份文件加 schema 版本号，恢复时做兼容校验。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>F-5 预算超额提醒闭环缺失 + 自定义阈值失效</b></div>
+    <div class="loc">app/lib/domain/services/budget_progress_calculator.dart:6 · data/repositories/budget_repository.dart:146</div>
+    <p>告警阈值硬编码 80%，budgets 表的 <code>threshold</code> 列与 <code>shouldNotify/markAlertNotified</code> 方法无任何调用方，也没有本地通知渠道——用户设置的阈值完全不生效。</p>
+    <div class="fix">修复：进度计算传入 budget.threshold；保存流水后评估阈值并接 flutter_local_notifications。</div>
+  </div>
+
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>F-6 合并跳过 FK 未就绪的流水即永久丢失</b></div>
+    <div class="loc">app/lib/features/sync/sync_merger.dart:163 · sync_engine.dart:171</div>
+    <p>_createTransaction 在 account 尚未同步到时返回 null 跳过，但引擎无条件推进游标 <code>setLastSyncedSeq(pull.nextSeq)</code>——若账户 op 在下一页才拉到，该流水永不重试。</p>
+    <div class="fix">修复：被跳过的 op 记录重放队列，或按依赖序分批确认游标。</div>
+  </div>
+
+  <h3>🟡 中严重度（功能缺失/半成品）</h3>
+  <table>
+    <tr><th>编号</th><th>位置</th><th>问题</th><th>建议</th></tr>
+    <tr><td>F-7</td><td>recurring_service.dart:46</td><td>周期规则类型硬编码 expense，工资等周期收入无法建模</td><td>规则表加 type 字段</td></tr>
+    <tr><td>F-8</td><td>transaction_repository.dart:116,126</td><td>转账币种硬编码 CNY，账户编辑页无币种选择 UI，多币种三要素在主链路不可达</td><td>账户/转账增加币种与汇率快照入口</td></tr>
+    <tr><td>F-9</td><td>currency_repository.dart:86</td><td>非 CNY 币种 seed 汇率固定占位值 0.1 且静默生效，外币余额折算错误无任何提示</td><td>提供手动汇率 UI；未设置汇率时显式提示而非静默用占位值</td></tr>
+    <tr><td>F-10</td><td>budgets_page.dart</td><td>预算只有新建，无编辑/删除入口（仓库方法存在但 UI 未接）；同分类重复建预算无拦截</td><td>补编辑/删除入口 + 唯一性校验</td></tr>
+    <tr><td>F-11</td><td>csv_import_page.dart:137</td><td>短信/通知自动记账入口 enabled:false 占位，无平台通道</td><td>符合"默认关闭"声明，但应在文档中明确未交付</td></tr>
+    <tr><td>F-12</td><td>backup_page.dart:71</td><td>恢复备份用 customStatement，drift 无法感知表变更，恢复后 UI 大面积陈旧</td><td>restore 后整体 invalidate 或提示重启</td></tr>
+  </table>
+</section>
+
+<!-- ============ 逻辑正确性 ============ -->
+<section>
+  <h2>三、逻辑正确性审查</h2>
+  <p class="lead">结论：核心金额/日期算法严谨（已确认健康），但同步协议、并发竞态、状态管理三类问题集中爆发，其中服务端 3 个并发缺陷可导致数据永久丢失或权限错乱。</p>
+
+  <h3>🟠 服务端高危逻辑缺陷</h3>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>L-1 自动建账竞态产生双 owner + 带副作用的 GET</b></div>
+    <div class="loc">server/src/auth/book.middleware.ts:39-53</div>
+    <p>两用户并发首推同一 book_id：SELECT 均空 → INSERT ON CONFLICT DO NOTHING 均成功 → 两人都成为 owner。且 <code>GET /sync/pull</code> 也走建账逻辑——任何登录用户可用随机 UUID 无限建账刷库。</p>
+    <div class="fix">修复：建账收敛到 push 单一路径并加唯一约束兜底；pull 对不存在账本返回 404。</div>
+  </div>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>L-2 邀请 token 可复用（非原子）</b></div>
+    <div class="loc">server/src/books/books.routes.ts:133-158</div>
+    <p>先 SELECT 查 used_at 再 UPDATE 标记，两个并发请求都通过检查 → 同一 token 被接受两次（叠加事务失效更严重）。</p>
+    <div class="fix">修复：单语句 <code>UPDATE invite_tokens SET used_at=now() WHERE token_hash=$1 AND used_at IS NULL AND expires_at&gt;now() RETURNING ...</code>，按返回行数判断。</div>
+  </div>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>L-3 增量 pull 存在丢 op 窗口（BIGSERIAL 游标缺陷）</b></div>
+    <div class="loc">server/src/sync/op.service.ts:58-63</div>
+    <p>序列号在语句执行时分配、可见性在 commit 时：push A(id=5) 与 push B(id=6) 并发，B 先提交，客户端拉到 next_seq=6 后 A 才提交——id=5 的 op 永久丢失。多设备并发推送时概率不低。</p>
+    <div class="fix">修复：拉取时减安全窗口（<code>created_at &lt; now() - interval '2 seconds'</code>）配合客户端重拉去重；或改用事务内统一赋 seq。</div>
+  </div>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>L-4 零安全中间件：无 CORS / helmet / 限流</b></div>
+    <div class="loc">server/src/app.ts:14-29</div>
+    <p>/auth/login、/auth/register、/auth/refresh 可无限爆破；scrypt N=2^17 每次约百毫秒，登录接口同时是 CPU DoS 放大器。</p>
+    <div class="fix">修复：auth 路由加 express-rate-limit（如 5 次/分钟/IP）；全局 helmet + 显式 CORS 白名单。</div>
+  </div>
+
+  <h3>🟡 客户端逻辑缺陷</h3>
+  <table>
+    <tr><th>编号</th><th>级别</th><th>位置</th><th>问题与建议</th></tr>
+    <tr><td>L-5</td><td><span class="tag t2">中</span></td><td>reports_repository.dart:189-195</td><td>报表多币种折算用当前汇率而非 transactions.rate_snapshot 历史快照，违反自身 Spec §4.5"历史流水不随汇率波动"。建议 GROUP BY 带出 rate_snapshot 按快照折算。</td></tr>
+    <tr><td>L-6</td><td><span class="tag t2">中</span></td><td>recurring_service.dart:98-102</td><td>分期排期 <code>DateTime(y, m+i, 31)</code> 月末溢出漂移（1月31日→3月3日），与 AnchorResolver 的月末回退语义不一致。建议复用 _dayInMonth 回退逻辑。</td></tr>
+    <tr><td>L-7</td><td><span class="tag t2">中</span></td><td>quick_entry_controller.dart:127-160</td><td>save() 无 try/catch：异常时 saving 永远停在 true，后续保存全部静默失败，需杀页面重进。建议 try/finally 复位并暴露错误态。</td></tr>
+    <tr><td>L-8</td><td><span class="tag t2">中</span></td><td>calendar_page.dart:260-261</td><td>日历日明细把转账计入净额且取 abs()：转出 -1000 算成 +1000，成对转账净额虚增 2 倍；_compactMoney 丢负号。</td></tr>
+    <tr><td>L-9</td><td><span class="tag t2">中</span></td><td>csv_parsers.dart:22,118</td><td>headerSkip=1 只跳一行，真实支付宝/微信导出文件头部有 4-20 行元信息，表头定位会失败；_parseAmount 走 double，大额有精度风险。</td></tr>
+    <tr><td>L-10</td><td><span class="tag t2">中</span></td><td>server/src/app.ts（Express 5）</td><td>无 JSON 错误中间件：默认返回 HTML 错误页（非 production 泄露堆栈），客户端对 HTML 执行 jsonDecode 抛 FormatException，逃逸出错误分类。建议统一 error middleware + 404 handler。</td></tr>
+    <tr><td>L-11</td><td><span class="tag t2">中</span></td><td>server/src/books/books.routes.ts:214</td><td>PATCH 成员角色允许提升为 owner，可制造多个不可降级 owner，权限不可逆。目标角色应限定 editor/viewer。</td></tr>
+    <tr><td>L-12</td><td><span class="tag t2">中</span></td><td>server/src/auth/tokens.ts:46-48</td><td>refresh 轮换时清理 DELETE 失败致半完成态：旧 token 已撤销但请求 500，客户端被迫重新登录。清理应 try/catch 或挪异步任务。</td></tr>
+  </table>
+
+  <h3>🟢 低严重度（择要）</h3>
+  <ul>
+    <li><code>database.dart:43</code> PRAGMA key 字符串插值（当前 key 为受控生成值，风险低，建议参数化）</li>
+    <li><code>budget_repository.dart:152</code> markAlertNotified 无 onConflict，并发重复调用主键冲突（暂无调用方）</li>
+    <li><code>account_repository.dart:221-250</code> refreshSnapshots 循环内逐行查询（N+1），且无流水账户不生成快照</li>
+    <li><code>recurring_engine.dart:74</code> firstDueAfter 窗口 400 天，interval≥2 的年频率规则返回 null</li>
+    <li><code>capture_confirm_page.dart:73-84</code> CSV commit 循环非事务，中途失败留半批</li>
+    <li><code>lww_resolver.dart:34-42</code> "删除优先无视 lamport"：迟到的旧 delete 会覆盖较新的 update，需确认符合预期</li>
+    <li><code>server/src/routes/auth.routes.ts:52-59</code> 登录响应时间差可探测注册邮箱（用户枚举时序侧信道）</li>
+    <li><code>server/jest.config.js</code> 默认 testMatch 命中集成测试（无 DB 必挂）；coverageThreshold 80% 被 --coverage=false 架空；集成测试默认连开发库会污染真实数据</li>
+  </ul>
+</section>
+
+<!-- ============ 体积优化 ============ -->
+<section>
+  <h2>四、体积优化审查</h2>
+  <p class="lead">APK v0.2.1 体积 <b>71MB</b>。解剖结论：99% 体积来自三个 ABI 的原生库，与 Dart 代码、资源文件几乎无关。通过 ABI 拆分 + 裁剪可轻松降至 <b>25MB 以下</b>（单 arm64 包）。</p>
+
+  <h3>APK 构成解剖（未压缩）</h3>
+  <table>
+    <tr><th>构成</th><th>大小</th><th>占比</th><th>说明</th></tr>
+    <tr><td>lib/x86_64/（模拟器架构）</td><td>27.0 MB</td><td>~37%</td><td>libflutter.so 12.9 + libapp.so 8.2 + libsqlcipher.so 5.9</td></tr>
+    <tr><td>lib/arm64-v8a/（主流真机）</td><td>24.8 MB</td><td>~34%</td><td>libflutter.so 11.6 + libapp.so 8.0 + libsqlcipher.so 5.1</td></tr>
+    <tr><td>lib/armeabi-v7a/（老旧 32 位机）</td><td>21.4 MB</td><td>~29%</td><td>libflutter.so 8.5 + libapp.so 8.9 + libsqlcipher.so 4.1</td></tr>
+    <tr><td>classes.dex + assets + res</td><td>~1.5 MB</td><td>~2%</td><td>Dart AOT 之外的一切，控制得很好</td></tr>
+  </table>
+  <div class="bar">
+    <div style="width:37%;background:#98a2b3">x86_64 27MB</div>
+    <div style="width:34%;background:#0e7490">arm64 24.8MB</div>
+    <div style="width:27%;background:#f79009">v7a 21.4MB</div>
+  </div>
+
+  <h3>体积优化方案（按收益排序）</h3>
+  <table>
+    <tr><th>优先级</th><th>措施</th><th>预计收益</th><th>具体操作</th></tr>
+    <tr><td><span class="tag t0">P0</span></td><td><b>ABI 拆分 / App Bundle</b></td><td>71MB → <b>约 25MB</b>（-65%）</td><td>分发改用 <code>flutter build appbundle</code>（Play 自动按设备下发单 ABI）；直发 APK 场景用 <code>flutter build apk --split-per-abi</code>，主推 arm64-v8a 包</td></tr>
+    <tr><td><span class="tag t0">P0</span></td><td><b>移除 release 包中的 x86_64</b></td><td>再省 27MB（未拆分时）</td><td>x86_64 仅模拟器需要；在 build.gradle.kts 的 release 中 <code>ndk { abiFilters }</code> 限定 arm64-v8a + armeabi-v7a</td></tr>
+    <tr><td><span class="tag t1">P1</span></td><td><b>SQLCipher 二选一：启用加密或移除</b></td><td>每个 ABI 省 4-6MB（总计 15MB）</td><td>当前 libsqlcipher.so 打包了但加密从未启用（见 B-2）——纯死重。若启用加密则体积合理；若决定不加密，移除 sqlcipher hooks 配置改用普通 sqlite3 原生库</td></tr>
+    <tr><td><span class="tag t1">P1</span></td><td><b>开启 R8 混淆 + 资源压缩 + 调试符号分离</b></td><td>dex/资源进一步缩减，便于崩溃符号化</td><td>release 加 <code>minifyEnabled = true; shrinkResources = true</code>；构建加 <code>--obfuscate --split-debug-info=build/symbols</code></td></tr>
+    <tr><td><span class="tag t2">P2</span></td><td><b>清理占位/重复依赖</b></td><td>减小依赖解析面，防冲突</td><td><code>sqlcipher_flutter_libs</code> 与 <code>sqlite3_flutter_libs</code> 均为 EOL 占位包（pubspec 注释自承），验证 hooks 链路后尝试移除其一；audit <code>http</code>（同步引擎未接线，确认无其他调用方后评估）</td></tr>
+    <tr><td><span class="tag t2">P2</span></td><td><b>删除死代码</b></td><td>可维护性收益为主</td><td><code>account_repository.dart:119-193</code> 的 createTransfer 与 <code>transaction_repository.dart:99-172</code> 完全重复，删其一；未接线的 sms_parser、installSeeds（currency）等确认后归档或接线</td></tr>
+    <tr><td><span class="tag t3">P3</span></td><td><b>老旧 32 位设备取舍</b></td><td>再省 21MB（单包场景）</td><td>若目标用户无需 armeabi-v7a（2017 年后设备基本不需要），仅保留 arm64-v8a</td></tr>
+  </table>
+  <div class="note">💡 结论：Dart 代码与资源已非常精简（&lt;2MB），无需在代码层做激进的 tree-shaking；<b>体积问题的本质是分发策略（单包三 ABI）+ SQLCipher 死重</b>，改构建配置即可解决，零业务风险。</div>
+</section>
+
+<!-- ============ 界面优化 ============ -->
+<section>
+  <h2>五、界面优化审查</h2>
+  <p class="lead">总体一致性评分 <b>6.5/10</b>。优点：唯一 ThemeData 入口、M3 组件运用规范、加载/空/错误三态覆盖率高、金额脱敏体系贯穿良好。短板集中在架构性双 Scaffold、深色模式缺失、语义色/小字号硬编码、图表信息设计四方面。</p>
+
+  <h3>🔴 架构级 UI 问题</h3>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>U-1 嵌套 Scaffold 导致双 AppBar + 双 FAB</b></div>
+    <div class="loc">app/lib/app.dart:67-111</div>
+    <p>主 shell 的 Scaffold 已含 AppBar（'bookkeep'）和全局 FAB（"记一笔"），而嵌入的 CategoriesPage、BudgetsPage 等页面又各自声明 Scaffold + AppBar + FAB——分类页同时渲染两个 AppBar、两个"+"按钮。代码中 HeroMode 禁用注释说明作者已知冲突但未根治。</p>
+    <div class="fix">修复：页面级组件去掉内层 Scaffold/AppBar，标题与 FAB 交由主 shell 统一管理（或主 shell 改 IndexedStack + 页面自管 AppBar，二选一）。</div>
+  </div>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>U-2 深色模式完全缺失 + 系统栏样式写死</b></div>
+    <div class="loc">app/lib/app.dart:61-64 · main.dart:27-32,53-60</div>
+    <p>全项目无 darkTheme/themeMode；秒开模式的第二个 MaterialApp 连 theme 都未设置，与主入口视觉不一致；statusBarIconBrightness 写死 dark，深色壁纸下状态栏图标不可读。</p>
+    <div class="fix">修复：抽取共享 <code>buildTheme(Brightness)</code>，提供 darkTheme 并支持跟随系统；系统栏样式随主题联动。</div>
+  </div>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>U-3 记账键盘无底部 SafeArea（核心路径）</b></div>
+    <div class="loc">app/lib/features/quick_entry/amount_keyboard.dart:19-33 · quick_entry_sheet.dart:108-152</div>
+    <p>Android targetSdk 36 强制 edge-to-edge，AmountKeyboard 直接置于 Column 底部，"确定"行会被手势条遮挡。这是记账核心路径，必须修。</p>
+    <div class="fix">修复：键盘容器包 <code>SafeArea(top: false)</code> 或叠加 MediaQuery viewPadding.bottom。</div>
+  </div>
+  <div class="issue">
+    <div class="hd"><span class="tag t1">高</span><b>U-4 记账保存无防重入 + 周期规则编辑 Sheet 无键盘避让</b></div>
+    <div class="loc">quick_entry_sheet.dart:82-97 · recurring_page.dart:236-318</div>
+    <p>"确定"键连点会重复入账（controller.save 异步期间无 busy 锁）；RuleEditSheet 是唯一未处理 viewInsets.bottom 的编辑弹窗，键盘弹出遮挡金额框。</p>
+    <div class="fix">修复：保存入口加 busy 锁（其它三个编辑 Sheet 已有 _saving 模式，照搬即可）。</div>
+  </div>
+
+  <h3>🟡 视觉一致性与可访问性</h3>
+  <table>
+    <tr><th>编号</th><th>级别</th><th>问题</th><th>建议</th></tr>
+    <tr><td>U-5</td><td><span class="tag t2">中</span></td><td>收支红/绿/橙硬编码散布 6 处文件；books_page 硬编码 Colors.teal；同一组 8 色调色板在两处重复定义</td><td>建 <code>ThemeExtension</code>（expenseColor/incomeColor/warningColor）统一语义色，同时解决色盲可区分性</td></tr>
+    <tr><td>U-6</td><td><span class="tag t1">高</span></td><td>字号硬编码低至 8sp（calendar_page.dart:198）、9sp/10sp（report_charts.dart），远低于 Material 12sp 下限</td><td>全项目字号下限 12sp；日历日格金额可改徽标形式</td></tr>
+    <tr><td>U-7</td><td><span class="tag t1">高</span></td><td>颜色选择 CircleAvatar 触控目标仅 32dp &lt; 48dp 标准（category_edit_sheet.dart:120）</td><td>用 InkResponse 48dp 热区或增大色块</td></tr>
+    <tr><td>U-8</td><td><span class="tag t2">中</span></td><td>Colors.orange 白底 12sp 文本对比度约 2.2:1，不达 WCAG 4.5:1</td><td>改 colorScheme.tertiary 或加深橙色阶</td></tr>
+    <tr><td>U-9</td><td><span class="tag t2">中</span></td><td>Tab 切换无状态保持（app.dart:74-81），滚动位置与报表筛选状态全部丢失</td><td>body 改 IndexedStack 或 PageView</td></tr>
+    <tr><td>U-10</td><td><span class="tag t2">中</span></td><td>列表仅 1 处用 ListView.builder，账户/分类/预算/周期均全量构建，数据增长后掉帧</td><td>统一改 ListView.builder/separated</td></tr>
+    <tr><td>U-11</td><td><span class="tag t2">中</span></td><td>报表三图表 maybeWhen(orElse: 转圈)，错误态被吞为永久 loading 无重试</td><td>补错误态 + 重试按钮</td></tr>
+    <tr><td>U-12</td><td><span class="tag t2">中</span></td><td>账户操作入口仅"长按"，无可发现性；备份页四个操作全部无 busy 态</td><td>加 trailing more 图标；异步操作统一加进度与防重</td></tr>
+    <tr><td>U-13</td><td><span class="tag t3">低</span></td><td>全项目零 HapticFeedback、零 Semantics（自绘键盘对读屏器无语义）</td><td>数字键盘/PIN 键加触觉反馈与语义标签</td></tr>
+  </table>
+
+  <h3>📊 图表信息设计（fl_chart）</h3>
+  <ul>
+    <li><span class="tag t1">高</span> <b>饼图标题内嵌扇区</b>（report_charts.dart:24-45）：分类超 5-6 个必然重叠，&gt;8 类颜色循环重复，无图例无交互。建议扇区只留百分比 + 外置 legend 列表。</li>
+    <li><span class="tag t2">中</span> 折线图 touch 开启但未配 touchTooltipData——默认 tooltip 显示原始"分"值（123456 而非 ¥1,234.56）；柱状图禁用 touch；双折线无图例仅靠红绿区分（色盲不友好）。</li>
+    <li><span class="tag t2">中</span> 三个图表隐藏所有坐标轴标签，用户无法读数。</li>
+    <li><span class="tag t2">中</span> <b>隐私泄露</b>：cashflow_chart.dart:52-64 脱敏态仅把数据点替换为 (0,0)，但 minY/maxY 仍按真实金额计算——坐标尺度泄露金额量级。</li>
+    <li><span class="tag t3">低</span> table_calendar 未设 sixWeekMonthsEnforced，月份行数变化致下方图表跳动。</li>
+  </ul>
+</section>
+
+<!-- ============ 路线图 ============ -->
+<section>
+  <h2>六、修复优先级路线图</h2>
+  <div class="road">
+    <div class="phase" style="border-top:4px solid var(--p0)">
+      <h4>🔴 第一波：阻塞修复（1-2 天）</h4>
+      <ul>
+        <li>B-4 服务端事务改 pool.connect()</li>
+        <li>B-3 RecurringService 注入当前 bookId</li>
+        <li>F-1 统一 ledgerVersionProvider 刷新链路</li>
+        <li>F-2 启动/resumed 自动补跑周期与分期</li>
+        <li>B-1/B-2 决策：同步与加密是"接线"还是"官宣延期"</li>
+      </ul>
+    </div>
+    <div class="phase" style="border-top:4px solid var(--p1)">
+      <h4>🟠 第二波：数据安全与并发（3-5 天）</h4>
+      <ul>
+        <li>L-1/L-2/L-3 服务端三并发缺陷 + L-4 限流 helmet</li>
+        <li>F-3 共享账本落地 + F-4 备份补 4 表</li>
+        <li>F-6 同步重放队列；L-10 JSON 错误中间件</li>
+        <li>U-1 双 Scaffold 架构整改；U-3 键盘 SafeArea；U-4 保存防重入</li>
+      </ul>
+    </div>
+    <div class="phase" style="border-top:4px solid var(--p2)">
+      <h4>🔵 第三波：体验与体积（1 周）</h4>
+      <ul>
+        <li>体积：appbundle / split-per-abi + R8 + SQLCipher 取舍（71MB→25MB）</li>
+        <li>U-2 深色模式；U-5 ThemeExtension 语义色治理；U-6 字号下限</li>
+        <li>图表：饼图外置图例、tooltip 格式化、坐标轴读数</li>
+        <li>F-5 预算提醒闭环；F-8 多币种 UI；F-10 预算编辑/删除</li>
+      </ul>
+    </div>
+    <div class="phase" style="border-top:4px solid var(--p3)">
+      <h4>⚪ 第四波：加固与清偿（持续）</h4>
+      <ul>
+        <li>并发测试用例补齐（双 owner / 邀请复用 / pull 丢 op）</li>
+        <li>jest.config 拆分单元/集成测试 + 独立测试库</li>
+        <li>死代码清理、依赖 audit、可访问性（Semantics/触控目标）</li>
+        <li>CSV 解析鲁棒性（表头自动定位、金额整数解析）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Bookkeep 代码审查报告 · 基于 v0.2.1 全量源码 · 所有问题均附文件:行号证据，关键阻塞项已经人工复核<br>
+  生成于 2026-08-07 · Mobile App Builder
+</footer>
+
+</div>
+</body>
+</html>
