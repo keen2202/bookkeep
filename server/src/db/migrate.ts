@@ -19,20 +19,3 @@ export async function migrate(pool: Pool): Promise<void> {
     client.release();
   }
 }
-
-// CLI: node dist/db/migrate.js（或 ts-node src/db/migrate.ts）
-if (require.main === module) {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep',
-  });
-  migrate(pool)
-    .then(() => {
-      console.log('schema migrated');
-      return pool.end();
-    })
-    .catch((err) => {
-      console.error('migration failed:', err);
-      process.exitCode = 1;
-      return pool.end();
-    });
-}

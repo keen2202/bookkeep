@@ -28,11 +28,13 @@ async function timingEqualizer(password: string): Promise<void> {
 interface AuthDeps {
   pool: DbPool;
   jwtSecret: string;
+  /** 限流开关（测试注入）：429 专项用例单独启用，其余集成用例关闭避免共享桶互扰 */
+  rateLimit?: boolean;
 }
 
-export function authRouter({ pool, jwtSecret }: AuthDeps): Router {
+export function authRouter({ pool, jwtSecret, rateLimit = true }: AuthDeps): Router {
   const router = Router();
-  router.use(authRateLimit);
+  if (rateLimit) router.use(authRateLimit);
 
   router.post('/register', async (req, res) => {
     const { email, password } = req.body ?? {};

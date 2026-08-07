@@ -7,7 +7,7 @@ on:
 
 jobs:
   server:
-    name: Server lint + unit (coverage >= 80%)
+    name: Server lint + test (coverage >= 80%, unit + integration)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -35,6 +35,12 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
+      # 集成测试使用独立 bookkeep_test 库（审查 R-021：不污染开发库）；
+      # 服务容器仅初始化 bookkeep，这里显式补建
+      - name: Create integration test database
+        run: |
+          docker exec "$(docker ps -q --filter 'publish=5432' | head -1)" \
+            psql -U bookkeep -d bookkeep -c "CREATE DATABASE bookkeep_test OWNER bookkeep"
       - run: npm run test:coverage
 
   app:

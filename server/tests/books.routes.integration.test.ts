@@ -35,7 +35,7 @@ describe('books routes (integration, real PostgreSQL)', () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: DATABASE_URL });
     await migrate(pool);
-    app = createApp({ pool, jwtSecret: SECRET });
+    app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const suffix = crypto.randomUUID().slice(0, 8);
     owner = await registerUser(app, `bk-owner-${suffix}@test.local`, 'password-123');
     collaborator = await registerUser(app, `bk-collab-${suffix}@test.local`, 'password-123');

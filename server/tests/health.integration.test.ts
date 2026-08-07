@@ -17,7 +17,7 @@ describe('GET /health/db (integration, real PostgreSQL)', () => {
   });
 
   it('reports connected against a live database', async () => {
-    const app = createApp({ pool });
+    const app = createApp({ pool, rateLimit: false });
     const res = await request(app).get('/health/db');
 
     expect(res.status).toBe(200);

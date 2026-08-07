@@ -25,7 +25,7 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   const email = () => `auth-${crypto.randomUUID()}@test.local`;
 
   it('registers a user and returns a token pair', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const res = await request(app)
       .post('/auth/register')
       .send({ email: email(), password: 'password-123' });
@@ -38,7 +38,7 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   });
 
   it('returns 409 for a duplicate email', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const mail = email();
     await request(app).post('/auth/register').send({ email: mail, password: 'password-123' });
     const res = await request(app).post('/auth/register').send({ email: mail, password: 'password-123' });
@@ -47,13 +47,13 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   });
 
   it('rejects invalid credentials shape with 400', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const res = await request(app).post('/auth/register').send({ email: 'not-an-email', password: 'x' });
     expect(res.status).toBe(400);
   });
 
   it('logs in with valid credentials and rejects wrong ones', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const mail = email();
     await request(app).post('/auth/register').send({ email: mail, password: 'password-123' });
 
@@ -69,7 +69,7 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   });
 
   it('rotates the refresh token pair and invalidates the old token', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const mail = email();
     const reg = await request(app).post('/auth/register').send({ email: mail, password: 'password-123' });
     const oldRefresh = reg.body.refresh_token;
@@ -87,13 +87,13 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   });
 
   it('rejects a garbage refresh token with 401', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const res = await request(app).post('/auth/refresh').send({ refresh_token: 'not-a-token' });
     expect(res.status).toBe(401);
   });
 
   it('allows only one concurrent rotation of the same refresh token', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const mail = email();
     const reg = await request(app).post('/auth/register').send({ email: mail, password: 'password-123' });
     const token = reg.body.refresh_token;
@@ -108,6 +108,7 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   });
 
   it('rate limits auth endpoints: 6th request in a minute returns 429 (L-4)', async () => {
+    // 专项用例：保持默认限流开启（其余用例共享桶已关闭，此处计数从零开始）
     const app = createApp({ pool, jwtSecret: SECRET });
     for (let i = 0; i < 5; i++) {
       const res = await request(app).post('/auth/login').send({ email: email(), password: 'wrong-password' });
@@ -119,14 +120,14 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   });
 
   it('unknown email login returns 401 with equalized timing (L-4)', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const res = await request(app).post('/auth/login').send({ email: email(), password: 'password-123' });
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('invalid_credentials');
   });
 
   it('overlong password rejected with 400 (L-4)', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const res = await request(app)
       .post('/auth/register')
       .send({ email: email(), password: 'x'.repeat(129) });
@@ -134,11 +135,11 @@ describe('auth routes (integration, real PostgreSQL)', () => {
   });
 
   it('unknown route returns JSON 404, not an HTML error page (L-10)', async () => {
-    const app = createApp({ pool, jwtSecret: SECRET });
+    const app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const res = await request(app).get('/no/such/route');
     expect(res.status).toBe(404);
     expect(res.headers['content-type']).toContain('application/json');
     expect(res.body).toEqual({ error: 'not_found' });
   });
 });
-});
+

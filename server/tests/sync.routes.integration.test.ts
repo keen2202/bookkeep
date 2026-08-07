@@ -47,7 +47,7 @@ describe('sync routes (integration, real PostgreSQL)', () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: DATABASE_URL });
     await migrate(pool);
-    app = createApp({ pool, jwtSecret: SECRET });
+    app = createApp({ pool, jwtSecret: SECRET, rateLimit: false });
     const suffix = crypto.randomUUID().slice(0, 8);
     userA = await registerUser(app, `sync-a-${suffix}@test.local`, 'password-123');
     userB = await registerUser(app, `sync-b-${suffix}@test.local`, 'password-123');

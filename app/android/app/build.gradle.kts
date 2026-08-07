@@ -39,10 +39,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // 审查体积：移除 x86_64（模拟器不在分发范围；dev 构建含 x86_64 由 debug 兜底）
-        ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
-        }
     }
 
     signingConfigs {
@@ -82,4 +78,7 @@ kotlin {
 
 flutter {
     source = "../.."
+    // 审查体积 BK-R-015：分发仅含 arm ABI（移除 x86_64，模拟器仅 debug 使用；
+    // 注意不得用 ndk.abiFilters——与 Flutter 插件的 splits abi 配置冲突导致构建失败）
+    targetPlatforms = listOf("android-arm", "android-arm64")
 }

@@ -7,6 +7,8 @@ import { validateOpBatch } from '../sync/validate';
 
 interface SyncDeps {
   pool: DbPool;
+  /** 限流开关（测试注入）：集成用例关闭避免共享桶互扰 */
+  rateLimit?: boolean;
 }
 
 // sync 按用户配额（审查 L-4）：每轮同步 2 请求（push+pull），
@@ -21,9 +23,9 @@ const syncRateLimit = rateLimit({
   message: { error: 'rate_limited' },
 });
 
-export function syncRouter({ pool }: SyncDeps): Router {
+export function syncRouter({ pool, rateLimit = true }: SyncDeps): Router {
   const router = Router();
-  router.use(syncRateLimit);
+  if (rateLimit) router.use(syncRateLimit);
 
   router.post('/push', requireBookMember(pool, { allowWrite: true, autoCreate: true }), async (req, res) => {
     const validated = validateOpBatch(req.body);

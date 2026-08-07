@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { createApp } from '../src/app';
 import { migrate } from '../src/db/migrate';
 import { withTransaction } from '../src/db/tx';
@@ -9,9 +9,10 @@ jest.setTimeout(30_000);
 const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgres://bookkeep:bookkeep_dev@localhost:5432/bookkeep_test';
 
-describe('withTransaction (integration, real PostgreSQL)', () => {
-  let pool: Pool;
+// 模块级 pool：文件尾部的事务注入辅助（appWithFailingMembersInsert）需要访问
+let pool: Pool;
 
+describe('withTransaction (integration, real PostgreSQL)', () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: DATABASE_URL });
     await migrate(pool);
@@ -69,8 +70,8 @@ function appWithFailingMembersInsert() {
         }
         return orig(sql as never, params as never);
       }) as typeof client.query;
-      return { ...client, query: wrapped };
+      return { ...client, query: wrapped } as unknown as PoolClient;
     },
   };
-  return createApp({ pool: failing, jwtSecret: 'tx-route-secret' });
+  return createApp({ pool: failing, jwtSecret: 'tx-route-secret', rateLimit: false });
 }
