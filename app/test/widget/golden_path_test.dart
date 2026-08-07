@@ -13,8 +13,10 @@ import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/budget_repository.dart';
 import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/data/repositories/lock_repository.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 
+import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
 
 /// 黄金路径 e2e（Spec §5.2 集成测试的设备端前置；本地以 widget 级全链路验证）：
@@ -24,6 +26,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
       child: const BookkeepApp(),
@@ -57,16 +60,17 @@ void main() {
     addTearDown(db.close);
 
     // 准备：seed 分类 + 账户 + 总预算 100 元
-    final categoryRepo = CategoryRepository(db);
+    final categoryRepo = CategoryRepository(db, bookId: testBookId);
     await categoryRepo.installSeeds(testSeed);
     await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     final now = DateTime.now();
-    await BudgetRepository(db).createBudget(
+    await BudgetRepository(db, bookId: testBookId).createBudget(
       categoryId: null,
       period: now.toString().substring(0, 10),
       amountMinor: 10000,

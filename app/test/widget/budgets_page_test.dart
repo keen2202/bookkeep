@@ -9,9 +9,11 @@ import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/budget_repository.dart';
 import 'package:bookkeep_app/data/repositories/category_repository.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/budgets/budgets_page.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 
+import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
 
 void main() {
@@ -19,6 +21,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
       child: const MaterialApp(home: BudgetsPage()),
@@ -28,9 +31,9 @@ void main() {
   testWidgets('creates a total budget and shows spent progress', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    final categoryRepo = CategoryRepository(db);
+    final categoryRepo = CategoryRepository(db, bookId: testBookId);
     await categoryRepo.installSeeds(testSeed);
-    final budgetRepo = BudgetRepository(db);
+    final budgetRepo = BudgetRepository(db, bookId: testBookId);
     await budgetRepo.createBudget(categoryId: null, period: '2026-08-01', amountMinor: 100000);
 
     await tester.pumpWidget(harness(db));
@@ -44,12 +47,14 @@ void main() {
 
     // 记账保存路径会 invalidate 预算 provider（Spec §3.4 记账后重算）
     final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           type: TransactionType.expense,
           amountMinor: -30000,

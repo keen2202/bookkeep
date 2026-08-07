@@ -19,7 +19,7 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
     repo = TransactionRepository(db, bookId: bookId);
     accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
@@ -103,7 +103,7 @@ void main() {
     for (var i = 0; i < 10000; i++) {
       final month = 1 + (i % 12);
       await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: const Value(bookId),
+            bookId: bookId,
             accountId: accountId,
             type: TransactionType.expense,
             amountMinor: -(i % 1000 + 1),

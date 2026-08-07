@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/core/errors/repository_exceptions.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
@@ -14,6 +13,8 @@ import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 import 'package:bookkeep_app/domain/services/account_balance_calculator.dart';
 
+import '../../../helpers/fixtures.dart';
+
 void main() {
   late AppDatabase db;
   late AccountRepository repo;
@@ -21,7 +22,7 @@ void main() {
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
-    repo = AccountRepository(db);
+    repo = AccountRepository(db, bookId: testBookId);
   });
 
   tearDown(() async {
@@ -58,6 +59,7 @@ void main() {
   test('refuses to delete an account that has transactions', () async {
     final id = await repo.createAccount(name: '有流水', type: AccountType.cash);
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: id,
           type: TransactionType.expense,
           amountMinor: 100,
@@ -82,7 +84,7 @@ void main() {
     final toId = await repo.createAccount(name: 'B', type: AccountType.savings);
 
     // 审查 R-022：转账实现已收敛到 TransactionRepository（删除账户仓库重复版）
-    final txRepo = TransactionRepository(db, bookId: kDefaultBookId);
+    final txRepo = TransactionRepository(db, bookId: testBookId);
     final transferId = await txRepo.createTransfer(
       fromAccountId: fromId,
       toAccountId: toId,
@@ -105,6 +107,7 @@ void main() {
   test('daily snapshot refresh writes one row per account per day', () async {
     final id = await repo.createAccount(name: 'A', type: AccountType.cash);
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: id,
           type: TransactionType.expense,
           amountMinor: -800,
@@ -133,6 +136,7 @@ void main() {
         final amount = rng.nextInt(10000) - 5000;
         expectedSum += amount;
         b.insert(db.transactions, TransactionsCompanion.insert(
+              bookId: testBookId,
               accountId: ids[rng.nextInt(ids.length)],
               type: amount >= 0 ? TransactionType.income : TransactionType.expense,
               amountMinor: amount,
@@ -193,7 +197,7 @@ void main() {
 
   test('createTransfer enqueues paired transfer ops', () async {
     final toId = await repo.createAccount(name: '储蓄', type: AccountType.savings);
-    final txRepo = TransactionRepository(db, bookId: kDefaultBookId);
+    final txRepo = TransactionRepository(db, bookId: testBookId);
     await txRepo.createTransfer(
       fromAccountId: 1,
       toAccountId: toId,

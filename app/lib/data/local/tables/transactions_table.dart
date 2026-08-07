@@ -11,7 +11,7 @@ enum TransactionType { expense, income, transfer }
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
   /// 账本分区（Spec §4.1 / BK-T-010）
-  TextColumn get bookId => text().named('book_id').withDefault(const Constant(kDefaultBookId))();
+  TextColumn get bookId => text().named('book_id')();
   /// 跨设备实体身份（uuid v4，同步域 entity_id）
   TextColumn get remoteId => text().named('remote_id').nullable()();
   IntColumn get accountId => integer().named('account_id').references(Accounts, #id)();

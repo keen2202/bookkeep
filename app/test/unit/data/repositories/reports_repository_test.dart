@@ -10,6 +10,8 @@ import 'package:bookkeep_app/data/local/tables/categories_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/reports_repository.dart';
 
+import '../../../helpers/fixtures.dart';
+
 void main() {
   late AppDatabase db;
   late ReportsRepository repo;
@@ -19,14 +21,16 @@ void main() {
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
-    repo = ReportsRepository(db);
+    repo = ReportsRepository(db, bookId: testBookId);
     accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     foodId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
           name: '餐饮',
           icon: 'restaurant',
           color: 0xFF111111,
@@ -34,6 +38,7 @@ void main() {
           updatedAt: DateTime.utc(2026, 8, 1),
         ));
     transportId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
           name: '交通',
           icon: 'bus',
           color: 0xFF222222,
@@ -54,6 +59,7 @@ void main() {
     bool deleted = false,
   }) {
     return db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           categoryId: Value(categoryId),
           type: type,
@@ -134,6 +140,7 @@ void main() {
     await db.batch((b) {
       for (var i = 0; i < 10000; i++) {
         b.insert(db.transactions, TransactionsCompanion.insert(
+              bookId: testBookId,
               accountId: accountId,
               categoryId: Value(i.isEven ? foodId : transportId),
               type: TransactionType.expense,

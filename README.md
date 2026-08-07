@@ -40,7 +40,7 @@ bookkeep/
 ### 客户端分层（`app/lib/`）
 
 - **core/** — 常量、错误、工具（金额/CSV）、安全（`pin_hash`、`backup_cipher`、`cipher`、`key_store`）
-- **data/** — Drift 数据库（12 张表，schema v6 迁移链）、按实体划分的 Repository（transaction/account/category/budget/book/currency/settings/reports/lock）、`OpLogger` 操作日志
+- **data/** — Drift 数据库（13 张表，schema v7 迁移链）、按实体划分的 Repository（transaction/account/category/budget/book/currency/settings/reports/lock）、`OpLogger` 操作日志
 - **domain/** — 实体模型、值对象、服务（`AccountBalanceCalculator`、`BudgetProgressCalculator`、`CategoryResolver`、`LwwResolver`）、用例（`create_transaction`）
 - **features/** — 按功能分模块：quick_entry、accounts、categories、budgets、reports、calendar、books、auto_capture、recurring、currency、backup、auth_lock、sync
 - **shared/** — 通用组件（`category_picker` 两级选择器等）
@@ -107,7 +107,7 @@ make server-coverage
 make app-coverage
 ```
 
-当前基线（`docs/04-验收报告.md` 2026-08-02 实测）：客户端 **242/242** 测试通过、`flutter analyze` 0 issues、服务端 **55/55** 测试通过；性能预算达标（100 次保存平均 < 200ms、10k 条报表渲染 < 500ms）。App 覆盖率实测 68.2%（门禁目标 80%）、服务端 87.7%（门禁 80% 通过）。
+当前基线（`docs/04-验收报告.md` 2026-08-02 实测）：客户端 **242/242** 测试通过、`flutter analyze` 0 issues、服务端 **55/55** 测试通过；性能预算达标（100 次保存平均 < 200ms、10k 条报表渲染 < 500ms）。App 覆盖率实测 68.2%（CI 仅收集不设门禁）、服务端 87.7%（门禁 80% 通过）。
 
 ## 文档
 

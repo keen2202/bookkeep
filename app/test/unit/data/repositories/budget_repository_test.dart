@@ -11,6 +11,8 @@ import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/repositories/budget_repository.dart';
 
+import '../../../helpers/fixtures.dart';
+
 void main() {
   late AppDatabase db;
   late BudgetRepository repo;
@@ -20,14 +22,16 @@ void main() {
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
-    repo = BudgetRepository(db);
+    repo = BudgetRepository(db, bookId: testBookId);
     accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     foodId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
           name: '餐饮',
           icon: 'restaurant',
           color: 0xFF111111,
@@ -35,6 +39,7 @@ void main() {
           updatedAt: DateTime.utc(2026, 8, 1),
         ));
     otherId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
           name: '交通',
           icon: 'bus',
           color: 0xFF222222,
@@ -49,6 +54,7 @@ void main() {
 
   Future<void> insertTx({required int categoryId, required int amountMinor, required DateTime occurredAt, bool deleted = false}) {
     return db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           categoryId: Value(categoryId),
           type: TransactionType.expense,
@@ -88,6 +94,7 @@ void main() {
     await insertTx(categoryId: foodId, amountMinor: -9000, occurredAt: DateTime.utc(2026, 9, 1));
     // 收入不计
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           categoryId: Value(foodId),
           type: TransactionType.income,

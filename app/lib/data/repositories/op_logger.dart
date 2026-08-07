@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/constants/constants.dart';
 import '../local/database.dart';
 import '../local/tables/app_meta_table.dart';
 import '../local/tables/sync_ops_table.dart';
@@ -37,12 +36,12 @@ class OpLogger {
     required String remoteId,
     required SyncOpCode op,
     Map<String, dynamic>? payload,
-    String bookId = kDefaultBookId,
+    required String bookId,
   }) async {
     final lamport = await nextLamport();
     final cid = await clientId();
     await db.into(db.syncOps).insert(SyncOpsCompanion.insert(
-          bookId: Value(bookId),
+          bookId: bookId,
           entity: entity,
           entityId: entityId,
           remoteId: Value(remoteId),
@@ -130,15 +129,15 @@ class OpLogger {
     return id;
   }
 
-  Future<int> lastSyncedSeq({String? bookId}) async {
-    final key = '$lastSyncedSeqKeyPrefix${bookId ?? kDefaultBookId}';
+  Future<int> lastSyncedSeq({required String bookId}) async {
+    final key = '$lastSyncedSeqKeyPrefix$bookId';
     final rows = await (db.select(db.appMeta)..where((t) => t.key.equals(key))).get();
     if (rows.isEmpty) return 0;
     return int.tryParse(rows.single.value) ?? 0;
   }
 
-  Future<void> setLastSyncedSeq(int seq, {String? bookId}) async {
-    final key = '$lastSyncedSeqKeyPrefix${bookId ?? kDefaultBookId}';
+  Future<void> setLastSyncedSeq(int seq, {required String bookId}) async {
+    final key = '$lastSyncedSeqKeyPrefix$bookId';
     await db.into(db.appMeta)
         .insert(
           AppMetaCompanion.insert(key: key, value: '$seq'),

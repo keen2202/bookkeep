@@ -1,11 +1,10 @@
-import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/categories_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 
-/// 测试用账本分区（与列默认 kDefaultBookId 一致，单账本测试无需显式传入）
-const testBookId = kDefaultBookId;
+/// 测试用账本分区 id（固定字面量；R-004 后无占位常量，单账本测试统一使用）
+const testBookId = '00000000-0000-4000-8000-000000000001';
 
 Account account(int id, String name, int initialBalance,
     {AccountType type = AccountType.cash,

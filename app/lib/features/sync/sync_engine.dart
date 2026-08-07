@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import '../../core/constants/constants.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/op_logger.dart';
 import '../../domain/models/remote_op.dart';
@@ -21,10 +20,10 @@ class SyncEngine {
     SyncMerger? merger,
     this.email,
     this.password,
-    this.bookId,
+    required this.bookId,
     void Function()? onMerged,
   })  : // 合并归属本引擎账本（Spec §4.1 / BK-T-010）
-        _merger = merger ?? SyncMerger(opLogger.db, bookId: bookId ?? kDefaultBookId, onMerged: onMerged);
+        _merger = merger ?? SyncMerger(opLogger.db, bookId: bookId, onMerged: onMerged);
 
   final OpLogger opLogger;
   final SyncApi _api;
@@ -32,7 +31,7 @@ class SyncEngine {
   final SyncMerger _merger;
   final String? email;
   final String? password;
-  final String? bookId;
+  final String bookId;
 
   final SyncPhaseNotifier phaseNotifier = SyncPhaseNotifier();
   SyncPhase get phase => phaseNotifier.value;
@@ -66,7 +65,6 @@ class SyncEngine {
   /// 登录后由设置页触发 sync 追平）。
   Future<void> sync() async {
     if (_syncing) return;
-    if (bookId == null) return;
     final stored = await _tokenStore.read();
     if (stored == null && (email == null || password == null)) return;
     _syncing = true;
@@ -162,7 +160,7 @@ class SyncEngine {
           for (final o in pending)
             if (o.remoteId != null) _toWireOp(o),
         ];
-        await _api.push(bookId!, ops, accessToken: _tokens!.accessToken);
+        await _api.push(bookId, ops, accessToken: _tokens!.accessToken);
         await opLogger.markPushed([for (final o in pending) o.id]);
         // 注意：push 不推进游标。游标仅随 pull 前进，
         // 否则并发期间到达的其他客户端 op 会被自己的 push 游标跳过（数据丢失）。
@@ -171,7 +169,7 @@ class SyncEngine {
 
       phaseNotifier.value = SyncPhase.pulling;
       final since = await opLogger.lastSyncedSeq(bookId: bookId);
-      final pull = await _api.pull(bookId!, since, accessToken: _tokens!.accessToken);
+      final pull = await _api.pull(bookId, since, accessToken: _tokens!.accessToken);
       // 本机 op 已物化到本地库，跳过避免重复建行
       final foreign = pull.ops.where((o) => o.clientId != ownClientId).toList();
       if (foreign.isNotEmpty) {

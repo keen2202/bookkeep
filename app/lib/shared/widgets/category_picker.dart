@@ -25,6 +25,8 @@ class CategoryPicker extends StatefulWidget {
 
 class _CategoryPickerState extends State<CategoryPicker> {
   late int? _selectedId;
+  /// 有子级父分类的折叠集（默认全部展开）
+  final Set<int> _collapsed = {};
 
   @override
   void initState() {
@@ -39,21 +41,28 @@ class _CategoryPickerState extends State<CategoryPicker> {
       .where((c) => c.parentId == parentId && c.kind == widget.kind)
       .toList();
 
+  bool _hasChildren(int parentId) => _childrenOf(parentId).isNotEmpty;
+
+  void _toggle(int parentId) => setState(() {
+        if (!_collapsed.add(parentId)) _collapsed.remove(parentId);
+      });
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final parent in _parents) ...[
-          // 无子级的父分类（自建顶层分类）点击直接选中，有子级则仅作分组标题
+          // 有子级：点击折叠/展开；无子级（自建顶层分类）：点击直接选中
           _ParentTile(
             parent: parent,
-            expanded: _childrenOf(parent.id).isNotEmpty,
-            onTap: _childrenOf(parent.id).isEmpty
-                ? () => widget.onSelected?.call(parent.id)
-                : null,
+            hasChildren: _hasChildren(parent.id),
+            expanded: !_collapsed.contains(parent.id),
+            onTap: () => _hasChildren(parent.id)
+                ? _toggle(parent.id)
+                : widget.onSelected?.call(parent.id),
           ),
-          if (_childrenOf(parent.id).isNotEmpty)
+          if (_hasChildren(parent.id) && !_collapsed.contains(parent.id))
             Padding(
               padding: const EdgeInsets.only(left: 16),
               child: Wrap(
@@ -76,11 +85,17 @@ class _CategoryPickerState extends State<CategoryPicker> {
 }
 
 class _ParentTile extends StatelessWidget {
-  const _ParentTile({required this.parent, required this.expanded, this.onTap});
+  const _ParentTile({
+    required this.parent,
+    required this.hasChildren,
+    required this.expanded,
+    required this.onTap,
+  });
 
   final Category parent;
+  final bool hasChildren;
   final bool expanded;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +104,9 @@ class _ParentTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: Icon(categoryIcon(parent.icon), color: Color(parent.color)),
       title: Text(parent.name),
-      trailing: expanded ? const Icon(Icons.expand_more, size: 18) : null,
+      trailing: hasChildren
+          ? Icon(expanded ? Icons.expand_more : Icons.expand_less, size: 18)
+          : null,
       onTap: onTap,
     );
   }

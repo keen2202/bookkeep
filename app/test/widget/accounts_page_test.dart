@@ -8,11 +8,17 @@ import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/features/accounts/accounts_page.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
+
+import '../helpers/fixtures.dart';
 
 void main() {
   Widget harness(AppDatabase db) {
     return ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+      ],
       child: const MaterialApp(home: AccountsPage()),
     );
   }
@@ -51,7 +57,7 @@ void main() {
   testWidgets('archiving an account removes it from the list', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    final repo = AccountRepository(db);
+    final repo = AccountRepository(db, bookId: testBookId);
     await repo.createAccount(name: '钱包', type: AccountType.cash, initialBalance: 500);
 
     await tester.pumpWidget(harness(db));

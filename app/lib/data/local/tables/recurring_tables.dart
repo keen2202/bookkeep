@@ -1,13 +1,11 @@
 import 'package:drift/drift.dart';
 
-import '../../../core/constants/constants.dart';
-
 /// 周期记账规则（Spec §4.4 / BK-T-013）：
 /// frequency + interval + anchor_type + anchor_day + time_of_day 持久化，
 /// 由 AnchorResolver 统一解析为具体日期（锚点语义集中）。
 class RecurringRules extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get bookId => text().named('book_id').withDefault(const Constant(kDefaultBookId))();
+  TextColumn get bookId => text().named('book_id')();
   TextColumn get frequency => text()(); // day/week/month/quarter/year
   IntColumn get interval => integer().withDefault(const Constant(1))();
   TextColumn get anchorType => text().named('anchor_type')(); // start/middle/end/custom
@@ -29,7 +27,7 @@ class RecurringRules extends Table {
 /// 分期计划（Spec §4.4）：等额，末笔补差；关联信用卡账户
 class InstallmentPlans extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get bookId => text().named('book_id').withDefault(const Constant(kDefaultBookId))();
+  TextColumn get bookId => text().named('book_id')();
   TextColumn get name => text()();
   IntColumn get totalMinor => integer().named('total_minor')();
   IntColumn get periods => integer()();

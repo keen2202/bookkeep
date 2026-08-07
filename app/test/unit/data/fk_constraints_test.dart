@@ -7,6 +7,8 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 
+import '../../helpers/fixtures.dart';
+
 /// 回归测试：drift 2.34.5 codegen 开始为 5 个外键列生成 REFERENCES 约束，
 /// 而 AppDatabase.beforeOpen 固定执行 PRAGMA foreign_keys = ON —— 新建库
 /// （含本测试的内存库）首次真正强制外键（父行删除被 RESTRICT 拒绝），
@@ -19,6 +21,7 @@ void main() {
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           remoteId: const Value('fk-test-account'),
           accountType: AccountType.cash,
           name: 'FK 回归账户',
@@ -26,6 +29,7 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           type: TransactionType.expense,
           amountMinor: -100,

@@ -55,7 +55,7 @@ Widget? categoriesPageAction(BuildContext context, WidgetRef ref) {
   );
 }
 
-class _CategoryList extends ConsumerWidget {
+class _CategoryList extends ConsumerStatefulWidget {
   const _CategoryList({required this.categories, required this.viewer});
 
   final List<Category> categories;
@@ -64,28 +64,43 @@ class _CategoryList extends ConsumerWidget {
   final bool viewer;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CategoryList> createState() => _CategoryListState();
+}
+
+class _CategoryListState extends ConsumerState<_CategoryList> {
+  /// 有子级父分类的折叠集（默认全部展开）
+  final Set<int> _collapsed = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = widget.categories;
     final parents = categories.where((c) => c.parentId == null).toList();
     // 审查 U-10：扁平化后经 ListView.builder 惰性构建（大分类数下 60fps）
     final tiles = <Widget>[
       for (final parent in parents) ...[
         _ParentHeader(
           parent: parent,
-          onMore: !viewer && !parent.isSystem
-              ? () => _showActions(context, ref, parent)
-              : null,
+          hasChildren: categories.any((c) => c.parentId == parent.id),
+          collapsed: _collapsed.contains(parent.id),
+          onToggle: () => setState(() {
+            if (!_collapsed.add(parent.id)) _collapsed.remove(parent.id);
+          }),
+          onMore: widget.viewer || parent.isSystem
+              ? null
+              : () => _showActions(context, ref, parent),
         ),
-        for (final child in categories.where((c) => c.parentId == parent.id))
-          ListTile(
-            leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
-            title: Text(child.name),
-            trailing: child.isSystem || viewer
-                ? null
-                : IconButton(
-                    icon: const Icon(Icons.more_vert),
-                    onPressed: () => _showActions(context, ref, child),
-                  ),
-          ),
+        if (!_collapsed.contains(parent.id))
+          for (final child in categories.where((c) => c.parentId == parent.id))
+            ListTile(
+              leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
+              title: Text(child.name),
+              trailing: child.isSystem || widget.viewer
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.more_vert),
+                      onPressed: () => _showActions(context, ref, child),
+                    ),
+            ),
       ],
     ];
     return ListView.builder(
@@ -134,9 +149,18 @@ class _CategoryList extends ConsumerWidget {
 }
 
 class _ParentHeader extends StatelessWidget {
-  const _ParentHeader({required this.parent, this.onMore});
+  const _ParentHeader({
+    required this.parent,
+    required this.hasChildren,
+    required this.collapsed,
+    required this.onToggle,
+    this.onMore,
+  });
 
   final Category parent;
+  final bool hasChildren;
+  final bool collapsed;
+  final VoidCallback onToggle;
   final VoidCallback? onMore;
 
   @override
@@ -151,9 +175,16 @@ class _ParentHeader extends StatelessWidget {
             .titleSmall
             ?.copyWith(color: Color(parent.color), fontWeight: FontWeight.bold),
       ),
-      trailing: onMore == null
-          ? null
-          : IconButton(icon: const Icon(Icons.more_vert), onPressed: onMore),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasChildren)
+            Icon(collapsed ? Icons.expand_less : Icons.expand_more),
+          if (onMore != null)
+            IconButton(icon: const Icon(Icons.more_vert), onPressed: onMore),
+        ],
+      ),
+      onTap: hasChildren ? onToggle : null,
     );
   }
 }

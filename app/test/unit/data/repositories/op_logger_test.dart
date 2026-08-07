@@ -7,6 +7,8 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/repositories/op_logger.dart';
 
+import '../../../helpers/fixtures.dart';
+
 const remoteA = '11111111-1111-4111-8111-111111111111';
 const remoteB = '22222222-2222-4222-8222-222222222222';
 
@@ -24,8 +26,8 @@ void main() {
   });
 
   test('enqueue writes ops with strictly increasing lamport and a persisted uuid client_id', () async {
-    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c, payload: {'a': 1});
-    await logger.enqueue(entity: 'transaction', entityId: 2, remoteId: remoteB, op: SyncOpCode.c, payload: {'a': 2});
+    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c, bookId: testBookId, payload: {'a': 1});
+    await logger.enqueue(entity: 'transaction', entityId: 2, remoteId: remoteB, op: SyncOpCode.c, bookId: testBookId, payload: {'a': 2});
 
     final ops = await db.select(db.syncOps).get();
     expect(ops, hasLength(2));
@@ -37,14 +39,14 @@ void main() {
     expect(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$').hasMatch(clientId), isTrue);
 
     // 同一实例再次入队仍用同一 client_id
-    await logger.enqueue(entity: 'budget', entityId: 5, remoteId: remoteA, op: SyncOpCode.c);
+    await logger.enqueue(entity: 'budget', entityId: 5, remoteId: remoteA, op: SyncOpCode.c, bookId: testBookId);
     final again = await db.select(db.syncOps).get();
     expect(again.last.clientId, clientId);
   });
 
   test('enqueue stores the remote id and payload snapshot', () async {
-    await logger.enqueue(entity: 'transaction', entityId: 7, remoteId: remoteA, op: SyncOpCode.d);
-    await logger.enqueue(entity: 'transaction', entityId: 8, remoteId: remoteB, op: SyncOpCode.c, payload: {'amount_minor': -100});
+    await logger.enqueue(entity: 'transaction', entityId: 7, remoteId: remoteA, op: SyncOpCode.d, bookId: testBookId);
+    await logger.enqueue(entity: 'transaction', entityId: 8, remoteId: remoteB, op: SyncOpCode.c, bookId: testBookId, payload: {'amount_minor': -100});
 
     final ops = await db.select(db.syncOps).get();
     expect(ops[0].remoteId, remoteA);
@@ -55,7 +57,7 @@ void main() {
 
   test('pendingOps returns only unpushed ops ordered by id and respects the limit', () async {
     for (var i = 1; i <= 5; i++) {
-      await logger.enqueue(entity: 'transaction', entityId: i, remoteId: remoteA, op: SyncOpCode.c);
+      await logger.enqueue(entity: 'transaction', entityId: i, remoteId: remoteA, op: SyncOpCode.c, bookId: testBookId);
     }
     final all = await db.select(db.syncOps).get();
     await logger.markPushed([all[0].id, all[1].id]);
@@ -68,8 +70,8 @@ void main() {
   });
 
   test('markPushed flips the pushed flag only for the given ids', () async {
-    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c);
-    await logger.enqueue(entity: 'transaction', entityId: 2, remoteId: remoteB, op: SyncOpCode.c);
+    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c, bookId: testBookId);
+    await logger.enqueue(entity: 'transaction', entityId: 2, remoteId: remoteB, op: SyncOpCode.c, bookId: testBookId);
     final ops = await db.select(db.syncOps).get();
 
     await logger.markPushed([ops[0].id]);
@@ -80,11 +82,11 @@ void main() {
   });
 
   test('lastSyncedSeq persists across OpLogger instances', () async {
-    expect(await logger.lastSyncedSeq(), 0);
-    await logger.setLastSyncedSeq(42);
+    expect(await logger.lastSyncedSeq(bookId: testBookId), 0);
+    await logger.setLastSyncedSeq(42, bookId: testBookId);
 
     final logger2 = OpLogger(db);
-    expect(await logger2.lastSyncedSeq(), 42);
+    expect(await logger2.lastSyncedSeq(bookId: testBookId), 42);
   });
 
   test('ensureBookId creates and persists a uuid book id', () async {
@@ -103,13 +105,13 @@ void main() {
   });
 
   test('nextLamport rises above the recorded remote lamport after a merge', () async {
-    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c);
+    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c, bookId: testBookId);
     expect(await logger.nextLamport(), 2);
 
     // 合并了远端 lamport=100 的 op 后，本地新 op 必须 > 100（因果序）
     await logger.recordRemoteLamports([100]);
 
-    await logger.enqueue(entity: 'transaction', entityId: 2, remoteId: remoteB, op: SyncOpCode.c);
+    await logger.enqueue(entity: 'transaction', entityId: 2, remoteId: remoteB, op: SyncOpCode.c, bookId: testBookId);
     final ops = await db.select(db.syncOps).get();
     expect(ops.last.lamport, 101);
   });
@@ -117,7 +119,7 @@ void main() {
   test('onChange fires when an op is enqueued', () async {
     final events = <void>[];
     final sub = logger.onChange.listen(events.add);
-    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c);
+    await logger.enqueue(entity: 'transaction', entityId: 1, remoteId: remoteA, op: SyncOpCode.c, bookId: testBookId);
     await Future<void>.delayed(Duration.zero);
     expect(events, hasLength(1));
     await sub.cancel();

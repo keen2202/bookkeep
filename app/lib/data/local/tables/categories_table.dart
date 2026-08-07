@@ -1,7 +1,5 @@
 import 'package:drift/drift.dart';
 
-import '../../../core/constants/constants.dart';
-
 /// 分类收支类型
 enum CategoryKind { expense, income }
 
@@ -9,7 +7,7 @@ enum CategoryKind { expense, income }
 class Categories extends Table {
   IntColumn get id => integer().autoIncrement()();
   /// 账本分区（Spec §4.1 / BK-T-010）
-  TextColumn get bookId => text().named('book_id').withDefault(const Constant(kDefaultBookId))();
+  TextColumn get bookId => text().named('book_id')();
   /// 跨设备实体身份（uuid v4，同步域 entity_id）
   TextColumn get remoteId => text().named('remote_id').nullable()();
   IntColumn get parentId => integer().named('parent_id').nullable().references(Categories, #id)();

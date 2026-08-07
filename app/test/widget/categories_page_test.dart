@@ -9,7 +9,10 @@ import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/data/local/tables/categories_table.dart';
 import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/domain/models/category_seed.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
+
+import '../helpers/fixtures.dart';
 
 /// 测试用 seed：两级分类样例（生产 seed 的真实性由 category_repository_test 覆盖）
 const testSeed = CategorySeed(
@@ -69,6 +72,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
       child: const MaterialApp(home: Scaffold(body: CategoriesPage())),
@@ -80,6 +84,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
       child: const BookkeepApp(),
@@ -122,7 +127,7 @@ void main() {
   testWidgets('deleting a custom category removes it from the list', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    final repo = CategoryRepository(db);
+    final repo = CategoryRepository(db, bookId: testBookId);
     await repo.createCategory(
       name: '临时',
       icon: 'tag',
@@ -144,5 +149,27 @@ void main() {
     await pumpUntilGone(tester, find.text('删除')); // 弹窗关闭
     await pumpUntilGone(tester, find.text('临时')); // 列表刷新完成
     expect(find.text('临时'), findsNothing);
+  });
+
+  testWidgets('collapsing a parent header hides its children', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntil(tester, find.text('餐饮'));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 默认全部展开：子分类可见
+    expect(find.text('早餐'), findsOneWidget);
+
+    // 点击父分类标题折叠 → 子分类隐藏
+    await tester.tap(find.text('餐饮'));
+    await tester.pump();
+    expect(find.text('早餐'), findsNothing);
+
+    // 再次点击展开 → 子分类恢复
+    await tester.tap(find.text('餐饮'));
+    await tester.pump();
+    expect(find.text('早餐'), findsOneWidget);
   });
 }

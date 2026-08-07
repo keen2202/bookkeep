@@ -4,7 +4,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
@@ -12,6 +11,8 @@ import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/data/repositories/book_repository.dart';
 import 'package:bookkeep_app/data/repositories/op_logger.dart';
 import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
+
+import '../../../helpers/fixtures.dart';
 
 const bookA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const bookB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -30,7 +31,7 @@ void main() {
   group('BookRepository（Spec §4.1 / BK-T-010）', () {
     test('新库自动种子默认账本，currentBook 可用', () async {
       final id = await repo.currentBookId();
-      expect(id, isNot(kDefaultBookId));
+      expect(id, isNot(testBookId));
       final book = await repo.currentBook();
       expect(book, isNotNull);
       expect(book!.name, '默认账本');

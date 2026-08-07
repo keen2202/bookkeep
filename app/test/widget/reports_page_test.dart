@@ -10,12 +10,18 @@ import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/categories_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/reports/reports_page.dart';
+
+import '../helpers/fixtures.dart';
 
 void main() {
   Widget harness(AppDatabase db) {
     return ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+      ],
       child: const MaterialApp(home: ReportsPage()),
     );
   }
@@ -32,12 +38,14 @@ void main() {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     final foodId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
           name: '餐饮',
           icon: 'restaurant',
           color: 0xFF111111,
@@ -47,6 +55,7 @@ void main() {
     final now = DateTime.now();
     final inMonth = DateTime(now.year, now.month, 1);
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           categoryId: Value(foodId),
           type: TransactionType.expense,
@@ -56,6 +65,7 @@ void main() {
           updatedAt: now,
         ));
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           categoryId: Value(foodId),
           type: TransactionType.income,

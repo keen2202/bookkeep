@@ -5,6 +5,8 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/domain/models/remote_op.dart';
 import 'package:bookkeep_app/features/sync/sync_merger.dart';
 
+import '../../../helpers/fixtures.dart';
+
 const client = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 // 远端实体身份（uuid 字符串，与实体表 remote_id 列一致）
@@ -17,7 +19,7 @@ void main() {
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
-    merger = SyncMerger(db);
+    merger = SyncMerger(db, bookId: testBookId);
   });
 
   tearDown(() async {

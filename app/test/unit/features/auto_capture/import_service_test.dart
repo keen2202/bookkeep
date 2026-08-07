@@ -32,6 +32,7 @@ void main() {
     repo = TransactionRepository(db, bookId: testBookId);
     service = CsvImportService(repo);
     await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',

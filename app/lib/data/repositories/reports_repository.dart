@@ -37,11 +37,9 @@ class PeriodBucket {
 /// 报表只读查询层（Spec §3.5 / BK-P0-005）：单条 GROUP BY SQL，避免 N+1；
 /// 强制按账本过滤（Spec §4.1 / BK-T-010）
 class ReportsRepository {
-  ReportsRepository(this.db, {this.bookId});
+  ReportsRepository(this.db, {required this.bookId});
   final AppDatabase db;
-  final String? bookId;
-
-  Future<String> _bookId() async => bookId ?? kDefaultBookId;
+  final String bookId;
 
   /// 按日聚合：支出/收入（不含已删除与转账）。
   /// 多币种：按 (币种, 记账时汇率快照) 分组，以快照折算主币种（审查 F-8：
@@ -51,7 +49,7 @@ class ReportsRepository {
     required DateTime end,
     Map<String, int> rates = const {},
   }) async {
-    final currentBookId = await _bookId();
+    final currentBookId = bookId;
     final rows = await db.customSelect(
       "SELECT date(occurred_at, 'unixepoch') AS day, currency, rate_snapshot, "
       'COALESCE(SUM(CASE WHEN type = ? THEN -amount_minor END), 0) AS expense, '
@@ -97,7 +95,7 @@ class ReportsRepository {
     required DateTime end,
     Map<String, int> rates = const {},
   }) async {
-    final currentBookId = await _bookId();
+    final currentBookId = bookId;
     final rows = await db.customSelect(
       'SELECT t.category_id, c.name AS category_name, t.currency, t.rate_snapshot, '
       'COALESCE(SUM(-t.amount_minor), 0) AS amount '
@@ -142,7 +140,7 @@ class ReportsRepository {
     required BucketGranularity granularity,
     Map<String, int> rates = const {},
   }) async {
-    final currentBookId = await _bookId();
+    final currentBookId = bookId;
     final format = granularity == BucketGranularity.week
         ? "%Y-W%W" // 周
         : '%Y-%m'; // 月

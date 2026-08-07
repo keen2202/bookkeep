@@ -10,6 +10,9 @@ import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/domain/services/capture_candidate.dart';
 import 'package:bookkeep_app/features/auto_capture/capture_confirm_page.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
+
+import '../helpers/fixtures.dart';
 
 void main() {
   final candidates = [
@@ -30,7 +33,10 @@ void main() {
 
   Widget harness(AppDatabase db, List<CaptureCandidate> cands) {
     return ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+      ],
       child: MaterialApp(
         home: Builder(
           builder: (context) => Scaffold(
@@ -54,7 +60,7 @@ void main() {
   testWidgets('渲染候选明细：金额/对方/分类/收支方向图标', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    await AccountRepository(db).createAccount(name: '钱包', type: AccountType.cash);
+    await AccountRepository(db, bookId: testBookId).createAccount(name: '钱包', type: AccountType.cash);
 
     await tester.pumpWidget(harness(db, candidates));
     await tester.tap(find.text('打开确认页'));
@@ -74,7 +80,7 @@ void main() {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final accountId =
-        await AccountRepository(db).createAccount(name: '工资卡', type: AccountType.cash);
+        await AccountRepository(db, bookId: testBookId).createAccount(name: '工资卡', type: AccountType.cash);
 
     await tester.pumpWidget(harness(db, candidates));
     await tester.tap(find.text('打开确认页'));
@@ -109,7 +115,7 @@ void main() {
   testWidgets('返回取消不入库', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    await AccountRepository(db).createAccount(name: '钱包', type: AccountType.cash);
+    await AccountRepository(db, bookId: testBookId).createAccount(name: '钱包', type: AccountType.cash);
 
     await tester.pumpWidget(harness(db, candidates));
     await tester.tap(find.text('打开确认页'));

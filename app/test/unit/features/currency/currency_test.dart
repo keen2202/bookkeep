@@ -143,7 +143,7 @@ void main() {
 
     test('净资产：美元账户余额按汇率折算主币种', () async {
       final usdAccountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             accountType: AccountType.cash,
             name: '美元账户',
             currency: 'USD',
@@ -168,7 +168,7 @@ void main() {
 
     test('报表：多币种流水折算后合计（精度到分）', () async {
       final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             accountType: AccountType.cash,
             name: '钱包',
             currency: 'CNY',
@@ -201,7 +201,7 @@ void main() {
 
     test('审查 F-8：报表折算读 rate_snapshot，当前汇率变化不改历史报表金额', () async {
       final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             accountType: AccountType.cash,
             name: '钱包',
             currency: 'USD',
@@ -244,14 +244,14 @@ void main() {
 
     test('审查 F-8：转账按账户币种写汇率快照', () async {
       final cnyId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             accountType: AccountType.cash,
             name: '人民币钱包',
             currency: 'CNY',
             createdAt: DateTime.utc(2026, 8, 1),
           ));
       final usdId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             accountType: AccountType.cash,
             name: '美元钱包',
             currency: 'USD',
@@ -281,7 +281,7 @@ void main() {
 
     test('审查 F-8：未设置汇率的账户建流水自动继承账户币种并快照', () async {
       final usdId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-            bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             accountType: AccountType.cash,
             name: '美元钱包',
             currency: 'USD',

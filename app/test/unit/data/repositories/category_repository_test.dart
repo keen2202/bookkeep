@@ -14,6 +14,8 @@ import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/domain/models/category_seed.dart';
 
+import '../../../helpers/fixtures.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late AppDatabase db;
@@ -21,7 +23,7 @@ void main() {
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
-    repo = CategoryRepository(db);
+    repo = CategoryRepository(db, bookId: testBookId);
   });
 
   tearDown(() async {
@@ -85,7 +87,7 @@ void main() {
     await db.into(db.appMeta).insert(AppMetaCompanion.insert(key: 'seed_version', value: '1'));
     final bookX = CategoryRepository(db, bookId: 'book-X');
     await db.into(db.categories).insert(CategoriesCompanion.insert(
-          bookId: const Value('book-X'),
+          bookId: 'book-X',
           remoteId: const Value('legacy-uuid'),
           name: '旧系统分类',
           icon: 'tag',
@@ -139,12 +141,14 @@ void main() {
       kind: CategoryKind.expense,
     );
     final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: 'A',
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           accountId: accountId,
           categoryId: Value(id),
           type: TransactionType.expense,

@@ -25,6 +25,7 @@ void main() {
     repo = TransactionRepository(db, bookId: testBookId);
     accountRemoteId = repo.opLogger.newUuid();
     accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           remoteId: Value(accountRemoteId),
           accountType: AccountType.cash,
           name: '钱包',
@@ -33,6 +34,7 @@ void main() {
         ));
     categoryRemoteId = repo.opLogger.newUuid();
     categoryId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
           remoteId: Value(categoryRemoteId),
           name: '餐饮',
           icon: 'restaurant',
@@ -129,6 +131,7 @@ void main() {
 
   test('creates a transfer with paired ops', () async {
     final toAccountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.savings,
           name: '储蓄',
           currency: 'CNY',

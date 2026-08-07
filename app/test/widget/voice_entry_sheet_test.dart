@@ -9,6 +9,9 @@ import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/features/auto_capture/voice_entry_sheet.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
+
+import '../helpers/fixtures.dart';
 
 void main() {
   group('VoiceRuleEngine 规则抽取', () {
@@ -44,7 +47,10 @@ void main() {
 
   Widget harness(AppDatabase db) {
     return ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+      ],
       child: const MaterialApp(home: VoiceEntrySheet()),
     );
   }
@@ -78,7 +84,7 @@ void main() {
   testWidgets('输入文本提取成功跳转确认页', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    await AccountRepository(db).createAccount(name: '钱包', type: AccountType.cash);
+    await AccountRepository(db, bookId: testBookId).createAccount(name: '钱包', type: AccountType.cash);
 
     await tester.pumpWidget(harness(db));
     await tester.pumpAndSettle();

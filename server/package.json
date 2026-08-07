@@ -7,12 +7,12 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "jest --coverage=false --testPathIgnorePatterns '/tests/.*\\.integration\\.test\\.ts$'",
-    "test:coverage": "jest --coverage",
+    "test": "jest",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns '/node_modules/'",
     "build": "tsc",
     "dev": "ts-node src/index.ts",
     "migrate": "ts-node src/db/migrate-cli.ts",
-    "test:integration": "jest --coverage=false --testMatch '**/*.integration.test.ts'"
+    "test:integration": "jest --coverage=false --testPathIgnorePatterns '/node_modules/' --testMatch '**/*.integration.test.ts'"
   },
   "keywords": [],
   "author": "",

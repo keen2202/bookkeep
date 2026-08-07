@@ -185,7 +185,7 @@
 - 触控目标 ≥48dp；HapticFeedback + Semantics；账户 trailing more 图标；备份操作 busy 态；报表错误态重试。
 
 #### BK-R-021 并发测试与测试基建
-- 并发用例：双 owner / 邀请复用 / pull 丢 op / refresh 轮换；jest 默认排除 integration、独立 `bookkeep_test` 库、去除 `--coverage=false` 使 80% 阈值生效。
+- 并发用例：双 owner / 邀请复用 / pull 丢 op / refresh 轮换；jest 默认排除 integration、独立 `bookkeep_test` 库、去除 `--coverage=false`（80% 覆盖率门禁由 CI `test:coverage` 全量套件实际执行）。
 - **涉及文件**：`server/jest.config.js`、`server/tests/`
 
 #### BK-R-022 技术债清偿（低危项集合）
@@ -295,7 +295,7 @@
 
 - 服务端：并发套件（双 owner / 邀请复用 / pull 乱序 / refresh 轮换）；统一 JSON 错误形态断言（无 HTML）；限流触发 429。
 - 客户端：备份全表往返（含 4 张补录表）逐行比对；sqlcipher_export 迁移后行数校验；CSV 真实支付宝/微信样本（20 行元信息头）导入成功。
-- jest：默认 `npm test` 仅单元（无 DB 可跑）；`test:integration` 连 `bookkeep_test` 独立库；coverageThreshold 80% 实际生效。
+- jest：默认 `npm test` 仅单元（无 DB 可跑，jest 默认不收集覆盖率）；`test:integration` 连 `bookkeep_test` 独立库；coverageThreshold 80% 由 CI `test:coverage` 全量单元+集成套件门禁。
 
 ### 5.3 端到端 / 设备验证
 

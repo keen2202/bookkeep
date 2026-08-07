@@ -20,7 +20,7 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-          bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+          bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           remoteId: const Value('11111111-1111-4111-8111-111111111111'),
           accountType: AccountType.cash,
           name: '钱包',
@@ -29,7 +29,7 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
-          bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+          bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           remoteId: const Value('22222222-2222-4222-8222-222222222222'),
           accountId: accountId,
           type: TransactionType.expense,
@@ -40,7 +40,7 @@ void main() {
           updatedAt: DateTime.utc(2026, 8, 1, 12),
         ));
     await db.into(db.syncOps).insert(SyncOpsCompanion.insert(
-          bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+          bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           entity: 'transaction',
           entityId: 1,
           remoteId: const Value('22222222-2222-4222-8222-222222222222'),
@@ -58,7 +58,7 @@ void main() {
           updatedAt: DateTime.utc(2026, 8, 1),
         ));
     final ruleId = await db.into(db.recurringRules).insert(RecurringRulesCompanion.insert(
-          bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+          bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           frequency: 'month',
           anchorType: 'start',
           amountMinor: -1000,
@@ -69,7 +69,7 @@ void main() {
           updatedAt: DateTime.utc(2026, 8, 1),
         ));
     final planId = await db.into(db.installmentPlans).insert(InstallmentPlansCompanion.insert(
-          bookId: const Value('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+          bookId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           name: '手机分期',
           totalMinor: 12000,
           periods: 3,

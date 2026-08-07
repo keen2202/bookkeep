@@ -15,6 +15,7 @@ import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/books/books_page.dart' show showBookActions;
 import 'package:bookkeep_app/features/books/books_providers.dart';
 
+import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
 
 /// 权限矩阵 UI 拦截（Spec §4.1）：viewer 角色隐藏全部写入口。
@@ -24,6 +25,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
         currentRoleProvider.overrideWith((ref) => role),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
@@ -35,6 +37,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
         currentRoleProvider.overrideWith((ref) => role),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
@@ -68,7 +71,7 @@ void main() {
   testWidgets('viewer 隐藏账户页「新建账户」FAB 且长按无编辑菜单', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    await AccountRepository(db).createAccount(name: '钱包', type: AccountType.cash);
+    await AccountRepository(db, bookId: testBookId).createAccount(name: '钱包', type: AccountType.cash);
 
     await tester.pumpWidget(pageHarness(db, const AccountsPage(), role: 'viewer'));
     await tester.pumpAndSettle();
@@ -83,7 +86,7 @@ void main() {
   testWidgets('owner 账户页可新建与编辑', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    await AccountRepository(db).createAccount(name: '钱包', type: AccountType.cash);
+    await AccountRepository(db, bookId: testBookId).createAccount(name: '钱包', type: AccountType.cash);
 
     await tester.pumpWidget(pageHarness(db, const AccountsPage()));
     await tester.pumpAndSettle();
@@ -130,7 +133,7 @@ void main() {
   testWidgets('viewer 隐藏分类页新建动作与自定义分类编辑入口', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    await CategoryRepository(db).createCategory(
+    await CategoryRepository(db, bookId: testBookId).createCategory(
       name: '旅行',
       icon: 'tag',
       color: 0xFF000000,

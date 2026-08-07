@@ -38,7 +38,7 @@ void main() {
 
   Future<void> spend(int minor) async {
     await db.into(db.transactions).insert(TransactionsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           remoteId: const Value('22222222-2222-4222-8222-222222222222'),
           accountId: 1,
           type: TransactionType.expense,
@@ -52,7 +52,7 @@ void main() {
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     await db.into(db.accounts).insert(AccountsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',

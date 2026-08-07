@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+// 生成代码（part database.g.dart）引用 kRateScale（rate_snapshot 列默认值），须保留
 import '../../core/constants/constants.dart';
 import 'tables/account_snapshots_table.dart';
 import 'tables/accounts_table.dart';
@@ -77,7 +78,8 @@ class AppDatabase extends _$AppDatabase {
             // 先加列再回填：生成的 select 映射器需要全部列存在。
             await m.createTable(books);
             final legacy = await _meta(AppMetaKeys.syncBookId);
-            final defaultId = legacy ?? kDefaultBookId;
+            // 与 onCreate 一致：随机 uuid，不再有固定占位 id（R-004）
+            final defaultId = legacy ?? _uuid.v4();
             if (legacy == null) {
               await _setMeta(AppMetaKeys.syncBookId, defaultId);
             }
@@ -90,27 +92,19 @@ class AppDatabase extends _$AppDatabase {
               ),
               onConflict: DoNothing(),
             );
-            await m.addColumn(accounts, accounts.bookId);
-            await m.addColumn(categories, categories.bookId);
-            await m.addColumn(transactions, transactions.bookId);
-            await m.addColumn(budgets, budgets.bookId);
-            await m.addColumn(syncOps, syncOps.bookId);
-            // 既有行回填默认账本（列默认值 kDefaultBookId → 更新为真实默认账本 id）
-            await customStatement(
-              "UPDATE accounts SET book_id = '$defaultId' WHERE book_id = '$kDefaultBookId'",
-            );
-            await customStatement(
-              "UPDATE categories SET book_id = '$defaultId' WHERE book_id = '$kDefaultBookId'",
-            );
-            await customStatement(
-              "UPDATE transactions SET book_id = '$defaultId' WHERE book_id = '$kDefaultBookId'",
-            );
-            await customStatement(
-              "UPDATE budgets SET book_id = '$defaultId' WHERE book_id = '$kDefaultBookId'",
-            );
-            await customStatement(
-              "UPDATE sync_ops SET book_id = '$defaultId' WHERE book_id = '$kDefaultBookId'",
-            );
+            // 列默认已从表定义移除（R-004）：drift addColumn 对无默认的 NOT NULL
+            // 列生成 "ADD COLUMN ... NOT NULL"（不带 DEFAULT），SQLite 在非空表上
+            // 直接报错，故用 customStatement 携带历史占位默认，保持与旧 v4 库一致
+            const placeholder = '00000000-0000-4000-8000-000000000001';
+            for (final table in ['accounts', 'categories', 'transactions', 'budgets', 'sync_ops']) {
+              await customStatement(
+                "ALTER TABLE $table ADD COLUMN book_id TEXT NOT NULL DEFAULT '$placeholder'",
+              );
+              // 既有行回填默认账本（ADD COLUMN 占位默认 → 真实默认账本 id）
+              await customStatement(
+                "UPDATE $table SET book_id = '$defaultId' WHERE book_id = '$placeholder'",
+              );
+            }
             await _setMeta(AppMetaKeys.currentBook, defaultId);
           }
           if (from < 5) {
@@ -158,9 +152,10 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  /// 当前账本 id（app_meta current_book_id；缺失时回退默认分区）
+  /// 当前账本 id（app_meta current_book_id；缺失属状态损坏，快速失败）
   Future<String> currentBookId() async =>
-      await _meta(AppMetaKeys.currentBook) ?? kDefaultBookId;
+      await _meta(AppMetaKeys.currentBook) ??
+      (throw StateError('current book not set in app_meta'));
 
   Future<void> setCurrentBookId(String bookId) => _setMeta(AppMetaKeys.currentBook, bookId);
 

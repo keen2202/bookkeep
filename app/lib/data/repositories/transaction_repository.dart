@@ -49,7 +49,7 @@ class TransactionRepository {
         }
       }
       final id = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(bookId),
+            bookId: bookId,
             remoteId: Value(remoteId),
             accountId: accountId,
             categoryId: Value(categoryId),
@@ -127,7 +127,7 @@ class TransactionRepository {
       final fromRate = await _rateOf(fromCurrency);
       final toRate = await _rateOf(toCurrency);
       final fromId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(bookId),
+            bookId: bookId,
             remoteId: Value(fromRemoteId),
             accountId: fromAccountId,
             type: TransactionType.transfer,
@@ -138,7 +138,7 @@ class TransactionRepository {
             updatedAt: now,
           ));
       final pairedId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(bookId),
+            bookId: bookId,
             remoteId: Value(pairedRemoteId),
             accountId: toAccountId,
             type: TransactionType.transfer,

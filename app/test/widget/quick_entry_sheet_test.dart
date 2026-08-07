@@ -8,9 +8,11 @@ import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
 import 'package:bookkeep_app/data/repositories/category_repository.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/quick_entry/quick_entry_sheet.dart';
 
+import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
 
 void main() {
@@ -18,6 +20,7 @@ void main() {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
       child: const MaterialApp(home: QuickEntrySheet()),
@@ -56,9 +59,10 @@ void main() {
   }
 
   Future<void> seedDb(AppDatabase db) async {
-    final repo = CategoryRepository(db);
+    final repo = CategoryRepository(db, bookId: testBookId);
     await repo.installSeeds(testSeed);
     await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
@@ -70,7 +74,7 @@ void main() {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     await seedDb(db);
-    final lunch = await CategoryRepository(db).listCategories();
+    final lunch = await CategoryRepository(db, bookId: testBookId).listCategories();
     final lunchId = lunch.firstWhere((c) => c.name == '早餐').id;
 
     await tester.pumpWidget(harness(db));
@@ -123,5 +127,34 @@ void main() {
 
     expect(find.text('金额无效，请重新输入'), findsOneWidget);
     expect(await db.select(db.transactions).get(), isEmpty);
+  });
+
+  testWidgets('category picker collapses and expands parent categories', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+
+    // 打开分类选择器（默认全部展开）
+    await pumpUntilFound(tester, find.text('选择分类'));
+    await tester.tap(find.text('选择分类'));
+    await tester.pumpAndSettle();
+    Finder breakfastChip() => find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(FilterChip, '早餐'),
+        );
+    expect(breakfastChip(), findsOneWidget);
+
+    // 点击父分类标题折叠 → 子分类 chip 隐藏
+    await tester.tap(find.text('餐饮'));
+    await tester.pumpAndSettle();
+    expect(breakfastChip(), findsNothing);
+
+    // 再次点击展开 → 子分类 chip 恢复
+    await tester.tap(find.text('餐饮'));
+    await tester.pumpAndSettle();
+    expect(breakfastChip(), findsOneWidget);
   });
 }

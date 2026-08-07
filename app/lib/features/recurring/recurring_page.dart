@@ -217,7 +217,7 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
           categoryId: const Value(null),
           nextDue: nextDue,
           startDate: today,
-          bookId: Value(ref.read(currentBookIdProvider)),
+          bookId: ref.read(currentBookIdProvider),
           updatedAt: DateTime.now().toUtc(),
         ));
     if (!mounted) return;

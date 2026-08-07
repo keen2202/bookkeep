@@ -2,7 +2,6 @@ import 'package:drift/drift.dart' hide isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
@@ -15,6 +14,7 @@ import 'package:bookkeep_app/features/sync/sync_state.dart';
 import 'package:bookkeep_app/features/sync/token_store.dart';
 
 import '../../../helpers/fake_sync_server.dart';
+import '../../../helpers/fixtures.dart';
 
 void main() {
   late AppDatabase db;
@@ -35,11 +35,11 @@ void main() {
       opLogger: logger,
       api: server,
       tokenStore: tokens,
-      merger: SyncMerger(db),
+      merger: SyncMerger(db, bookId: bookId ?? testBookId),
       email: email,
       password: password,
-      // 默认测试账本 = kDefaultBookId（与直接插入/入队行一致，BK-T-010）
-      bookId: bookId ?? kDefaultBookId,
+      // 默认测试账本 = testBookId（与直接插入/入队行一致，BK-T-010）
+      bookId: bookId ?? testBookId,
     );
   }
 
@@ -52,6 +52,7 @@ void main() {
       int amountMinor) async {
     final accountRemoteId = logger.newUuid();
     await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           remoteId: Value(accountRemoteId),
           accountType: AccountType.cash,
           name: '钱包',
@@ -60,6 +61,7 @@ void main() {
         ));
     final txRemoteId = logger.newUuid();
     final txId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           remoteId: Value(txRemoteId),
           accountId: 1,
           type: TransactionType.expense,
@@ -73,6 +75,7 @@ void main() {
       entityId: txId,
       remoteId: txRemoteId,
       op: SyncOpCode.c,
+      bookId: testBookId,
       payload: {
         'account_id': accountRemoteId,
         'category_id': null,
@@ -97,7 +100,7 @@ void main() {
     expect(await tokens.read(), isNotNull);
     // 推送后队列清空，游标推进
     expect(await logger.pendingOps(), isEmpty);
-    expect(await logger.lastSyncedSeq(), server.seq);
+    expect(await logger.lastSyncedSeq(bookId: testBookId), server.seq);
   });
 
   test('start() auto-syncs when any OpLogger instance enqueues (shared stream, H4)', () async {
@@ -114,7 +117,7 @@ void main() {
   test('offline sync fails into error phase and recovers with all 100 ops and no duplicates', () async {
     await setUpEngine();
     for (var i = 0; i < 100; i++) {
-      await logger.enqueue(entity: 'transaction', entityId: i, remoteId: logger.newUuid(), op: SyncOpCode.c, bookId: kDefaultBookId, payload: {'amount_minor': -i});
+      await logger.enqueue(entity: 'transaction', entityId: i, remoteId: logger.newUuid(), op: SyncOpCode.c, bookId: testBookId, payload: {'amount_minor': -i});
     }
     server.offline = true;
 
@@ -140,7 +143,7 @@ void main() {
     await engine.sync();
 
     // 另一台设备 A 直接向服务端推入一笔（模拟远端写入）
-    final bookId = engine.bookId!;
+    final bookId = engine.bookId;
     server.addMember(bookId, 'other@test.local');
     const remoteAccount = '99999999-9999-4999-8999-999999999990';
     const remoteTx = '99999999-9999-4999-8999-999999999991';
@@ -170,7 +173,7 @@ void main() {
     expect(txs.map((t) => t.amountMinor), containsAll([-100, -250]));
     final accounts = await db.select(db.accounts).get();
     expect(accounts.map((a) => a.name), containsAll(['钱包', '远端钱包']));
-    expect(await logger.lastSyncedSeq(), server.seq);
+    expect(await logger.lastSyncedSeq(bookId: testBookId), server.seq);
   });
 
   test('remote update of a locally created entity applies in place without duplicates (B1)', () async {
@@ -179,7 +182,7 @@ void main() {
     await engine.sync();
 
     // 远端设备改本机自建的流水（改金额+备注）
-    final bookId = engine.bookId!;
+    final bookId = engine.bookId;
     server.addMember(bookId, 'other@test.local');
     await server.push(bookId, [
       {
@@ -205,7 +208,7 @@ void main() {
     final local = await createLocalAccountAndTx(-100);
     await engine.sync();
 
-    final bookId = engine.bookId!;
+    final bookId = engine.bookId;
     server.addMember(bookId, 'other@test.local');
     await server.push(bookId, [
       {
@@ -255,7 +258,7 @@ void main() {
     final accountRemote = loggerA.newUuid();
     final txRemote = loggerA.newUuid();
     await dbA.into(dbA.accounts).insert(AccountsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           remoteId: Value(accountRemote),
           accountType: AccountType.cash,
           name: '钱包',
@@ -263,7 +266,7 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await dbA.into(dbA.transactions).insert(TransactionsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           remoteId: Value(txRemote),
           accountId: 1,
           type: TransactionType.expense,
@@ -340,7 +343,7 @@ void main() {
     final accountRemote = loggerA.newUuid();
     final txRemote = loggerA.newUuid();
     await dbA.into(dbA.accounts).insert(AccountsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           remoteId: Value(accountRemote),
           accountType: AccountType.cash,
           name: '钱包',
@@ -348,7 +351,7 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     await dbA.into(dbA.transactions).insert(TransactionsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           remoteId: Value(txRemote),
           accountId: 1,
           type: TransactionType.expense,
@@ -397,8 +400,8 @@ void main() {
       opLogger: logger,
       api: server,
       tokenStore: tokens,
-      merger: SyncMerger(db),
-      bookId: kDefaultBookId,
+      merger: SyncMerger(db, bookId: testBookId),
+      bookId: testBookId,
     );
     var serverTouched = false;
     final proxied = _TouchCountingServer(server, () => serverTouched = true);
@@ -407,8 +410,8 @@ void main() {
       opLogger: logger,
       api: proxied,
       tokenStore: tokens,
-      merger: SyncMerger(db),
-      bookId: kDefaultBookId,
+      merger: SyncMerger(db, bookId: testBookId),
+      bookId: testBookId,
     );
     await spyEngine.sync();
     expect(spyEngine.phase, SyncPhase.idle);
@@ -427,6 +430,7 @@ void main() {
     ));
     final accountRemoteId = logger.newUuid();
     await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           remoteId: Value(accountRemoteId),
           accountType: AccountType.cash,
           name: '钱包',
@@ -435,6 +439,7 @@ void main() {
         ));
     final txRemoteId = logger.newUuid();
     final txId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
           remoteId: Value(txRemoteId),
           accountId: 1,
           type: TransactionType.expense,
@@ -448,17 +453,17 @@ void main() {
       entityId: txId,
       remoteId: txRemoteId,
       op: SyncOpCode.c,
-      bookId: kDefaultBookId,
+      bookId: testBookId,
       payload: {'account_id': accountRemoteId, 'category_id': null, 'type': 'expense', 'amount_minor': -100, 'currency': 'CNY', 'occurred_at': '2026-08-01T12:00:00.000Z', 'auto_generated': false},
     );
     engine = SyncEngine(
       opLogger: logger,
       api: expiring,
       tokenStore: tokens,
-      merger: SyncMerger(db),
+      merger: SyncMerger(db, bookId: testBookId),
       email: email,
       password: password,
-      bookId: kDefaultBookId,
+      bookId: testBookId,
     );
     await engine.sync();
     expect(expiring.refreshCalls, 1);

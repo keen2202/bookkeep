@@ -14,6 +14,8 @@ import 'core/security/key_store.dart';
 import 'data/local/database.dart';
 import 'data/local/database_encryption.dart';
 import 'data/local/database_provider.dart';
+import 'data/local/tables/accounts_table.dart';
+import 'data/repositories/account_repository.dart';
 import 'data/repositories/book_repository.dart';
 import 'data/repositories/lock_repository.dart';
 import 'data/repositories/settings_repository.dart';
@@ -59,6 +61,12 @@ Future<void> main() async {
   final initialLock = await lockRepo.initialState();
   // 当前账本：启动即注入真实默认账本（Spec §4.1 / BK-T-010）
   final currentBook = await BookRepository(db).ensureDefaultBook();
+  // 开箱即用：默认账本无账户时种子「现金」账户（幂等，含归档判定——
+  // 用户归档唯一账户后重启不复活；createAccount 入队 op-log，登录后随首推同步）
+  final accountRepo = AccountRepository(db, bookId: currentBook);
+  if ((await accountRepo.listAccounts(includeArchived: true)).isEmpty) {
+    await accountRepo.createAccount(name: '现金', type: AccountType.cash);
+  }
 
   runApp(ProviderScope(
     overrides: [

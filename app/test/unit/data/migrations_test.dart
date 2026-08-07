@@ -5,9 +5,10 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import 'package:bookkeep_app/core/constants/constants.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
+
+import '../../helpers/fixtures.dart';
 
 // v1 DDL mirrored from the v1 schema, used to simulate an existing install
 // before the v1 -> v2 example migration runs. Column storage follows drift's
@@ -90,7 +91,8 @@ ALTER TABLE sync_ops ADD COLUMN remote_id TEXT;
 CREATE INDEX idx_transactions_occurred_at ON transactions(occurred_at);
 ''';
 
-// v4 schema 新增：books 表 + 业务表 book_id（默认 kDefaultBookId，v3→v4 迁移产物）
+// v4 schema 新增：books 表 + 业务表 book_id（默认历史占位 id，v3→v4 迁移产物；
+// R-004 后无占位常量，此处为模拟旧库的历史字面量）
 const v4ColumnDdl = '''
 CREATE TABLE books (
   id TEXT NOT NULL PRIMARY KEY,
@@ -98,18 +100,18 @@ CREATE TABLE books (
   type TEXT NOT NULL DEFAULT 'default',
   created_at INTEGER NOT NULL
 );
-ALTER TABLE accounts ADD COLUMN book_id TEXT NOT NULL DEFAULT '$kDefaultBookId';
-ALTER TABLE categories ADD COLUMN book_id TEXT NOT NULL DEFAULT '$kDefaultBookId';
-ALTER TABLE transactions ADD COLUMN book_id TEXT NOT NULL DEFAULT '$kDefaultBookId';
-ALTER TABLE budgets ADD COLUMN book_id TEXT NOT NULL DEFAULT '$kDefaultBookId';
-ALTER TABLE sync_ops ADD COLUMN book_id TEXT NOT NULL DEFAULT '$kDefaultBookId';
+ALTER TABLE accounts ADD COLUMN book_id TEXT NOT NULL DEFAULT '00000000-0000-4000-8000-000000000001';
+ALTER TABLE categories ADD COLUMN book_id TEXT NOT NULL DEFAULT '00000000-0000-4000-8000-000000000001';
+ALTER TABLE transactions ADD COLUMN book_id TEXT NOT NULL DEFAULT '00000000-0000-4000-8000-000000000001';
+ALTER TABLE budgets ADD COLUMN book_id TEXT NOT NULL DEFAULT '00000000-0000-4000-8000-000000000001';
+ALTER TABLE sync_ops ADD COLUMN book_id TEXT NOT NULL DEFAULT '00000000-0000-4000-8000-000000000001';
 ''';
 
 // v5 schema 新增：周期规则 + 分期计划表（v4→v5 迁移产物）
 const v5TableDdl = '''
 CREATE TABLE recurring_rules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  book_id TEXT NOT NULL DEFAULT '$kDefaultBookId',
+  book_id TEXT NOT NULL DEFAULT '00000000-0000-4000-8000-000000000001',
   frequency TEXT NOT NULL,
   interval INTEGER NOT NULL DEFAULT 1,
   anchor_type TEXT NOT NULL,
@@ -125,7 +127,7 @@ CREATE TABLE recurring_rules (
 );
 CREATE TABLE installment_plans (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  book_id TEXT NOT NULL DEFAULT '$kDefaultBookId',
+  book_id TEXT NOT NULL DEFAULT '00000000-0000-4000-8000-000000000001',
   name TEXT NOT NULL,
   total_minor INTEGER NOT NULL,
   periods INTEGER NOT NULL,
@@ -161,6 +163,7 @@ void main() {
     final accountId = await db
         .into(db.accounts)
         .insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
@@ -258,7 +261,7 @@ void main() {
     final db = AppDatabase(NativeDatabase(File(dbPath)));
     expect(db.schemaVersion, 7);
 
-    // book_id 回填到既有 sync_book_id（同步域连续），而非 kDefaultBookId
+    // book_id 回填到既有 sync_book_id（同步域连续），而非固定占位 id
     final account = await db.select(db.accounts).getSingle();
     expect(account.bookId, 'legacy-book-id');
     final tx = await db.select(db.transactions).getSingle();
@@ -291,20 +294,20 @@ void main() {
     raw.execute(
         "INSERT INTO accounts (account_type, name, currency, initial_balance, archived, created_at) "
         "VALUES ('cash', '旧账户', 'CNY', 500, 0, 1754064000)");
-    // 真实 v4 库在 v3→v4 迁移时已插入默认账本行
+    // 真实 v4 库在 v3→v4 迁移时已插入默认账本行（历史占位 id = testBookId 字面量）
     raw.execute(
         "INSERT INTO books (id, name, type, created_at) "
-        "VALUES ('$kDefaultBookId', '默认账本', 'default', 1754064000)");
+        "VALUES ('$testBookId', '默认账本', 'default', 1754064000)");
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
     expect(db.schemaVersion, 7);
 
-    // 无 sync_book_id → 默认账本 = kDefaultBookId，book_id 保持列默认值
+    // 无 sync_book_id → 默认账本 = 历史占位 id（testBookId），book_id 保持列默认值
     final account = await db.select(db.accounts).getSingle();
-    expect(account.bookId, kDefaultBookId);
+    expect(account.bookId, testBookId);
     final book = await db.select(db.books).getSingle();
-    expect(book.id, kDefaultBookId);
+    expect(book.id, testBookId);
     expect(account.name, '旧账户');
     // v5/v6 表已建
     final tables = await db
@@ -348,6 +351,38 @@ void main() {
         .customSelect("SELECT name FROM sqlite_master WHERE type='table' AND name = 'currencies'")
         .get();
     expect(tables, hasLength(1));
+    await db.close();
+  });
+
+  test('v3 database without sync_book_id migrates to v7 with a random default book', () async {
+    // 无 sync_book_id 元数据：迁移生成随机默认账本并回填（R-004 后不再有固定占位 id）
+    final raw = sqlite.sqlite3.open(dbPath);
+    raw.execute(v1Ddl);
+    raw.execute(v3ColumnDdl);
+    raw.execute('PRAGMA user_version = 3');
+    raw.execute(
+        "INSERT INTO accounts (account_type, name, currency, initial_balance, archived, created_at) "
+        "VALUES ('cash', '旧账户', 'CNY', 500, 0, 1754064000)");
+    raw.close();
+
+    final db = AppDatabase(NativeDatabase(File(dbPath)));
+    expect(db.schemaVersion, 7);
+
+    const placeholder = '00000000-0000-4000-8000-000000000001';
+    final current = await db.currentBookId();
+    // 随机 uuid 而非历史占位 id
+    expect(current, isNot(placeholder));
+    expect(current, matches(RegExp(r'^[0-9a-f-]{36}$')));
+
+    // 既有账户行回填到随机默认账本，books 行 id 与之一致
+    final account = await db.select(db.accounts).getSingle();
+    expect(account.bookId, current);
+    expect(account.bookId, isNot(placeholder));
+    final book = await db.select(db.books).getSingle();
+    expect(book.id, current);
+    expect(book.id, isNot(placeholder));
+    expect(book.name, '默认账本');
+    expect(account.name, '旧账户');
     await db.close();
   });
 }

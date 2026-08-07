@@ -16,6 +16,7 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
     service = RecurringService(db, bookId: testBookId);
     await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
@@ -37,6 +38,7 @@ void main() {
     String type = 'expense',
   }) async {
     return db.into(db.recurringRules).insert(RecurringRulesCompanion.insert(
+          bookId: testBookId,
           frequency: frequency,
           anchorType: anchorType,
           anchorDay: Value(anchorDay),
@@ -168,7 +170,7 @@ void main() {
     const otherBook = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     final otherPlanId = await db.into(db.installmentPlans).insert(
         InstallmentPlansCompanion.insert(
-          bookId: const Value(otherBook),
+          bookId: otherBook,
           name: '他账本分期',
           totalMinor: 30000,
           periods: 1,

@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
-import '../../core/constants/constants.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/accounts_table.dart';
 import '../../data/local/tables/categories_table.dart';
@@ -17,7 +16,7 @@ import '../../domain/services/lww_resolver.dart';
 /// 畸形 payload 单 op 跳过，不中断整批合并（评审 H1）。
 /// 合并结果归属 sync 引擎的账本（Spec §4.1 / BK-T-010）。
 class SyncMerger {
-  SyncMerger(this.db, {LwwResolver? resolver, this.bookId = kDefaultBookId, this.onMerged})
+  SyncMerger(this.db, {LwwResolver? resolver, required this.bookId, this.onMerged})
       : _resolver = resolver ?? const LwwResolver();
 
   final AppDatabase db;
@@ -216,7 +215,7 @@ class SyncMerger {
     final type = _enumFromName(p['type'], AccountType.values);
     if (type == null) return null;
     return db.into(db.accounts).insert(AccountsCompanion.insert(
-          bookId: Value(bookId),
+          bookId: bookId,
           remoteId: Value(remoteId),
           accountType: type,
           name: _str(p, 'name') ?? '',
@@ -233,7 +232,7 @@ class SyncMerger {
     final parentRef = _str(p, 'parent_id');
     final parentId = parentRef == null ? null : await _localIdByRemoteId('category', parentRef);
     return db.into(db.categories).insert(CategoriesCompanion.insert(
-          bookId: Value(bookId),
+          bookId: bookId,
           remoteId: Value(remoteId),
           parentId: Value(parentId),
           name: _str(p, 'name') ?? '',
@@ -263,7 +262,7 @@ class SyncMerger {
     final transferId = transferRef == null ? null : await _localIdByRemoteId('transaction', transferRef);
 
     return db.into(db.transactions).insert(TransactionsCompanion.insert(
-          bookId: Value(bookId),
+          bookId: bookId,
           remoteId: Value(remoteId),
           accountId: accountId,
           categoryId: Value(categoryId),
@@ -284,7 +283,7 @@ class SyncMerger {
     final categoryRef = _str(p, 'category_id');
     final categoryId = categoryRef == null ? null : await _localIdByRemoteId('category', categoryRef);
     return db.into(db.budgets).insert(BudgetsCompanion.insert(
-          bookId: Value(bookId),
+          bookId: bookId,
           remoteId: Value(remoteId),
           categoryId: Value(categoryId),
           period: _str(p, 'period') ?? '',

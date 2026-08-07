@@ -20,12 +20,14 @@ void main() {
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
           createdAt: DateTime.utc(2026, 8, 1),
         ));
     categoryId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
           name: '餐饮',
           icon: 'restaurant',
           color: 0xFF111111,
@@ -36,7 +38,7 @@ void main() {
     controller = QuickEntryController(
       createTransaction: CreateTransaction(repo),
       transactionRepository: repo,
-      accountRepository: AccountRepository(db),
+      accountRepository: AccountRepository(db, bookId: testBookId),
     );
     controller.categoryId = categoryId;
     controller.accountId = accountId;
@@ -151,6 +153,7 @@ void main() {
 
     test('transfer mode moves money between two accounts', () async {
       final toId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: testBookId,
             accountType: AccountType.savings,
             name: '储蓄',
             currency: 'CNY',

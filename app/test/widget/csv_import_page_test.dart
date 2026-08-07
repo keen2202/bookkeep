@@ -8,6 +8,9 @@ import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/features/auto_capture/csv_import/csv_import_page.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
+
+import '../helpers/fixtures.dart';
 
 /// 支付宝账单样本：表头 + 2 条有效记录（可附加批内重复行）
 String alipayCsv({int duplicateCount = 0}) {
@@ -25,7 +28,10 @@ String alipayCsv({int duplicateCount = 0}) {
 void main() {
   Widget harness(AppDatabase db) {
     return ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+      ],
       child: const MaterialApp(home: CsvImportPage()),
     );
   }
@@ -105,7 +111,7 @@ void main() {
   testWidgets('确认入账跳转确认页', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    await AccountRepository(db).createAccount(name: '钱包', type: AccountType.cash);
+    await AccountRepository(db, bookId: testBookId).createAccount(name: '钱包', type: AccountType.cash);
 
     await tester.pumpWidget(harness(db));
     await tester.pumpAndSettle();

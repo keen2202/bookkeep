@@ -17,7 +17,7 @@ void main() {
   Future<AppDatabase> seedDb() async {
     final db = AppDatabase(NativeDatabase.memory());
     final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-          bookId: const Value(bookId),
+          bookId: bookId,
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
@@ -31,7 +31,7 @@ void main() {
       TransactionType type = TransactionType.expense,
     }) {
       return db.into(db.transactions).insert(TransactionsCompanion.insert(
-            bookId: Value(book),
+            bookId: book,
             accountId: accountId,
             type: type,
             amountMinor: amount,

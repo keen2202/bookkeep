@@ -11,6 +11,9 @@ import 'package:bookkeep_app/features/accounts/accounts_page.dart';
 import 'package:bookkeep_app/features/auth_lock/biometric.dart';
 import 'package:bookkeep_app/features/auth_lock/lock_controller.dart';
 import 'package:bookkeep_app/features/auth_lock/lock_gate.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
+
+import '../helpers/fixtures.dart';
 
 /// 设置 PIN：PBKDF2 的 Future.delayed 让出点需真实事件循环（testWidgets 假时钟不推进），
 /// 故经 runAsync 执行（BK-T-008）。
@@ -118,6 +121,7 @@ void main() {
   group('金额脱敏（Spec §3.6）', () {
     testWidgets('后台驻留期间账户页金额掩码显示', (tester) async {
       await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: testBookId,
             accountType: AccountType.cash,
             name: '钱包',
             currency: 'CNY',
@@ -127,6 +131,7 @@ void main() {
       await tester.pumpWidget(ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(db),
+          currentBookIdProvider.overrideWith((ref) => testBookId),
           biometricProvider.overrideWithValue(bio),
           lockControllerProvider.overrideWith((ref) => LockController(
                 repo,

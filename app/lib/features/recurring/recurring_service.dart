@@ -86,7 +86,7 @@ class RecurringService {
   }) async {
     final planId = await db.into(db.installmentPlans).insert(
           InstallmentPlansCompanion.insert(
-            bookId: Value(bookId),
+            bookId: bookId,
             name: name,
             totalMinor: totalMinor,
             periods: periods,
