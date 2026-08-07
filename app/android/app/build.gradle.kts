@@ -28,6 +28,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications 22.x 使用 java.time 等新 API，需 core library desugaring
+        //（minSdk < 26 时 AGP checkReleaseAarMetadata 强制要求）
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -74,6 +77,11 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    // AGP 9.0 需 desugar_jdk_libs 2.1.5+（2.1.4 为 AGP 8.7 最低要求）
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {
