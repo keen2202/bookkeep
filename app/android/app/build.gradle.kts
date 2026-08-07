@@ -78,7 +78,8 @@ kotlin {
 
 flutter {
     source = "../.."
-    // 审查体积 BK-R-015：分发仅含 arm ABI（移除 x86_64，模拟器仅 debug 使用；
-    // 注意不得用 ndk.abiFilters——与 Flutter 插件的 splits abi 配置冲突导致构建失败）
-    targetPlatforms = listOf("android-arm", "android-arm64")
+    // 审查体积 BK-R-015：分发仅含 arm ABI（移除 x86_64）。ABI 过滤由 CI 的
+    // --target-platform 控制（插件据此设置 splits.abi.include）；不得在 build.gradle
+    // 配置 ndk.abiFilters（与插件 splits 配置冲突）——flutter.targetPlatforms 在
+    // Flutter 3.44.x 插件中不存在，同样不可用
 }

@@ -182,9 +182,10 @@ jobs:
           EOF
 
       # 审查体积 BK-R-015：AAB 为主分发（Play 按 ABI 下发）；APK 直发场景 --split-per-abi 兜底；
+      # --target-platform 限定 arm ABI（Flutter 插件据此设置 splits.abi.include，勿在 build.gradle 配 ABI）；
       # --obfuscate --split-debug-info 混淆并产出符号表，崩溃可符号化（归档见下）
       - name: Build release APK (split-per-abi)
-        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols $DART_DEFINES
+        run: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64 --obfuscate --split-debug-info=build/symbols $DART_DEFINES
 
       - name: Build release App Bundle
         run: flutter build appbundle --release --obfuscate --split-debug-info=build/symbols $DART_DEFINES
