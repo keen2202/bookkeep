@@ -12,6 +12,7 @@ class SettingsRepository {
   static const _secondsOpenKey = 'seconds_open_mode';
   static const _themeSeedKey = 'theme_seed';
   static const _themeModeKey = 'theme_mode';
+  static const _themeIconPackKey = 'theme_icon_pack';
 
   Future<bool> secondsOpenMode() async {
     final rows =
@@ -27,10 +28,10 @@ class SettingsRepository {
         );
   }
 
-  /// 主题设置（未配置回退默认：青碧 + 跟随系统）
+  /// 主题设置（未配置回退默认：青碧 + 跟随系统 + 线性图标）
   Future<ThemeSettings> themeSettings() async {
     final rows = await (db.select(db.appMeta)
-          ..where((t) => t.key.isIn({_themeSeedKey, _themeModeKey})))
+          ..where((t) => t.key.isIn({_themeSeedKey, _themeModeKey, _themeIconPackKey})))
         .get();
     final map = {for (final r in rows) r.key: r.value};
     final seed = _parseHexColor(map[_themeSeedKey]);
@@ -39,9 +40,11 @@ class SettingsRepository {
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
+    final iconPack = IconPack.values.asNameMap()[map[_themeIconPackKey]];
     return ThemeSettings(
       seedColor: seed ?? ThemeSettings.defaults.seedColor,
       mode: mode,
+      iconPack: iconPack ?? ThemeSettings.defaults.iconPack,
     );
   }
 
@@ -54,6 +57,10 @@ class SettingsRepository {
           AppMetaCompanion.insert(key: _themeModeKey, value: settings.mode.name),
           onConflict: DoUpdate(
               (_) => AppMetaCompanion(value: Value(settings.mode.name))));
+      batch.insert(db.appMeta,
+          AppMetaCompanion.insert(key: _themeIconPackKey, value: settings.iconPack.name),
+          onConflict: DoUpdate(
+              (_) => AppMetaCompanion(value: Value(settings.iconPack.name))));
     });
   }
 

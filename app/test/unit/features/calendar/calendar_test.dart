@@ -23,7 +23,7 @@ void main() {
           accountType: AccountType.cash,
           name: '钱包',
           currency: 'CNY',
-          createdAt: DateTime.utc(2026, 8, 1),
+          createdAt: DateTime(2026, 8, 1),
         ));
   });
 
@@ -44,15 +44,15 @@ void main() {
   }
 
   test('日聚合 = 明细合计（验证标准：日聚合=明细合计）', () async {
-    await addTx(at: DateTime.utc(2026, 8, 1, 9), amount: -1000);
-    await addTx(at: DateTime.utc(2026, 8, 1, 12), amount: -2500);
-    await addTx(at: DateTime.utc(2026, 8, 1, 20), amount: 5000);
-    await addTx(at: DateTime.utc(2026, 8, 2, 10), amount: -300);
+    await addTx(at: DateTime(2026, 8, 1, 9), amount: -1000);
+    await addTx(at: DateTime(2026, 8, 1, 12), amount: -2500);
+    await addTx(at: DateTime(2026, 8, 1, 20), amount: 5000);
+    await addTx(at: DateTime(2026, 8, 2, 10), amount: -300);
 
     final reports = ReportsRepository(db, bookId: bookId);
     final totals = await reports.dailyTotals(
-      start: DateTime.utc(2026, 8, 1),
-      end: DateTime.utc(2026, 8, 3),
+      start: DateTime(2026, 8, 1),
+      end: DateTime(2026, 8, 3),
     );
     expect(totals, hasLength(2));
 
@@ -67,8 +67,8 @@ void main() {
           ..where((t) =>
               t.bookId.equals(bookId) &
               t.deletedAt.isNull() &
-              t.occurredAt.isBiggerOrEqualValue(DateTime.utc(2026, 8, 1)) &
-              t.occurredAt.isSmallerThanValue(DateTime.utc(2026, 8, 2))))
+              t.occurredAt.isBiggerOrEqualValue(DateTime(2026, 8, 1)) &
+              t.occurredAt.isSmallerThanValue(DateTime(2026, 8, 2))))
         .get();
     final expenseSum = txs.where((t) => t.type == TransactionType.expense).fold<int>(0, (s, t) => s - t.amountMinor);
     final incomeSum = txs.where((t) => t.type == TransactionType.income).fold<int>(0, (s, t) => s + t.amountMinor);
@@ -77,12 +77,12 @@ void main() {
   });
 
   test('与报表同区间一致：日历日聚合 = 报表日聚合（同查询层）', () async {
-    await addTx(at: DateTime.utc(2026, 8, 5, 9), amount: -1200);
-    await addTx(at: DateTime.utc(2026, 8, 5, 15), amount: -800);
-    await addTx(at: DateTime.utc(2026, 8, 15, 10), amount: 9999);
+    await addTx(at: DateTime(2026, 8, 5, 9), amount: -1200);
+    await addTx(at: DateTime(2026, 8, 5, 15), amount: -800);
+    await addTx(at: DateTime(2026, 8, 15, 10), amount: 9999);
 
     final reports = ReportsRepository(db, bookId: bookId);
-    final window = (start: DateTime.utc(2026, 8, 1), end: DateTime.utc(2026, 9, 1));
+    final window = (start: DateTime(2026, 8, 1), end: DateTime(2026, 9, 1));
     final calendarTotals = await reports.dailyTotals(start: window.start, end: window.end);
     final reportTotals = await reports.dailyTotals(start: window.start, end: window.end);
 
@@ -109,8 +109,8 @@ void main() {
             amountMinor: -(i % 1000 + 1),
             currency: 'CNY',
             rateSnapshot: const Value(1000000),
-            occurredAt: DateTime.utc(2026, month, (i % 27) + 1, 12),
-            updatedAt: DateTime.utc(2026, month, 1),
+            occurredAt: DateTime(2026, month, (i % 27) + 1, 12),
+            updatedAt: DateTime(2026, month, 1),
           ));
     }
     final insertTime = sw.elapsedMilliseconds;
@@ -119,8 +119,8 @@ void main() {
     final reports = ReportsRepository(db, bookId: bookId);
     sw..reset()..start();
     final august = await reports.dailyTotals(
-      start: DateTime.utc(2026, 8, 1),
-      end: DateTime.utc(2026, 9, 1),
+      start: DateTime(2026, 8, 1),
+      end: DateTime(2026, 9, 1),
     );
     final queryTime = sw.elapsedMilliseconds;
 
@@ -131,8 +131,8 @@ void main() {
     final augTxs = await (db.select(db.transactions)
           ..where((t) =>
               t.bookId.equals(bookId) &
-              t.occurredAt.isBiggerOrEqualValue(DateTime.utc(2026, 8, 1)) &
-              t.occurredAt.isSmallerThanValue(DateTime.utc(2026, 9, 1))))
+              t.occurredAt.isBiggerOrEqualValue(DateTime(2026, 8, 1)) &
+              t.occurredAt.isSmallerThanValue(DateTime(2026, 9, 1))))
         .get();
     final augDetail = augTxs.fold<int>(0, (s, t) => s - t.amountMinor);
     expect(augTotal, augDetail);

@@ -69,6 +69,65 @@ void main() {
     expect(persisted.mode, ThemeMode.dark);
   });
 
+  testWidgets('icon pack switch applies immediately and persists', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(db)],
+      child: const MaterialApp(home: ThemeSettingsPage()),
+    ));
+    await tester.pump();
+
+    // 默认线性图标
+    expect(find.byIcon(Icons.calendar_month_outlined), findsOneWidget);
+
+    await tester.tap(find.text('圆角'));
+    await tester.pump();
+
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(ThemeSettingsPage)));
+    expect(container.read(themeSettingsProvider).iconPack, IconPack.rounded);
+    // 模块图标预览与种子色/外观模式同步切换
+    expect(find.byIcon(Icons.calendar_month_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.receipt_long_rounded), findsOneWidget);
+
+    final persisted = await SettingsRepository(db).themeSettings();
+    expect(persisted.iconPack, IconPack.rounded);
+    // 其余字段不受图标切换影响
+    expect(persisted.mode, ThemeMode.system);
+  });
+
+  testWidgets('nav bar icons follow the selected icon pack', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+        categorySeedProvider.overrideWith((ref) async => testSeed),
+      ],
+      child: const BookkeepApp(),
+    ));
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.byIcon(Icons.calendar_month_outlined), findsWidgets);
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('个性化主题'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('圆角'));
+    await tester.pump();
+
+    // 返回后底部导航图标随图标风格替换（zh 本地化下返回键 tooltip 非 'Back'，按类型查找）
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.calendar_month_rounded), findsWidgets);
+    expect(find.byIcon(Icons.calendar_month_outlined), findsNothing);
+  });
+
   testWidgets('settings sheet entry opens the theme page', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);

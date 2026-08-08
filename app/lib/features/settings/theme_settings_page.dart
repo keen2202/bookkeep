@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database_provider.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../shared/theme/app_icons.dart';
 import '../../shared/theme/color_picker_dialog.dart';
 import '../../shared/theme/theme_settings.dart';
 
@@ -26,6 +27,55 @@ class ThemeSettingsPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Text('应用图标', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: current.seedColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                appIcon(current.iconPack),
+                size: 36,
+                color: current.seedColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('图标风格', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SegmentedButton<IconPack>(
+            segments: [
+              for (final pack in IconPack.values)
+                ButtonSegment(value: pack, label: Text(pack.label)),
+            ],
+            selected: {current.iconPack},
+            onSelectionChanged: (s) => _apply(
+              context,
+              ref,
+              current.copyWith(iconPack: s.first),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 模块图标预览（账单/分类/周期记账/报表/日历）
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (final module in AppModule.values)
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(moduleIcon(module, current.iconPack), size: 28),
+                    const SizedBox(height: 4),
+                    Text(module.label, style: theme.textTheme.labelSmall),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
           Text('外观模式', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           SegmentedButton<ThemeMode>(
@@ -35,11 +85,7 @@ class ThemeSettingsPage extends ConsumerWidget {
               ButtonSegment(value: ThemeMode.system, label: Text('跟随系统')),
             ],
             selected: {current.mode},
-            onSelectionChanged: (s) => _apply(
-              context,
-              ref,
-              ThemeSettings(seedColor: current.seedColor, mode: s.first),
-            ),
+            onSelectionChanged: (s) => _apply(context, ref, current.copyWith(mode: s.first)),
           ),
           const SizedBox(height: 24),
           Text('主题颜色', style: theme.textTheme.titleSmall),
@@ -52,11 +98,7 @@ class ThemeSettingsPage extends ConsumerWidget {
                 _PresetDot(
                   color: color,
                   selected: color.toARGB32() == current.seedColor.toARGB32(),
-                  onTap: () => _apply(
-                    context,
-                    ref,
-                    ThemeSettings(seedColor: color, mode: current.mode),
-                  ),
+                  onTap: () => _apply(context, ref, current.copyWith(seedColor: color)),
                 ),
             ],
           ),
@@ -70,11 +112,7 @@ class ThemeSettingsPage extends ConsumerWidget {
                 initial: current.seedColor,
               );
               if (picked != null && context.mounted) {
-                await _apply(
-                  context,
-                  ref,
-                  ThemeSettings(seedColor: picked, mode: current.mode),
-                );
+                await _apply(context, ref, current.copyWith(seedColor: picked));
               }
             },
           ),

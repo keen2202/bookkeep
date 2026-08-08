@@ -26,6 +26,7 @@ import 'features/recurring/recurring_providers.dart' show recurringServiceProvid
 import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/theme_settings_page.dart';
+import 'shared/theme/app_icons.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/theme/theme_settings.dart';
 
@@ -94,7 +95,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    // 个性化主题：种子色 + 外观模式（设置页即时生效，全树热重建）
+    // 个性化主题：种子色 + 外观模式 + 图标风格（设置页即时生效，全树热重建）
     final themeSettings = ref.watch(themeSettingsProvider);
     return MaterialApp(
       title: 'bookkeep',
@@ -135,12 +136,12 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
             bottomNavigationBar: NavigationBar(
               selectedIndex: _tab,
               onDestinationSelected: (i) => setState(() => _tab = i),
-              destinations: const [
-                NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: '账单'),
-                NavigationDestination(icon: Icon(Icons.category_outlined), label: '分类'),
-                NavigationDestination(icon: Icon(Icons.repeat), label: '周期记账'),
-                NavigationDestination(icon: Icon(Icons.bar_chart), label: '报表'),
-                NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: '日历'),
+              destinations: [
+                for (final m in AppModule.values)
+                  NavigationDestination(
+                    icon: Icon(moduleIcon(m, themeSettings.iconPack)),
+                    label: m.label,
+                  ),
               ],
             ),
             // 审查 U-1：单 AppBar，按 Tab 配置标题与动作（页面动作经顶层函数组装）
@@ -200,7 +201,7 @@ class _SettingsSheet extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.palette_outlined),
                 title: const Text('个性化主题'),
-                subtitle: const Text('主题颜色 / 外观模式'),
+                subtitle: const Text('主题颜色 / 外观模式 / 图标风格'),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ThemeSettingsPage()),
                 ),

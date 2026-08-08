@@ -3,16 +3,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_theme.dart';
 
+/// 图标风格（Material 图标变体，应用于应用图标与各功能模块图标）
+enum IconPack {
+  outlined('线性'),
+  filled('实心'),
+  rounded('圆角'),
+  sharp('直角');
+
+  const IconPack(this.label);
+  final String label;
+}
+
 /// 个性化主题设置（设备级偏好，app_meta 持久化；main() 启动时注入）
 class ThemeSettings {
-  const ThemeSettings({required this.seedColor, required this.mode});
+  const ThemeSettings({
+    required this.seedColor,
+    required this.mode,
+    this.iconPack = IconPack.outlined,
+  });
 
   final Color seedColor;
   final ThemeMode mode;
+  final IconPack iconPack;
+
+  ThemeSettings copyWith({
+    Color? seedColor,
+    ThemeMode? mode,
+    IconPack? iconPack,
+  }) =>
+      ThemeSettings(
+        seedColor: seedColor ?? this.seedColor,
+        mode: mode ?? this.mode,
+        iconPack: iconPack ?? this.iconPack,
+      );
 
   static const defaults = ThemeSettings(
     seedColor: kDefaultSeedColor,
     mode: ThemeMode.system,
+    iconPack: IconPack.outlined,
   );
 }
 

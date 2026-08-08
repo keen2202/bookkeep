@@ -9,12 +9,13 @@ const _palette = [
   Color(0xFF42A5F5), Color(0xFF7E57C2), Color(0xFFEC407A), Color(0xFF8D6E63),
 ];
 
-/// 可读刻度（审查 U-11）：大额转「x.xx万」，小额原样；负值保留符号
+/// 可读刻度（审查 U-11）：大额转「x.xx万/x.xx百万」，小额原样；负值保留符号。
+/// 修正刻度错位：1万 = 1,000,000 minor，1百万 = 100,000,000 minor。
 String _compactTick(int minor) {
   final abs = minor.abs();
   final sign = minor < 0 ? '-' : '';
-  if (abs >= 10000000) return '$sign${(minor / 1000000).toStringAsFixed(1)}百万';
-  if (abs >= 100000) return '$sign${(minor / 100000).toStringAsFixed(1)}万';
+  if (abs >= 100000000) return '$sign${(minor / 100000000).toStringAsFixed(1)}百万';
+  if (abs >= 1000000) return '$sign${(minor / 100000).toStringAsFixed(1)}万';
   return '$sign${formatMoney(minor).replaceAll('¥', '')}';
 }
 
@@ -109,7 +110,8 @@ class PeriodBarChart extends StatelessWidget {
       height: 220,
       child: BarChart(
         BarChartData(
-          maxY: maxAmount.toDouble() * 1.2,
+          // 跨年对比允许某年无数据（0 柱）；maxY 兜底避免 0 刻度
+          maxY: (maxAmount == 0 ? 1 : maxAmount).toDouble() * 1.2,
           barTouchData: BarTouchData(
             enabled: !hideAmounts,
             touchTooltipData: BarTouchTooltipData(
@@ -164,7 +166,9 @@ class PeriodBarChart extends StatelessWidget {
   }
 }
 
-/// 收支趋势折线图（Spec §3.5；审查 U-11：tooltip 金额格式化 + 可读刻度）
+/// 收支趋势折线图（Spec §3.5；审查 U-11：tooltip 金额格式化 + 可读刻度）。
+/// 修正：单日（「日」维度）折线无法绘制时直接展示收支汇总；
+/// 采样步长取整；x 轴带日期标签；tooltip 显示日期。
 class TrendLineChart extends StatelessWidget {
   const TrendLineChart({
     super.key,
@@ -183,10 +187,21 @@ class TrendLineChart extends StatelessWidget {
       return const Center(child: Text('暂无数据'));
     }
     final sampled = totals.length > maxPoints
-        ? [for (var i = 0; i < totals.length; i += totals.length ~/ maxPoints) totals[i]]
+        ? [
+            for (var i = 0; i < totals.length; i += (totals.length / maxPoints).ceil())
+              totals[i],
+          ]
         : totals;
+    // 单日（如「日」维度）：折线至少需 2 点，单日直接展示收支汇总（与记录一致）
     if (sampled.length < 2) {
-      return const Center(child: Text('暂无数据'));
+      final t = sampled.single;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('${t.date}  支出 ${hideAmounts ? '***' : formatMoney(t.expenseMinor)}'),
+          Text('${t.date}  收入 ${hideAmounts ? '***' : formatMoney(t.incomeMinor)}'),
+        ],
+      );
     }
     final expense = <FlSpot>[
       for (var i = 0; i < sampled.length; i++)
@@ -200,6 +215,7 @@ class TrendLineChart extends StatelessWidget {
       for (final s in expense) s.y,
       for (final s in income) s.y,
     ].fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
+    final labelStep = (sampled.length / 6).ceil().clamp(1, 99);
 
     return SizedBox(
       height: 220,
@@ -213,7 +229,7 @@ class TrendLineChart extends StatelessWidget {
               getTooltipItems: (spots) => [
                 for (final s in spots)
                   LineTooltipItem(
-                    formatMoney(s.y.round()),
+                    '${sampled[s.spotIndex].date}\n${formatMoney(s.y.round())}',
                     TextStyle(
                       color: s.barIndex == 0
                           ? Theme.of(context).colorScheme.error
@@ -241,7 +257,25 @@ class TrendLineChart extends StatelessWidget {
                   ),
             rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 24,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= sampled.length) return const SizedBox.shrink();
+                  if (index % labelStep != 0 && index != sampled.length - 1) {
+                    return const SizedBox.shrink();
+                  }
+                  final parts = sampled[index].date.split('-');
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('${parts[1]}-${parts[2]}',
+                        style: const TextStyle(fontSize: 10)),
+                  );
+                },
+              ),
+            ),
           ),
           lineBarsData: [
             LineChartBarData(
