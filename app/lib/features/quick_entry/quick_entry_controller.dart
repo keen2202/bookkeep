@@ -15,7 +15,8 @@ class QuickEntryController extends ChangeNotifier {
     required this.createTransaction,
     required this.transactionRepository,
     required this.accountRepository,
-  });
+    DateTime? initialOccurredAt,
+  }) : occurredAt = initialOccurredAt ?? DateTime.now();
 
   final CreateTransaction createTransaction;
   final TransactionRepository transactionRepository;
@@ -30,6 +31,7 @@ class QuickEntryController extends ChangeNotifier {
   int? toAccountId;
   QuickEntryError error = QuickEntryError.none;
   bool saving = false;
+  DateTime occurredAt;
 
   void setType(TransactionType value) {
     type = value;
@@ -51,6 +53,13 @@ class QuickEntryController extends ChangeNotifier {
 
   void selectToAccount(int? id) {
     toAccountId = id;
+    error = QuickEntryError.none;
+    notifyListeners();
+  }
+
+  /// 手动选择记账时间（默认当前时刻；时分秒全精度入库）
+  void setOccurredAt(DateTime value) {
+    occurredAt = value;
     error = QuickEntryError.none;
     notifyListeners();
   }
@@ -131,7 +140,7 @@ class QuickEntryController extends ChangeNotifier {
           fromAccountId: accountId!,
           toAccountId: toAccountId!,
           amountMinor: amount,
-          occurredAt: DateTime.now(),
+          occurredAt: occurredAt,
         );
       } catch (_) {
         error = QuickEntryError.saveFailed;
@@ -158,6 +167,7 @@ class QuickEntryController extends ChangeNotifier {
         categoryId: categoryId!,
         type: type,
         amountMinor: signed,
+        occurredAt: occurredAt,
       );
       await transactionRepository.rememberDefaults(
         type: type,

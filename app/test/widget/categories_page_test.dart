@@ -109,6 +109,9 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db));
+    // 默认主页为账单，切换到分类 tab
+    await tester.tap(find.text('分类').last);
+    await tester.pump(const Duration(milliseconds: 300));
     await pumpUntil(tester, find.text('餐饮'));
 
     await tester.tap(find.byTooltip('新建分类'));

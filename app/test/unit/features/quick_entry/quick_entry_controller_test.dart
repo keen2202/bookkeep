@@ -171,5 +171,68 @@ void main() {
       expect(txs, hasLength(2));
       expect(txs.map((t) => t.amountMinor).toSet(), {-3000, 3000});
     });
+
+    test('occurredAt defaults to now and setOccurredAt notifies', () async {
+      final before = DateTime.now().subtract(const Duration(minutes: 1));
+      expect(controller.occurredAt.isAfter(before), isTrue);
+
+      var notified = 0;
+      controller.addListener(() => notified++);
+      final target = DateTime(2026, 8, 3, 9, 30, 15);
+      controller.setOccurredAt(target);
+      expect(controller.occurredAt, target);
+      expect(notified, 1);
+    });
+
+    test('initialOccurredAt injects and save persists full precision', () async {
+      final target = DateTime(2026, 8, 3, 9, 30, 15);
+      final repo = TransactionRepository(db, bookId: testBookId);
+      final withDate = QuickEntryController(
+        createTransaction: CreateTransaction(repo),
+        transactionRepository: repo,
+        accountRepository: AccountRepository(db, bookId: testBookId),
+        initialOccurredAt: target,
+      );
+      withDate.categoryId = categoryId;
+      withDate.accountId = accountId;
+      withDate.pressKey('5');
+      withDate.pressKey('0');
+
+      final ok = await withDate.save();
+
+      expect(ok, isTrue);
+      final txs = await db.select(db.transactions).get();
+      expect(txs.single.occurredAt, target);
+    });
+
+    test('transfer legs share the selected occurredAt', () async {
+      final target = DateTime(2026, 8, 3, 9, 30, 15);
+      final repo = TransactionRepository(db, bookId: testBookId);
+      final withDate = QuickEntryController(
+        createTransaction: CreateTransaction(repo),
+        transactionRepository: repo,
+        accountRepository: AccountRepository(db, bookId: testBookId),
+        initialOccurredAt: target,
+      );
+      final toId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+            bookId: testBookId,
+            accountType: AccountType.savings,
+            name: '储蓄',
+            currency: 'CNY',
+            createdAt: DateTime.utc(2026, 8, 1),
+          ));
+      withDate.accountId = accountId;
+      withDate.setType(TransactionType.transfer);
+      withDate.toAccountId = toId;
+      withDate.pressKey('3');
+      withDate.pressKey('0');
+
+      final ok = await withDate.save();
+
+      expect(ok, isTrue);
+      final txs = await db.select(db.transactions).get();
+      expect(txs, hasLength(2));
+      expect(txs.every((t) => t.occurredAt == target), isTrue);
+    });
   });
 }

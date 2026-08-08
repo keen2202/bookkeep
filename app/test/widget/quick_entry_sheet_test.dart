@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,14 +17,23 @@ import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
 
 void main() {
-  Widget harness(AppDatabase db) {
+  Widget harness(AppDatabase db, {DateTime? initialDate}) {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
         currentBookIdProvider.overrideWith((ref) => testBookId),
         categorySeedProvider.overrideWith((ref) async => testSeed),
       ],
-      child: const MaterialApp(home: QuickEntrySheet()),
+      child: MaterialApp(
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('zh', 'CN')],
+        locale: const Locale('zh', 'CN'),
+        home: QuickEntrySheet(initialDate: initialDate),
+      ),
     );
   }
 
@@ -38,6 +48,8 @@ void main() {
   /// 弹层内点「早餐」chip：选中即关闭弹层并回填（无确定按钮）
   Future<void> pickBreakfast(WidgetTester tester) async {
     await pumpUntilFound(tester, find.text('选择分类'));
+    await tester.ensureVisible(find.text('选择分类'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('选择分类'));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -52,6 +64,8 @@ void main() {
   /// 手动重新选择账户（覆盖自动回填）
   Future<void> pickAccount(WidgetTester tester) async {
     await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+    await tester.ensureVisible(find.text('账户'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('账户'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('钱包（现金）').last);
@@ -139,6 +153,8 @@ void main() {
 
     // 打开分类选择器（默认全部展开）
     await pumpUntilFound(tester, find.text('选择分类'));
+    await tester.ensureVisible(find.text('选择分类'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('选择分类'));
     await tester.pumpAndSettle();
     Finder breakfastChip() => find.descendant(
@@ -156,5 +172,109 @@ void main() {
     await tester.tap(find.text('餐饮'));
     await tester.pumpAndSettle();
     expect(breakfastChip(), findsOneWidget);
+  });
+
+  testWidgets('default date field shows today', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+
+    final now = DateTime.now();
+    final expected = '${now.year}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    expect(find.text(expected), findsOneWidget);
+  });
+
+  testWidgets('initialDate prefills and saves with full precision', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+    final target = DateTime(2026, 8, 3, 9, 30, 15);
+
+    await tester.pumpWidget(harness(db, initialDate: target));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+    expect(find.text('2026-08-03'), findsOneWidget);
+    expect(find.text('09:30'), findsOneWidget);
+
+    for (final key in ['2', '5', '.', '5']) {
+      await tester.tap(find.text(key));
+      await tester.pump();
+    }
+    await pickBreakfast(tester);
+    await tester.tap(find.text('确定'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final txs = await db.select(db.transactions).get();
+    expect(txs, hasLength(1));
+    expect(txs.single.occurredAt, target);
+  });
+
+  testWidgets('changing date via picker preserves time', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+    final target = DateTime(2026, 8, 3, 9, 30, 15);
+
+    await tester.pumpWidget(harness(db, initialDate: target));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+
+    await tester.tap(find.text('2026-08-03'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('15'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '确定'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2026-08-15'), findsOneWidget);
+    expect(find.text('09:30'), findsOneWidget);
+
+    for (final key in ['2', '5', '.', '5']) {
+      await tester.tap(find.text(key));
+      await tester.pump();
+    }
+    await pickBreakfast(tester);
+    await tester.tap(find.text('确定'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final txs = await db.select(db.transactions).get();
+    expect(txs.single.occurredAt, DateTime(2026, 8, 15, 9, 30, 15));
+  });
+
+  testWidgets('changing time via input picker preserves date', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+    final target = DateTime(2026, 8, 3, 9, 30, 15);
+
+    await tester.pumpWidget(harness(db, initialDate: target));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+
+    await tester.tap(find.text('09:30'));
+    await tester.pumpAndSettle();
+    // 输入模式时间选择器：时/分两个 TextField
+    final fields = find.byType(TextField);
+    expect(fields, findsNWidgets(2));
+    await tester.enterText(fields.at(0), '9');
+    await tester.enterText(fields.at(1), '05');
+    await tester.tap(find.widgetWithText(TextButton, '确定'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('09:05'), findsOneWidget);
+    expect(find.text('2026-08-03'), findsOneWidget);
+
+    for (final key in ['2', '5', '.', '5']) {
+      await tester.tap(find.text(key));
+      await tester.pump();
+    }
+    await pickBreakfast(tester);
+    await tester.tap(find.text('确定'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final txs = await db.select(db.transactions).get();
+    expect(txs.single.occurredAt, DateTime(2026, 8, 3, 9, 5, 15));
   });
 }

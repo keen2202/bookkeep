@@ -98,14 +98,22 @@ void main() {
     expect(find.text('归档'), findsOneWidget);
   });
 
-  testWidgets('viewer 隐藏预算页「新建预算」动作', (tester) async {
+  testWidgets('viewer 账单页空态提示（无写入口）', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db, role: 'viewer'));
-    await switchTab(tester, '预算');
-    await tester.pumpAndSettle();
-    expect(find.byTooltip('新建预算'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('暂无账单'), findsOneWidget);
+  });
+
+  testWidgets('owner 账单页空态提示', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(shellHarness(db));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('还没有账单，点击 + 记一笔'), findsOneWidget);
   });
 
   testWidgets('viewer 隐藏周期记账页「新建规则/立即补跑」动作', (tester) async {
@@ -142,6 +150,7 @@ void main() {
 
     await tester.pumpWidget(shellHarness(db, role: 'viewer'));
     await tester.pump(const Duration(milliseconds: 600));
+    await switchTab(tester, '分类');
     expect(find.byTooltip('新建分类'), findsNothing);
     expect(find.byIcon(Icons.more_vert), findsNothing);
     expect(find.text('旅行'), findsOneWidget);

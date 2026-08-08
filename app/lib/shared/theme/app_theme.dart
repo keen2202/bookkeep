@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+/// 默认主题种子色（品牌主色 teal 600）
+const kDefaultSeedColor = Color(0xFF00897B);
+
 /// 8 色调色板（审查 U-5：语义色统一提取至 constants，浅深两态可复用）
 const kAppPalette = <Color>[
-  Color(0xFF00897B), // teal 600（品牌主色）
+  kDefaultSeedColor, // teal 600（品牌主色）
   Color(0xFF26A69A), // teal 400
   Color(0xFF80CBC4), // teal 200
   Color(0xFF2E7D32), // green 800（收入）
@@ -69,17 +72,21 @@ extension AppColorsX on BuildContext {
   AppColors get appColors => Theme.of(this).extension<AppColors>() ?? AppColors.light;
 }
 
-/// 应用主题（审查 U-2）：浅深两态同源构建；系统栏样式随 Brightness 联动
-ThemeData buildTheme(Brightness brightness) {
+/// 应用主题（审查 U-2）：浅深两态同源构建；[seedColor] 支持个性化主题；
+/// accent 语义色跟随种子色（M3 tonal 色阶自动满足对比度），
+/// income/expense/warning 红绿语义保持静态不随主题漂移
+ThemeData buildTheme(Brightness brightness, {Color seedColor = kDefaultSeedColor}) {
   final dark = brightness == Brightness.dark;
   final scheme = ColorScheme.fromSeed(
-    seedColor: kAppPalette[0],
+    seedColor: seedColor,
     brightness: brightness,
   );
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
-    extensions: [dark ? AppColors.dark : AppColors.light],
+    extensions: [
+      (dark ? AppColors.dark : AppColors.light).copyWith(accent: scheme.primary),
+    ],
     appBarTheme: AppBarTheme(
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,

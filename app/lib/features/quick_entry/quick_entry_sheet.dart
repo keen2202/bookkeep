@@ -16,14 +16,30 @@ import '../books/books_providers.dart'
     show accountRepositoryProvider, budgetRepositoryProvider, transactionRepositoryProvider;
 import '../budgets/budget_alert_notifier.dart';
 import '../budgets/budget_alert_service.dart';
+import '../budgets/budget_summary_card.dart';
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'amount_keyboard.dart';
 import 'amount_parser.dart';
 import 'quick_entry_controller.dart';
 
-/// 极速记账页（Spec §3.1 / BK-P0-001）：+ → 类型 → 数字键盘 → 分类/账户 → 保存
+/// 共享导航：打开记账页（FAB / 日历日期跳转共用），保存成功回传 true 弹「已保存」
+Future<void> openQuickEntrySheet(BuildContext context, {DateTime? initialDate}) async {
+  final saved = await Navigator.of(context).push<bool>(
+    MaterialPageRoute(builder: (_) => QuickEntrySheet(initialDate: initialDate)),
+  );
+  if (saved == true && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已保存'), duration: Duration(seconds: 1)),
+    );
+  }
+}
+
+/// 极速记账页（Spec §3.1 / BK-P0-001）：+ → 类型 → 数字键盘 → 分类/账户 → 保存；
+/// [initialDate] 从日历跳转时预填记账日期（默认当前时刻）
 class QuickEntrySheet extends ConsumerStatefulWidget {
-  const QuickEntrySheet({super.key});
+  const QuickEntrySheet({super.key, this.initialDate});
+
+  final DateTime? initialDate;
 
   @override
   ConsumerState<QuickEntrySheet> createState() => _QuickEntrySheetState();
@@ -40,6 +56,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       createTransaction: CreateTransaction(ref.read(transactionRepositoryProvider)),
       transactionRepository: ref.read(transactionRepositoryProvider),
       accountRepository: ref.read(accountRepositoryProvider),
+      initialOccurredAt: widget.initialDate,
     );
     _controller.addListener(_onController);
     _loadDefaults();
@@ -149,6 +166,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           Expanded(
             child: ListView(
               children: [
+                const BudgetSummaryCard(),
                 _buildSelections(
                   accounts: accounts,
                   accountsLoading: accountsAsync.isLoading,
@@ -191,6 +209,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     if (_controller.type == TransactionType.transfer) {
       return Column(
         children: [
+          _DateTimeField(
+            occurredAt: _controller.occurredAt,
+            onChanged: _controller.setOccurredAt,
+          ),
           _AccountField(
             label: '转出账户',
             accounts: accounts,
@@ -218,6 +240,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     final kindCategories = categories.where((c) => c.kind == kind).toList();
     return Column(
       children: [
+        _DateTimeField(
+          occurredAt: _controller.occurredAt,
+          onChanged: _controller.setOccurredAt,
+        ),
         _AccountField(
           label: '账户',
           accounts: accounts,
@@ -426,6 +452,85 @@ class _LoadingField extends StatelessWidget {
           height: 16,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
+      ),
+    );
+  }
+}
+
+/// 日期/时间字段：点按弹出 Material 选择器；改日期保留原时间、改时间保留原日期，
+/// 秒精度从现有值保留（初始为当前时刻，全精度入库）
+class _DateTimeField extends StatelessWidget {
+  const _DateTimeField({required this.occurredAt, required this.onChanged});
+
+  final DateTime occurredAt;
+  final ValueChanged<DateTime> onChanged;
+
+  String get _dateLabel => '${occurredAt.year}-'
+      '${occurredAt.month.toString().padLeft(2, '0')}-'
+      '${occurredAt.day.toString().padLeft(2, '0')}';
+  String get _timeLabel => '${occurredAt.hour.toString().padLeft(2, '0')}:'
+      '${occurredAt.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _pickDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: occurredAt,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) {
+      onChanged(DateTime(picked.year, picked.month, picked.day,
+          occurredAt.hour, occurredAt.minute, occurredAt.second));
+    }
+  }
+
+  Future<void> _pickTime(BuildContext context) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(occurredAt),
+      initialEntryMode: TimePickerEntryMode.input,
+    );
+    if (picked != null) {
+      onChanged(DateTime(occurredAt.year, occurredAt.month, occurredAt.day,
+          picked.hour, picked.minute, occurredAt.second));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget field({required String label, required String text, required IconData icon, required VoidCallback onTap}) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(4),
+        onTap: onTap,
+        child: InputDecorator(
+          decoration: InputDecoration(labelText: label, suffixIcon: Icon(icon)),
+          child: Text(text),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: field(
+              label: '日期',
+              text: _dateLabel,
+              icon: Icons.calendar_today_outlined,
+              onTap: () => _pickDate(context),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: field(
+              label: '时间',
+              text: _timeLabel,
+              icon: Icons.schedule,
+              onTap: () => _pickTime(context),
+            ),
+          ),
+        ],
       ),
     );
   }

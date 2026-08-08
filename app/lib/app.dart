@@ -16,7 +16,7 @@ import 'features/backup/backup_page.dart';
 import 'features/books/book_switcher.dart';
 import 'features/books/books_page.dart' show serverBooksProvider;
 import 'features/books/books_providers.dart' show currentBookIdProvider, currentRoleProvider;
-import 'features/budgets/budgets_page.dart' show BudgetsPage, budgetsPageAction;
+import 'features/bills/bills_page.dart';
 import 'features/calendar/calendar_page.dart';
 import 'features/categories/categories_page.dart' show CategoriesPage, categoriesPageAction;
 import 'features/currency/currency_manage_page.dart';
@@ -25,7 +25,9 @@ import 'features/recurring/recurring_page.dart' show RecurringPage, recurringPag
 import 'features/recurring/recurring_providers.dart' show recurringServiceProvider;
 import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
+import 'features/settings/theme_settings_page.dart';
 import 'shared/theme/app_theme.dart';
+import 'shared/theme/theme_settings.dart';
 
 /// 中文本地化配置（主入口与秒开模式的 MaterialApp 共用）
 const bookkeepLocalizationsDelegates = [
@@ -86,30 +88,23 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   }
 
   /// 需传入 Navigator 内的 context（state.context 在 MaterialApp 之上，无法定位 Navigator）
-  Future<void> _openQuickEntry(BuildContext navContext) async {
-    final saved = await Navigator.of(navContext).push<bool>(
-      MaterialPageRoute(builder: (_) => const QuickEntrySheet()),
-    );
-    if (saved == true && navContext.mounted) {
-      ScaffoldMessenger.of(navContext).showSnackBar(
-        const SnackBar(content: Text('已保存'), duration: Duration(seconds: 1)),
-      );
-    }
-  }
+  Future<void> _openQuickEntry(BuildContext navContext) => openQuickEntrySheet(navContext);
 
-  static const _tabTitles = ['分类', '周期记账', '预算', '报表', '日历'];
+  static const _tabTitles = ['账单', '分类', '周期记账', '报表', '日历'];
 
   @override
   Widget build(BuildContext context) {
+    // 个性化主题：种子色 + 外观模式（设置页即时生效，全树热重建）
+    final themeSettings = ref.watch(themeSettingsProvider);
     return MaterialApp(
       title: 'bookkeep',
       locale: const Locale('zh', 'CN'),
       localizationsDelegates: bookkeepLocalizationsDelegates,
       supportedLocales: bookkeepSupportedLocales,
       // 审查 U-2：深色模式（themeMode: system 跟随系统），语义色经 AppColors 扩展
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
-      themeMode: ThemeMode.system,
+      theme: buildTheme(Brightness.light, seedColor: themeSettings.seedColor),
+      darkTheme: buildTheme(Brightness.dark, seedColor: themeSettings.seedColor),
+      themeMode: themeSettings.mode,
       builder: lockGateBuilder,
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
@@ -123,9 +118,9 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
             body: IndexedStack(
               index: _tab,
               children: const [
+                BillsPage(),
                 CategoriesPage(),
                 RecurringPage(),
-                BudgetsPage(),
                 ReportsPage(),
                 CalendarPage(),
               ],
@@ -141,9 +136,9 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
               selectedIndex: _tab,
               onDestinationSelected: (i) => setState(() => _tab = i),
               destinations: const [
+                NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: '账单'),
                 NavigationDestination(icon: Icon(Icons.category_outlined), label: '分类'),
                 NavigationDestination(icon: Icon(Icons.repeat), label: '周期记账'),
-                NavigationDestination(icon: Icon(Icons.pie_chart_outline), label: '预算'),
                 NavigationDestination(icon: Icon(Icons.bar_chart), label: '报表'),
                 NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: '日历'),
               ],
@@ -169,9 +164,8 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   /// 当前 Tab 的动作（viewer 只读时为空，Spec §4.1 双重拒绝）
   List<Widget> _tabActions(BuildContext navContext) {
     return switch (_tab) {
-      0 => [ ?categoriesPageAction(navContext, ref) ],
-      1 => recurringPageActions(navContext, ref),
-      2 => [ ?budgetsPageAction(navContext, ref) ],
+      1 => [ ?categoriesPageAction(navContext, ref) ],
+      2 => recurringPageActions(navContext, ref),
       _ => const [],
     };
   }
@@ -203,6 +197,15 @@ class _SettingsSheet extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const AccountSyncSection(),
+              ListTile(
+                leading: const Icon(Icons.palette_outlined),
+                title: const Text('个性化主题'),
+                subtitle: const Text('主题颜色 / 外观模式'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ThemeSettingsPage()),
+                ),
+              ),
+              const Divider(),
               SwitchListTile(
                 title: const Text('秒开模式（冷启动直达记账页）'),
                 value: enabled,

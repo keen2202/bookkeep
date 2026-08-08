@@ -6,7 +6,7 @@ import '../../domain/services/budget_progress_calculator.dart';
 import '../../features/quick_entry/amount_parser.dart';
 import '../books/books_providers.dart' show budgetRepositoryProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
-import 'budgets_page.dart' show budgetsViewModelProvider;
+import 'budget_providers.dart' show budgetsViewModelProvider, monthBudgetSummaryProvider;
 
 /// 新建/编辑预算（Spec §3.4 / 审查 F-10）：总预算或一级分类预算，月起始日取自当前周期；
 /// 编辑模式（[budget] 非空）可改金额/阈值/分类并删除
@@ -109,6 +109,7 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
         );
       }
       ref.invalidate(budgetsViewModelProvider);
+      ref.invalidate(monthBudgetSummaryProvider);
       if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -138,6 +139,7 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
     try {
       await ref.read(budgetRepositoryProvider).deleteBudget(widget.budget!.id);
       ref.invalidate(budgetsViewModelProvider);
+      ref.invalidate(monthBudgetSummaryProvider);
       if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -11,7 +11,9 @@ import '../../data/local/database_provider.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../data/repositories/reports_repository.dart';
 import '../auth_lock/lock_controller.dart';
-import '../books/books_providers.dart' show currentBookIdProvider, reportsRepositoryProvider;
+import '../books/books_providers.dart'
+    show currentBookIdProvider, currentRoleProvider, reportsRepositoryProvider;
+import '../quick_entry/quick_entry_sheet.dart' show openQuickEntrySheet;
 import '../reports/reports_page.dart' show ReportWindow, reportRatesProvider;
 import 'cashflow_chart.dart';
 
@@ -126,6 +128,7 @@ class _MonthTotalsScope extends ConsumerWidget {
       orElse: () => <String, DailyTotal>{},
     );
     final masked = ref.watch(amountMaskProvider);
+    final viewer = ref.watch(currentRoleProvider) == 'viewer';
 
     return TableCalendar<DailyTotal>(
       firstDay: DateTime(2020, 1, 1),
@@ -140,9 +143,19 @@ class _MonthTotalsScope extends ConsumerWidget {
       onFormatChanged: onFormatChanged,
       focusedDay: focusedDay,
       selectedDayPredicate: (day) => isSameDay(day, selectedDay),
+      // 单击 → 更新选中日并直达当日记账（日期预填）；viewer 只读不跳转
       onDaySelected: (selected, focused) {
         onSelected(selected);
         onFocused(focused);
+        if (!viewer) {
+          openQuickEntrySheet(context, initialDate: selected);
+        }
+      },
+      // 长按 → 当日明细弹层（Spec §4.6 点击日进明细）
+      onDayLongPressed: (day, focused) {
+        onSelected(day);
+        onFocused(focused);
+        DayDetailSheet.show(context, day);
       },
       onPageChanged: (focused) => onFocused(focused),
       calendarBuilders: CalendarBuilders<DailyTotal>(

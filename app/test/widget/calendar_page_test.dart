@@ -9,16 +9,26 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/data/repositories/reports_repository.dart';
+import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/calendar/calendar_page.dart';
+import 'package:bookkeep_app/features/categories/categories_page.dart';
+
+import '../helpers/fixtures.dart';
+import 'categories_page_test.dart' show testSeed;
 
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('zh_CN');
   });
 
-  Widget harness(AppDatabase db) {
+  Widget harness(AppDatabase db, {String role = 'owner'}) {
     return ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+        currentRoleProvider.overrideWith((ref) => role),
+        categorySeedProvider.overrideWith((ref) async => testSeed),
+      ],
       child: const MaterialApp(
         locale: Locale('zh', 'CN'),
         localizationsDelegates: [
@@ -29,6 +39,16 @@ void main() {
         home: Scaffold(body: CalendarPage()),
       ),
     );
+  }
+
+  /// 点击日历上「今天」所在的日格
+  Future<void> tapTodayCell(WidgetTester tester) async {
+    final day = DateTime.now().day;
+    await tester.tap(find.descendant(
+      of: find.byType(TableCalendar<DailyTotal>),
+      matching: find.text('$day'),
+    ));
+    await tester.pumpAndSettle();
   }
 
   Future<void> pumpUntil(WidgetTester tester, Finder finder) async {
@@ -64,5 +84,49 @@ void main() {
     expect(todayText.style?.fontWeight, FontWeight.bold);
     expect(todayText.style?.fontSize, 14);
     expect(todayText.style?.color, Colors.white);
+  });
+
+  testWidgets('tapping a date opens quick entry prefilled with that day', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntil(tester, find.text('周一'));
+    await tapTodayCell(tester);
+
+    expect(find.text('记一笔'), findsOneWidget);
+    final now = DateTime.now();
+    final expected = '${now.year}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    expect(find.text(expected), findsOneWidget);
+  });
+
+  testWidgets('viewer tapping a date does not open quick entry', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db, role: 'viewer'));
+    await pumpUntil(tester, find.text('周一'));
+    await tapTodayCell(tester);
+
+    expect(find.text('记一笔'), findsNothing);
+  });
+
+  testWidgets('long pressing a date shows the day detail sheet', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntil(tester, find.text('周一'));
+
+    final day = DateTime.now().day;
+    await tester.longPress(find.descendant(
+      of: find.byType(TableCalendar<DailyTotal>),
+      matching: find.text('$day'),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('净额'), findsOneWidget);
   });
 }

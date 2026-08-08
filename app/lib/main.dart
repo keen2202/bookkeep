@@ -27,6 +27,7 @@ import 'features/quick_entry/quick_entry_sheet.dart';
 import 'features/recurring/recurring_service.dart';
 import 'features/sync/sync_providers.dart';
 import 'shared/theme/app_theme.dart';
+import 'shared/theme/theme_settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,7 +56,10 @@ Future<void> main() async {
     return;
   }
   // 秒开模式：冷启动直达记账页（Spec §3.1 / BK-P0-001）
-  final secondsOpen = await SettingsRepository(db).secondsOpenMode();
+  final settingsRepo = SettingsRepository(db);
+  final secondsOpen = await settingsRepo.secondsOpenMode();
+  // 个性化主题：启动即注入持久化设置（秒开分支共用同一实例）
+  final themeSettings = await settingsRepo.themeSettings();
   // 隐私锁初始状态：进程被杀重进仍锁（Spec §3.6 / BK-P0-006 / BK-T-008）
   final lockRepo = LockRepository(db);
   final initialLock = await lockRepo.initialState();
@@ -72,6 +76,7 @@ Future<void> main() async {
     overrides: [
       databaseProvider.overrideWithValue(db),
       currentBookIdProvider.overrideWith((ref) => currentBook),
+      themeSettingsProvider.overrideWith((ref) => themeSettings),
       lockControllerProvider.overrideWith((ref) => LockController(
             lockRepo,
             LocalAuthBiometric(),
@@ -84,10 +89,10 @@ Future<void> main() async {
             locale: const Locale('zh', 'CN'),
             localizationsDelegates: bookkeepLocalizationsDelegates,
             supportedLocales: bookkeepSupportedLocales,
-            // 审查 U-2：秒开入口复用主题（深浅联动）
-            theme: buildTheme(Brightness.light),
-            darkTheme: buildTheme(Brightness.dark),
-            themeMode: ThemeMode.system,
+            // 审查 U-2：秒开入口复用主题（深浅联动 + 个性化设置）
+            theme: buildTheme(Brightness.light, seedColor: themeSettings.seedColor),
+            darkTheme: buildTheme(Brightness.dark, seedColor: themeSettings.seedColor),
+            themeMode: themeSettings.mode,
             builder: lockGateBuilder,
             home: const QuickEntrySheet(),
           )

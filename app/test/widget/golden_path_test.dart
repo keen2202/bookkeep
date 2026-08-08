@@ -91,6 +91,8 @@ void main() {
     await pumpUntilFound(tester, find.text('钱包（现金）'));
     // 分类：点字段弹出两级选择器 → 点 chip 即选中并关闭弹层
     await pumpUntilFound(tester, find.text('选择分类'));
+    await tester.ensureVisible(find.text('选择分类'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('选择分类'));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -116,11 +118,17 @@ void main() {
     expect(ops.last.op, SyncOpCode.c);
     expect(ops.last.lamport, greaterThan(0));
 
-    // ── ③ 预算页：已用 25.50 / 100.00 ──
-    await tester.tap(find.text('预算'));
+    // ── ③ 账单页（默认主页）：当天支出合计 + 分类行；记账页预算卡联动 ──
+    expect(find.textContaining('支出 ¥25.50'), findsOneWidget);
+    expect(find.text('餐饮 / 早餐'), findsOneWidget);
+    await tester.tap(find.byTooltip('记一笔'));
     await tester.pumpAndSettle();
-    expect(find.text('¥25.50 / ¥100.00'), findsOneWidget);
+    await pumpUntilFound(tester, find.text('本月预算'));
+    expect(find.text('已花 ¥25.50 / 总额 ¥100.00'), findsOneWidget);
     expect(find.text('剩余 ¥74.50'), findsOneWidget);
+    // 中文 locale 下 BackButton tooltip 为「返回」，pageBack 找不到，直接按类型找
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
 
     // ── ④ 报表页：三图渲染（当月区间）──
     await tester.tap(find.text('报表'));

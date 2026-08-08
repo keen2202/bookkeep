@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,7 +25,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.byType(BookkeepApp), findsOneWidget);
-    // 审查 U-1：AppBar 标题随 Tab 变化（默认分类页）
+    // 默认主页为账单详情页：AppBar 标题为「账单」
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('账单')),
+      findsOneWidget,
+    );
     expect(find.text('分类'), findsWidgets);
     expect(find.text('周期记账'), findsWidgets);
   });
