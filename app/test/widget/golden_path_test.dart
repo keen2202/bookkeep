@@ -119,7 +119,9 @@ void main() {
     expect(ops.last.lamport, greaterThan(0));
 
     // ── ③ 账单页（默认主页）：当天支出合计 + 分类行；记账页预算卡联动 ──
-    expect(find.textContaining('支出 ¥25.50'), findsOneWidget);
+    // （W3 迁移后'支出 '标签与金额拆分为独立 Text）
+    expect(find.text('支出 '), findsOneWidget);
+    expect(find.text('¥25.50'), findsOneWidget);
     expect(find.text('餐饮 / 早餐'), findsOneWidget);
     await tester.tap(find.byTooltip('记一笔'));
     await tester.pumpAndSettle();

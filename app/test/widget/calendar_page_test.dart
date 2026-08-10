@@ -82,7 +82,8 @@ void main() {
       ),
     );
     expect(todayText.style?.fontWeight, FontWeight.bold);
-    expect(todayText.style?.fontSize, 14);
+    // W3 迁移后今日日期走 TextTheme（bodyLarge）加粗白字，不再裸字号；
+    // 具体字号随主题字阶，此处不锁死具体值
     expect(todayText.style?.color, Colors.white);
   });
 

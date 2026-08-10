@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 
+import '../../shared/theme/background/background_settings.dart';
 import '../../shared/theme/theme_settings.dart';
 import '../local/database.dart';
 
@@ -15,6 +16,13 @@ class SettingsRepository {
   static const _themeIconPackKey = 'theme_icon_pack';
   // UI 重构（Spec §2.2/D5）：预制主题键；旧用户无此键时按旧 seed_color 落 'custom'
   static const _themePresetIdKey = 'theme_preset_id';
+
+  // UI 重构（Spec §2.3/D5）：背景系统键（图片仅存本地，不同步不备份）
+  static const _bgEnabledKey = 'bg_enabled';
+  static const _bgImagePathKey = 'bg_image_path';
+  static const _bgOverlayModeKey = 'bg_overlay_mode';
+  static const _bgOverlayAlphaKey = 'bg_overlay_alpha';
+  static const _bgBlurKey = 'bg_blur';
 
   Future<bool> secondsOpenMode() async {
     final rows =
@@ -77,6 +85,47 @@ class SettingsRepository {
           AppMetaCompanion.insert(key: _themePresetIdKey, value: settings.presetId),
           onConflict: DoUpdate(
               (_) => AppMetaCompanion(value: Value(settings.presetId))));
+    });
+  }
+
+  /// 背景设置（Spec §2.3）：全键缺失回退默认（无背景图）
+  Future<BackgroundSettings> backgroundSettings() async {
+    final rows = await (db.select(db.appMeta)
+          ..where((t) => t.key.isIn({
+                _bgEnabledKey,
+                _bgImagePathKey,
+                _bgOverlayModeKey,
+                _bgOverlayAlphaKey,
+                _bgBlurKey,
+              })))
+        .get();
+    final map = {for (final r in rows) r.key: r.value};
+    final rawPath = map[_bgImagePathKey];
+    return BackgroundSettings(
+      enabled: map[_bgEnabledKey] == 'true',
+      // 空串（clear 后写入的占位）与缺失键统一归一为 null
+      imagePath: (rawPath == null || rawPath.isEmpty) ? null : rawPath,
+      overlayMode: map[_bgOverlayModeKey] == 'manual'
+          ? OverlayMode.manual
+          : OverlayMode.auto,
+      manualAlpha: double.tryParse(map[_bgOverlayAlphaKey] ?? '') ??
+          BackgroundSettings.defaults.manualAlpha,
+      blurEnabled: map[_bgBlurKey] != 'false',
+    );
+  }
+
+  Future<void> setBackgroundSettings(BackgroundSettings settings) async {
+    await db.batch((batch) {
+      void put(String key, String value) {
+        batch.insert(db.appMeta, AppMetaCompanion.insert(key: key, value: value),
+            onConflict: DoUpdate((_) => AppMetaCompanion(value: Value(value))));
+      }
+
+      put(_bgEnabledKey, '${settings.enabled}');
+      put(_bgImagePathKey, settings.imagePath ?? '');
+      put(_bgOverlayModeKey, settings.overlayMode.name);
+      put(_bgOverlayAlphaKey, '${settings.manualAlpha}');
+      put(_bgBlurKey, '${settings.blurEnabled}');
     });
   }
 

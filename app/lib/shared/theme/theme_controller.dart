@@ -16,7 +16,7 @@ import 'theme_settings.dart';
 /// `themeControllerProvider.overrideWith(() => ThemeController(initial: s))`
 /// 覆盖，行为与原 themeSettingsProvider 注入一致。
 class ThemeController extends Notifier<ThemeSettings> {
-  ThemeController({ThemeSettings? initial}) : _initial = initial;
+  ThemeController({this._initial});
 
   final ThemeSettings? _initial;
 

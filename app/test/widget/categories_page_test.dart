@@ -11,6 +11,7 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/domain/models/category_seed.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
+import 'package:bookkeep_app/shared/widgets/app_button.dart';
 
 import '../helpers/fixtures.dart';
 
@@ -118,7 +119,7 @@ void main() {
     await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
     await tester.pump(const Duration(milliseconds: 400)); // 弹窗入场动画完成
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '旅行');
-    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.tap(find.widgetWithText(AppButton, '保存'));
     await pumpUntilGone(tester, find.text('保存')); // 弹窗完全关闭
     await pumpUntil(tester, find.byType(ListView)); // 数据视图已刷新
 

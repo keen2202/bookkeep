@@ -25,8 +25,9 @@ import 'features/recurring/recurring_page.dart' show RecurringPage, recurringPag
 import 'features/recurring/recurring_providers.dart' show recurringServiceProvider;
 import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
-import 'features/settings/theme_settings_page.dart';
+import 'features/settings/appearance_page.dart';
 import 'shared/theme/app_icons.dart';
+import 'shared/theme/background/app_background.dart';
 import 'shared/theme/theme_controller.dart';
 import 'shared/theme/theme_transition.dart';
 
@@ -107,9 +108,12 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
       theme: themes.theme,
       darkTheme: themes.darkTheme,
       themeMode: themes.mode,
-      // 主题切换 250ms 过场（BK-UI-004）+ 隐私锁门禁
+      // 主题切换 250ms 过场（BK-UI-004）+ 全局背景（BK-UI-014，位于
+      // Navigator 之上，二级页/弹层共享同一背景）+ 隐私锁门禁
       builder: (context, child) => ThemeTransition(
-        child: lockGateBuilder(context, child),
+        child: AppBackground(
+          child: lockGateBuilder(context, child),
+        ),
       ),
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
@@ -204,10 +208,10 @@ class _SettingsSheet extends ConsumerWidget {
               const AccountSyncSection(),
               ListTile(
                 leading: const Icon(Icons.palette_outlined),
-                title: const Text('个性化主题'),
-                subtitle: const Text('主题颜色 / 外观模式 / 图标风格'),
+                title: const Text('外观'),
+                subtitle: const Text('主题方案 / 图标风格 / 个性背景'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ThemeSettingsPage()),
+                  MaterialPageRoute(builder: (_) => const AppearancePage()),
                 ),
               ),
               const Divider(),

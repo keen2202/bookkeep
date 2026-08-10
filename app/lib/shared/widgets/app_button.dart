@@ -84,7 +84,7 @@ class _AppButtonState extends State<AppButton> {
     final appColors = context.appColors;
     final enabled = widget.onPressed != null && !widget.loading;
 
-    final (Color? bg, Color? fg) = switch (widget.variant) {
+    final (Color? bg, Color fg) = switch (widget.variant) {
       AppButtonVariant.primary => (palette.primary, palette.onPrimary),
       AppButtonVariant.secondary => (palette.primaryContainer, palette.textPrimary),
       AppButtonVariant.danger => (
@@ -102,11 +102,20 @@ class _AppButtonState extends State<AppButton> {
       shape: WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
       ),
-      backgroundColor: bg == null ? null : WidgetStatePropertyAll(bg),
-      foregroundColor: WidgetStatePropertyAll(fg),
-      disabledBackgroundColor:
-          bg == null ? null : WidgetStatePropertyAll(palette.textDisabled.withValues(alpha: 0.24)),
-      disabledForegroundColor: WidgetStatePropertyAll(palette.textDisabled),
+      // 禁用态：主/危险按钮淡化底，前景统一 textDisabled（Flutter 3.44 移除
+      // disabledBackgroundColor/disabledForegroundColor，改由 WidgetState 解析）
+      backgroundColor: bg == null
+          ? null
+          : WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled)
+                  ? palette.textDisabled.withValues(alpha: 0.24)
+                  : bg,
+            ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? palette.textDisabled
+            : fg,
+      ),
       // 按压 12% 加深遮罩
       overlayColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.pressed)

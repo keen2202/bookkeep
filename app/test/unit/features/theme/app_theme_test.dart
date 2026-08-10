@@ -4,12 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
+import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 import 'package:bookkeep_app/shared/theme/theme_settings.dart';
+import 'package:bookkeep_app/shared/theme/tokens.dart';
 
 void main() {
+  // 自定义种子色模式（旧 fromSeed 路径，Spec D3）：浅/深双槽位
+  ThemeData buildCustom(Brightness brightness, [Color? seed]) => buildTheme(
+        null,
+        customSeed: seed ?? kDefaultSeedColor,
+        customMode: brightness == Brightness.dark
+            ? ThemeMode.dark
+            : ThemeMode.light,
+      );
+
   test('审查 U-2：深浅主题同源构建且携带语义色扩展', () {
-    final light = buildTheme(Brightness.light);
-    final dark = buildTheme(Brightness.dark);
+    final light = buildCustom(Brightness.light);
+    final dark = buildCustom(Brightness.dark);
 
     expect(light.brightness, Brightness.light);
     expect(dark.brightness, Brightness.dark);
@@ -27,8 +38,9 @@ void main() {
   });
 
   test('个性化主题：种子色改变主色与 accent，红绿语义不变', () {
-    final teal = buildTheme(Brightness.light);
-    final violet = buildTheme(Brightness.light, seedColor: const Color(0xFF8E24AA));
+    final teal = buildCustom(Brightness.light);
+    final violet =
+        buildCustom(Brightness.light, const Color(0xFF8E24AA));
 
     expect(violet.colorScheme.primary, isNot(teal.colorScheme.primary));
     expect(violet.extension<AppColors>()!.accent, violet.colorScheme.primary);
@@ -82,8 +94,8 @@ void main() {
     }
 
     for (final seed in kThemePresets) {
-      final light = buildTheme(Brightness.light, seedColor: seed);
-      final dark = buildTheme(Brightness.dark, seedColor: seed);
+      final light = buildCustom(Brightness.light, seed);
+      final dark = buildCustom(Brightness.dark, seed);
       expect(contrast(light.colorScheme.primary, Colors.white), greaterThanOrEqualTo(4.5),
           reason: '浅色态种子 $seed 主色对白底对比度不足');
       expect(
@@ -93,12 +105,50 @@ void main() {
     }
   });
 
-  test('审查 U-2：系统栏样式随亮度联动', () {
-    final light = buildTheme(Brightness.light);
-    final dark = buildTheme(Brightness.dark);
-    expect(light.appBarTheme.systemOverlayStyle!.statusBarIconBrightness,
-        Brightness.dark);
-    expect(dark.appBarTheme.systemOverlayStyle!.statusBarIconBrightness,
-        Brightness.light);
+  test('系统栏样式随亮度联动', () {
+    final light = buildCustom(Brightness.light);
+    final dark = buildCustom(Brightness.dark);
+    // BK-UI-014：静态 systemOverlayStyle 已从 AppBarTheme 移除，
+    // 状态栏图标明暗改由 AppBackground 按主题明暗/遮罩有效亮度动态计算
+    expect(light.appBarTheme.systemOverlayStyle, isNull);
+    expect(dark.appBarTheme.systemOverlayStyle, isNull);
+  });
+
+  // ── UI 重构（BK-UI-002）：预制主题直出 ──
+
+  test('预制主题：8 套直出且调色板全量落地 ColorScheme', () {
+    expect(kThemePresetsV2, hasLength(8));
+    expect(findPresetById('t1'), isNotNull);
+    expect(findPresetById('t9'), isNull);
+
+    for (final preset in kThemePresetsV2) {
+      final theme = buildTheme(preset);
+      expect(theme.brightness, preset.brightness, reason: '${preset.id} 明暗');
+      // ColorScheme 显式构造（Spec §4.1，不再 fromSeed 派生）
+      expect(theme.colorScheme.primary, preset.palette.primary);
+      expect(theme.colorScheme.onPrimary, preset.palette.onPrimary);
+      expect(theme.colorScheme.surface, preset.palette.surface);
+      expect(theme.colorScheme.onSurface, preset.palette.textPrimary);
+      expect(theme.colorScheme.outline, preset.palette.border);
+      // 语义色扩展锁定
+      final semantic = theme.extension<AppColors>()!;
+      expect(semantic.income,
+          preset.isDark ? AppColors.dark.income : AppColors.light.income);
+      // Token 扩展携带调色板与字阶
+      final tokens = theme.extension<AppTokens>()!;
+      expect(tokens.palette.primary, preset.palette.primary);
+      expect(tokens.palette.textPrimary, preset.palette.textPrimary);
+      expect(tokens.palette.surface, preset.palette.surface);
+      expect(tokens.amountStyle.fontFeatures, isNotEmpty);
+    }
+  });
+
+  test('预制主题：浅色卡片阴影 / 深色卡片描边（设计文档 §3.3）', () {
+    final light = buildTheme(findPresetById('t1')!);
+    final dark = buildTheme(findPresetById('t5')!);
+    expect(light.cardTheme.elevation, 2);
+    expect(dark.cardTheme.elevation, 0);
+    expect((dark.cardTheme.shape! as RoundedRectangleBorder).side,
+        isNot(BorderSide.none));
   });
 }

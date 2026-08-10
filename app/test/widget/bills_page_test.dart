@@ -61,8 +61,10 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(harness(db));
-    await pumpUntilFound(tester, find.text('还没有账单，点击 + 记一笔'));
-    expect(find.text('还没有账单，点击 + 记一笔'), findsOneWidget);
+    // W3 迁移至 AppEmpty：title 与 message 拆分为独立 Text（Spec §6）
+    await pumpUntilFound(tester, find.text('还没有账单'));
+    expect(find.text('还没有账单'), findsOneWidget);
+    expect(find.text('点击右下角 + 记一笔'), findsOneWidget);
   });
 
   testWidgets('groups bills by day with totals and category rows', (tester) async {
@@ -103,9 +105,12 @@ void main() {
     await tester.pumpWidget(harness(db));
     await pumpUntilFound(tester, find.text('餐饮 / 早餐'));
 
-    // 组头：当天支出 ¥25.50 · 收入 ¥100.00（转账不计入）
-    expect(find.textContaining('支出 ¥25.50'), findsOneWidget);
-    expect(find.textContaining('收入 ¥100.00'), findsOneWidget);
+    // 组头：当天支出 ¥25.50 · 收入 ¥100.00（转账不计入）；
+    // W3 迁移后'支出 '标签与金额（AppAmountText 等宽数字）拆分为独立 Text
+    expect(find.text('支出 '), findsOneWidget);
+    expect(find.text('¥25.50'), findsOneWidget);
+    expect(find.text('收入 '), findsOneWidget);
+    expect(find.text('¥100.00'), findsOneWidget);
     // 分类行（父/子拼接）+ 时间
     expect(find.text('餐饮 / 早餐'), findsOneWidget);
     expect(find.text('餐饮 / 晚餐'), findsOneWidget);
@@ -134,8 +139,8 @@ void main() {
     await tester.pumpWidget(harness(db, masked: true));
     await pumpUntilFound(tester, find.text('餐饮 / 早餐'));
 
-    expect(find.text('支出 ***'), findsOneWidget);
-    expect(find.text('***'), findsWidgets);
-    expect(find.textContaining('¥25.50'), findsNothing);
+    expect(find.text('支出 '), findsOneWidget);
+    expect(find.text('¥***'), findsWidgets);
+    expect(find.textContaining('25.50'), findsNothing);
   });
 }

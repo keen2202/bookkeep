@@ -113,7 +113,9 @@ void main() {
 
     await tester.pumpWidget(shellHarness(db));
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('还没有账单，点击 + 记一笔'), findsOneWidget);
+    // W3 迁移至 AppEmpty：title 与 message 拆分为独立 Text
+    expect(find.text('还没有账单'), findsOneWidget);
+    expect(find.text('点击右下角 + 记一笔'), findsOneWidget);
   });
 
   testWidgets('viewer 隐藏周期记账页「新建规则/立即补跑」动作', (tester) async {

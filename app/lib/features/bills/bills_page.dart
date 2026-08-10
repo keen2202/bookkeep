@@ -99,7 +99,8 @@ class _DayHeader extends StatelessWidget {
           if (day.expenseMinor > 0)
             Text('支出 ', style: theme.textTheme.bodySmall),
           if (day.expenseMinor > 0)
-            AppAmountText.minor(-day.expenseMinor, signed: false, masked: masked),
+            AppAmountText.minor(day.expenseMinor,
+                signed: false, masked: masked, tone: AppAmountTone.expense),
           if (day.expenseMinor > 0 && day.incomeMinor > 0)
             Text(' · ', style: theme.textTheme.bodySmall),
           if (day.incomeMinor > 0)

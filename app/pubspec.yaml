@@ -25,6 +25,8 @@ dependencies:
   cryptography: ^2.9.0
   intl: ^0.20.2 # flutter_localizations 钉 0.20.2（^0.20.3 会解析冲突）
   path_provider: ^2.1.6
+  # UI 重构 W4 背景系统（Spec D6）：相册选图；Android 13+ PhotoPicker / iOS 相册权限
+  image_picker: ^1.2.1
   http: ^1.6.0
   uuid: ^4.6.0
   sqlite3: ^3.5.1 # 明文检测/迁移与加密打开（SQLCipher 经 native-assets hooks 提供）

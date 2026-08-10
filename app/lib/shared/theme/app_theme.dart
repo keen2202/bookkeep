@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'theme_presets.dart';
 import 'tokens.dart';
@@ -207,7 +206,9 @@ ThemeData _assemble({
     hintColor: palette.textDisabled,
     extensions: [semantic, tokens],
     textTheme: textTheme,
-    // AppBar 透明化（设计文档 §5.4.3）：与页面底色/背景遮罩一体化
+    // AppBar 透明化（设计文档 §5.4.3）：与页面底色/背景遮罩一体化。
+    // 注意：不再配置 systemOverlayStyle——状态栏图标明暗由 AppBackground
+    // 按遮罩后有效亮度动态计算（设计文档 §5.2），静态值会覆盖动态结果
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       foregroundColor: palette.textPrimary,
@@ -215,12 +216,6 @@ ThemeData _assemble({
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
       titleTextStyle: textTheme.titleLarge,
-      systemOverlayStyle: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
-      ),
     ),
     // 卡片：圆角 md；浅色海拔阴影 / 深色描边（设计文档 §3.3）
     cardTheme: CardThemeData(

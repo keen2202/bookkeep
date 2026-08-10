@@ -9,6 +9,7 @@ import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/repositories/account_repository.dart';
 import 'package:bookkeep_app/features/accounts/accounts_page.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
+import 'package:bookkeep_app/shared/widgets/app_button.dart';
 
 import '../helpers/fixtures.dart';
 
@@ -46,7 +47,7 @@ void main() {
 
     await tester.enterText(find.widgetWithText(TextFormField, '账户名称'), '工资卡');
     await tester.enterText(find.widgetWithText(TextFormField, '初始余额（元）'), '1000.50');
-    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.tap(find.widgetWithText(AppButton, '保存'));
     await tester.pumpAndSettle();
 
     expect(find.text('工资卡'), findsOneWidget);
