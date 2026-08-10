@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/tables/accounts_table.dart';
+import '../../shared/theme/tokens.dart';
+import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_sheet.dart';
 import '../books/books_providers.dart' show accountRepositoryProvider;
 import '../currency/currency_providers.dart';
 import 'account_card.dart' show accountTypeLabel;
@@ -16,13 +19,11 @@ class AccountEditSheet extends ConsumerStatefulWidget {
   final Account? account;
 
   static Future<void> show(BuildContext context, {Account? account}) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: AccountEditSheet(account: account),
-      ),
+    // AppSheet 统一底部弹层（拖拽柄 / 圆角 lg / scrim 54%）
+    return showAppSheet<void>(
+      context,
+      title: account == null ? '新建账户' : '编辑账户',
+      child: AccountEditSheet(account: account),
     );
   }
 
@@ -102,23 +103,19 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Form(
+    // 标题与内边距由 AppSheet 统一承载（Spec §5.4），此处只渲染表单主体
+    return Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(widget.account == null ? '新建账户' : '编辑账户',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: '账户名称'),
               validator: (v) => (v == null || v.trim().isEmpty) ? '请输入账户名称' : null,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
             DropdownButtonFormField<AccountType>(
               initialValue: _type,
               decoration: const InputDecoration(labelText: '账户类型'),
@@ -134,7 +131,7 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
               ],
               onChanged: (v) => setState(() => _type = v!),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
             // 审查 F-8：账户币种选择（转账/报表按币种记账折算）
             FutureBuilder<List<Currency>>(
               future: ref.read(currenciesViewModelProvider.future),
@@ -156,7 +153,7 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
                 );
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
             TextFormField(
               controller: _balanceController,
               decoration: const InputDecoration(labelText: '初始余额（元）', prefixText: '¥ '),
@@ -164,14 +161,16 @@ class _AccountEditSheetState extends ConsumerState<AccountEditSheet> {
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
               validator: (v) => _parseMinor(v ?? '') == null ? '金额格式不正确' : null,
             ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: Text(_saving ? '保存中…' : '保存'),
+            const SizedBox(height: AppSpacing.lg),
+            // AppButton：loading 态内置防重入 + 转圈（Spec §5.1）
+            AppButton.primary(
+              block: true,
+              loading: _saving,
+              onPressed: _save,
+              child: const Text('保存'),
             ),
           ],
         ),
-      ),
     );
   }
 }

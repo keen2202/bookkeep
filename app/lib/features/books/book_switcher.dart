@@ -91,7 +91,8 @@ class BookSwitcher extends ConsumerWidget {
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(label, style: TextStyle(fontSize: 11, color: color)),
+      child: Text(label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color)),
     );
   }
 }

@@ -9,6 +9,10 @@ import '../../data/local/database.dart';
 import '../../data/local/tables/categories_table.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/usecases/create_transaction.dart';
+import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/tokens.dart';
+import '../../shared/widgets/app_sheet.dart';
+import '../../shared/widgets/app_snack.dart';
 import '../../shared/widgets/category_picker.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
 import '../accounts/accounts_providers.dart';
@@ -28,9 +32,7 @@ Future<void> openQuickEntrySheet(BuildContext context, {DateTime? initialDate}) 
     MaterialPageRoute(builder: (_) => QuickEntrySheet(initialDate: initialDate)),
   );
   if (saved == true && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已保存'), duration: Duration(seconds: 1)),
-    );
+    AppSnack.success(context, '已保存');
   }
 }
 
@@ -112,8 +114,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         QuickEntryError.saveFailed => '保存失败，请重试',
         _ => '金额无效，请重新输入',
       };
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      AppSnack.error(context, message);
       return;
     }
     // 刷新总线：报表/日历/账户/预算 provider 均 watch，自动重建（审查 F-1）
@@ -152,15 +153,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             onSelectionChanged: (s) => _controller.setType(s.first),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
             child: Text(
               _displayAmount,
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: _controller.error == QuickEntryError.invalidAmount
-                        ? Theme.of(context).colorScheme.error
-                        : null,
-                  ),
+              // displayAmount 大数字档（设计文档 §3.2，等宽数字）
+              style: context.tokens.displayAmountStyle.copyWith(
+                color: _controller.error == QuickEntryError.invalidAmount
+                    ? context.appColors.expense
+                    : null,
+              ),
             ),
           ),
           Expanded(
@@ -254,7 +255,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           onChanged: _controller.selectAccount,
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -307,7 +308,7 @@ class _AccountField extends StatelessWidget {
       return const _MessageField(label: '账户', message: '暂无账户，请先在账户页创建');
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       child: DropdownButtonFormField<int>(
         // initialValue 只在 FormField 首次建树时生效，异步回填默认账户后需换 key 重建 State 才能回显
         key: ValueKey(value),
@@ -370,7 +371,7 @@ class _CategoryField extends StatelessWidget {
     }
     final label = _selectedLabel;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: InkWell(
         borderRadius: BorderRadius.circular(4),
         onTap: () => _openPicker(context),
@@ -389,46 +390,20 @@ class _CategoryField extends StatelessWidget {
   }
 
   Future<void> _openPicker(BuildContext context) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
-          child: SizedBox(
-            height: MediaQuery.sizeOf(sheetContext).height * 0.6,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-                  child: Row(
-                    children: [
-                      Text('选择分类', style: Theme.of(sheetContext).textTheme.titleMedium),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(sheetContext),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: CategoryPicker(
-                      categories: categories,
-                      kind: kind,
-                      initialCategoryId: selectedId,
-                      onSelected: (id) {
-                        onSelected(id);
-                        Navigator.pop(sheetContext);
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    // AppSheet 统一底部弹层（拖拽柄 / 圆角 lg / scrim 54%，下滑关闭）
+    await showAppSheet<void>(
+      context,
+      title: '选择分类',
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.6,
+        child: CategoryPicker(
+          categories: categories,
+          kind: kind,
+          initialCategoryId: selectedId,
+          onSelected: (id) {
+            onSelected(id);
+            Navigator.pop(context);
+          },
         ),
       ),
     );
@@ -444,7 +419,7 @@ class _LoadingField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       child: InputDecorator(
         decoration: InputDecoration(labelText: label),
         child: const SizedBox(
@@ -510,7 +485,7 @@ class _DateTimeField extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       child: Row(
         children: [
           Expanded(
@@ -521,7 +496,7 @@ class _DateTimeField extends StatelessWidget {
               onTap: () => _pickDate(context),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
           Expanded(
             child: field(
               label: '时间',
@@ -551,7 +526,7 @@ class _MessageField extends StatelessWidget {
       child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       child: onTap == null ? content : InkWell(onTap: onTap, child: content),
     );
   }

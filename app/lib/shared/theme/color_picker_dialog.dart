@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'app_theme.dart';
+
 /// 自绘 HSV 取色器（无第三方依赖）：SV 方块 + 色相滑条 + 实时预览/HEX
+///
+/// 注：色相滑条与 SV 方块内的光谱渐变为功能性绘制（HSV 色彩空间固有取色），
+/// 不属于主题硬编码，不入 lint 收敛范围。
 class ColorPickerDialog extends StatefulWidget {
   const ColorPickerDialog({super.key, required this.initial});
 
@@ -119,14 +124,16 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
   }
 
   Widget _thumb(Color color) {
+    // UI 重构（Spec §6 收敛）：描边/阴影取 palette，描边色随取色动态取对比色
+    final palette = context.palette;
     return Container(
       width: 18,
       height: 18,
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+        border: Border.all(color: onColorFor(color), width: 2),
+        boxShadow: [BoxShadow(color: palette.scrim.withValues(alpha: 0.26), blurRadius: 2)],
       ),
     );
   }

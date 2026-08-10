@@ -23,4 +23,3 @@ build/
 # Project-internal data & build artifacts (do not commit)
 .workbuddy/
 /apk/
-/main

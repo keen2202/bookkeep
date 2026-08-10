@@ -180,11 +180,13 @@ class _MonthTotalsScope extends ConsumerWidget {
     final key = _dayKey(day);
     final total = totalsByDay[key];
     final net = total == null ? 0 : total.incomeMinor - total.expenseMinor;
+    // UI 重构（Spec §6）：选中/今日标记与金额色全部走 palette/语义色
     final color = net > 0
         ? context.appColors.income
         : net < 0
-            ? theme.colorScheme.error
-            : theme.colorScheme.onSurfaceVariant;
+            ? context.appColors.expense
+            : context.palette.textSecondary;
+    final onPrimary = context.palette.onPrimary;
     return Container(
       margin: const EdgeInsets.all(2),
       decoration: isToday
@@ -202,18 +204,17 @@ class _MonthTotalsScope extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text('${day.day}',
-              style: TextStyle(
-                fontSize: isToday ? 14 : 12,
+              style: (isToday ? context.text.bodyLarge : context.text.bodySmall)
+                  ?.copyWith(
                 fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                color: isToday ? Colors.white : null,
+                color: isToday ? onPrimary : null,
               )),
           if (net != 0)
             Text(
               masked ? '*' : _compactMoney(net),
-              style: TextStyle(
+              style: context.text.bodySmall?.copyWith(
                 // 审查 U-8：字号下限 12sp（WCAG 可读性）
-                fontSize: 12,
-                color: isToday ? Colors.white : color,
+                color: isToday ? onPrimary : color,
                 fontWeight: FontWeight.w600,
               ),
             ),

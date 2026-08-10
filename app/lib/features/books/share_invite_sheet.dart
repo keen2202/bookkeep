@@ -130,7 +130,8 @@ class _ShareInviteSheetState extends State<ShareInviteSheet> {
             Card(
               child: ListTile(
                 title: const Text('邀请 token'),
-                subtitle: Text(_token!, style: const TextStyle(fontSize: 12)),
+                subtitle: Text(_token!,
+                    style: Theme.of(context).textTheme.bodySmall),
                 trailing: IconButton(
                   icon: const Icon(Icons.copy),
                   tooltip: '复制',

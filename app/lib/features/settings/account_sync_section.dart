@@ -214,7 +214,7 @@ class _AccountSyncSectionState extends ConsumerState<AccountSyncSection> {
       ),
       child: Text(
         status.busy ? '同步中' : '已登录',
-        style: TextStyle(color: color, fontSize: 12),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
       ),
     );
   }

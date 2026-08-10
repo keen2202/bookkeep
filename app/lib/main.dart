@@ -26,8 +26,7 @@ import 'features/books/books_providers.dart';
 import 'features/quick_entry/quick_entry_sheet.dart';
 import 'features/recurring/recurring_service.dart';
 import 'features/sync/sync_providers.dart';
-import 'shared/theme/app_theme.dart';
-import 'shared/theme/theme_settings.dart';
+import 'shared/theme/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,7 +75,7 @@ Future<void> main() async {
     overrides: [
       databaseProvider.overrideWithValue(db),
       currentBookIdProvider.overrideWith((ref) => currentBook),
-      themeSettingsProvider.overrideWith((ref) => themeSettings),
+      themeControllerProvider.overrideWith(() => ThemeController(initial: themeSettings)),
       lockControllerProvider.overrideWith((ref) => LockController(
             lockRepo,
             LocalAuthBiometric(),
@@ -89,10 +88,10 @@ Future<void> main() async {
             locale: const Locale('zh', 'CN'),
             localizationsDelegates: bookkeepLocalizationsDelegates,
             supportedLocales: bookkeepSupportedLocales,
-            // 审查 U-2：秒开入口复用主题（深浅联动 + 个性化设置）
-            theme: buildTheme(Brightness.light, seedColor: themeSettings.seedColor),
-            darkTheme: buildTheme(Brightness.dark, seedColor: themeSettings.seedColor),
-            themeMode: themeSettings.mode,
+            // UI 重构（Spec §4）：秒开入口复用同一主题解析（预制直出 / custom 兼容）
+            theme: materialThemesFor(themeSettings).theme,
+            darkTheme: materialThemesFor(themeSettings).darkTheme,
+            themeMode: materialThemesFor(themeSettings).mode,
             builder: lockGateBuilder,
             home: const QuickEntrySheet(),
           )

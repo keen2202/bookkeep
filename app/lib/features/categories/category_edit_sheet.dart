@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/tables/categories_table.dart';
+import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/tokens.dart';
+import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_sheet.dart';
 import '../books/books_providers.dart' show categoryRepositoryProvider;
 import 'categories_page.dart' show categoriesViewModelProvider;
 
@@ -14,13 +18,11 @@ class CategoryEditSheet extends ConsumerStatefulWidget {
   final Category? category;
 
   static Future<void> show(BuildContext context, {Category? category}) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: CategoryEditSheet(category: category),
-      ),
+    // AppSheet 统一底部弹层（拖拽柄 / 圆角 lg / scrim 54%）
+    return showAppSheet<void>(
+      context,
+      title: category == null ? '新建分类' : '编辑分类',
+      child: CategoryEditSheet(category: category),
     );
   }
 
@@ -81,78 +83,78 @@ class _CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(widget.category == null ? '新建分类' : '编辑分类',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: '分类名称'),
-              validator: (v) {
-                final name = v?.trim() ?? '';
-                if (name.isEmpty) return '请输入分类名称';
-                if (name.length > 20) return '名称不能超过 20 字';
-                return null;
-              },
+    // 外层间距由 AppSheet.sheetPadding 提供
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _nameController,
+            decoration: const InputDecoration(labelText: '分类名称'),
+            validator: (v) {
+              final name = v?.trim() ?? '';
+              if (name.isEmpty) return '请输入分类名称';
+              if (name.length > 20) return '名称不能超过 20 字';
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
+          if (widget.category == null)
+            SegmentedButton<CategoryKind>(
+              segments: const [
+                ButtonSegment(value: CategoryKind.expense, label: Text('支出')),
+                ButtonSegment(value: CategoryKind.income, label: Text('收入')),
+              ],
+              selected: {_kind},
+              onSelectionChanged: (s) => setState(() => _kind = s.first),
             ),
-            const SizedBox(height: 12),
-            if (widget.category == null)
-              SegmentedButton<CategoryKind>(
-                segments: const [
-                  ButtonSegment(value: CategoryKind.expense, label: Text('支出')),
-                  ButtonSegment(value: CategoryKind.income, label: Text('收入')),
-                ],
-                selected: {_kind},
-                onSelectionChanged: (s) => setState(() => _kind = s.first),
-              ),
-            const SizedBox(height: 12),
-            // 审查 U-7：颜色选择触控目标 ≥48dp；小屏溢出改 Wrap 自动换行
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: [
-                for (var i = 0; i < _palette.length; i++)
-                  Semantics(
-                    button: true,
-                    label: '颜色 ${i + 1}',
-                    selected: _colorIndex == i,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(24),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _colorIndex = i);
-                      },
-                      child: SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: Center(
-                          child: CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Color(_palette[i]),
-                            child: _colorIndex == i
-                                ? const Icon(Icons.check, size: 18, color: Colors.white)
-                                : null,
-                          ),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
+          // 审查 U-7：颜色选择触控目标 ≥48dp；小屏溢出改 Wrap 自动换行
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (var i = 0; i < _palette.length; i++)
+                Semantics(
+                  button: true,
+                  label: '颜色 ${i + 1}',
+                  selected: _colorIndex == i,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppSpacing.lg),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _colorIndex = i);
+                    },
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                        child: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Color(_palette[i]),
+                          child: _colorIndex == i
+                              // 勾选色随底色动态取对比色（UI 重构 Spec §6 收敛）
+                              ? Icon(Icons.check,
+                                  size: 18,
+                                  color: onColorFor(Color(_palette[i])))
+                              : null,
                         ),
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: Text(_saving ? '保存中…' : '保存'),
-            ),
-          ],
-        ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md + AppSpacing.xs),
+          AppButton.primary(
+            onPressed: _save,
+            loading: _saving,
+            block: true,
+            child: const Text('保存'),
+          ),
+        ],
       ),
     );
   }

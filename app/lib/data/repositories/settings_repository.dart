@@ -13,6 +13,8 @@ class SettingsRepository {
   static const _themeSeedKey = 'theme_seed';
   static const _themeModeKey = 'theme_mode';
   static const _themeIconPackKey = 'theme_icon_pack';
+  // UI 重构（Spec §2.2/D5）：预制主题键；旧用户无此键时按旧 seed_color 落 'custom'
+  static const _themePresetIdKey = 'theme_preset_id';
 
   Future<bool> secondsOpenMode() async {
     final rows =
@@ -28,10 +30,17 @@ class SettingsRepository {
         );
   }
 
-  /// 主题设置（未配置回退默认：青碧 + 跟随系统 + 线性图标）
+  /// 主题设置（兼容规则 Spec §2.2：无 theme_preset_id 键时，
+  /// 旧用户存在 theme_seed → presetId='custom'（观感与旧版一致）；
+  /// 全新安装 → 默认 't1' 青碧·晨）
   Future<ThemeSettings> themeSettings() async {
     final rows = await (db.select(db.appMeta)
-          ..where((t) => t.key.isIn({_themeSeedKey, _themeModeKey, _themeIconPackKey})))
+          ..where((t) => t.key.isIn({
+                _themeSeedKey,
+                _themeModeKey,
+                _themeIconPackKey,
+                _themePresetIdKey,
+              })))
         .get();
     final map = {for (final r in rows) r.key: r.value};
     final seed = _parseHexColor(map[_themeSeedKey]);
@@ -41,7 +50,10 @@ class SettingsRepository {
       _ => ThemeMode.system,
     };
     final iconPack = IconPack.values.asNameMap()[map[_themeIconPackKey]];
+    final presetId = map[_themePresetIdKey] ??
+        (map.containsKey(_themeSeedKey) ? 'custom' : ThemeSettings.defaults.presetId);
     return ThemeSettings(
+      presetId: presetId,
       seedColor: seed ?? ThemeSettings.defaults.seedColor,
       mode: mode,
       iconPack: iconPack ?? ThemeSettings.defaults.iconPack,
@@ -61,6 +73,10 @@ class SettingsRepository {
           AppMetaCompanion.insert(key: _themeIconPackKey, value: settings.iconPack.name),
           onConflict: DoUpdate(
               (_) => AppMetaCompanion(value: Value(settings.iconPack.name))));
+      batch.insert(db.appMeta,
+          AppMetaCompanion.insert(key: _themePresetIdKey, value: settings.presetId),
+          onConflict: DoUpdate(
+              (_) => AppMetaCompanion(value: Value(settings.presetId))));
     });
   }
 

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
+import '../../shared/widgets/app_amount_text.dart';
+import '../../shared/widgets/app_empty.dart';
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart' show currentRoleProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
@@ -28,7 +30,12 @@ class BillsPage extends ConsumerWidget {
       error: (e, _) => Center(child: Text('加载失败：$e')),
       data: (days) {
         if (days.isEmpty) {
-          return Center(child: Text(viewer ? '暂无账单' : '还没有账单，点击 + 记一笔'));
+          // 统一空态（Spec §6 AppEmpty）
+          return AppEmpty(
+            icon: Icons.receipt_long_outlined,
+            title: viewer ? '暂无账单' : '还没有账单',
+            message: viewer ? null : '点击右下角 + 记一笔',
+          );
         }
         final categoriesAsync = ref.watch(categoriesViewModelProvider);
         final categories = categoriesAsync.maybeWhen(
@@ -80,25 +87,25 @@ class _DayHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final money = masked ? '***' : null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
       child: Row(
         children: [
           Text('${day.day.month}月${day.day.day}日 ${_weekdayNames[day.day.weekday - 1]}',
               style: theme.textTheme.titleSmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  ?.copyWith(color: context.palette.textSecondary)),
           const Spacer(),
           if (day.expenseMinor > 0)
-            Text('支出 ${money ?? formatMoney(day.expenseMinor)}',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: context.appColors.expense)),
+            Text('支出 ', style: theme.textTheme.bodySmall),
+          if (day.expenseMinor > 0)
+            AppAmountText.minor(-day.expenseMinor, signed: false, masked: masked),
           if (day.expenseMinor > 0 && day.incomeMinor > 0)
             Text(' · ', style: theme.textTheme.bodySmall),
           if (day.incomeMinor > 0)
-            Text('收入 ${money ?? formatMoney(day.incomeMinor)}',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: context.appColors.income)),
+            Text('收入 ', style: theme.textTheme.bodySmall),
+          if (day.incomeMinor > 0)
+            AppAmountText.minor(day.incomeMinor, signed: false, masked: masked),
         ],
       ),
     );
@@ -114,7 +121,6 @@ class _BillTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isTransfer = tx.type == TransactionType.transfer;
     final category = tx.categoryId == null ? null : categories[tx.categoryId];
     final name = isTransfer
@@ -127,16 +133,12 @@ class _BillTile extends StatelessWidget {
     final icon = isTransfer
         ? Icons.swap_horiz
         : categoryIcon(category?.icon ?? '');
-    final iconColor = category == null ? theme.colorScheme.onSurfaceVariant : Color(category.color);
-    final amount = masked
-        ? '***'
-        : tx.amountMinor < 0
-            ? formatMoney(tx.amountMinor)
-            : '+${formatMoney(tx.amountMinor)}';
-    final amountColor = switch (tx.type) {
-      TransactionType.expense => context.appColors.expense,
-      TransactionType.income => context.appColors.income,
-      TransactionType.transfer => theme.colorScheme.onSurfaceVariant,
+    final iconColor = category == null ? context.palette.textSecondary : Color(category.color);
+    // 金额：等宽数字 + 按交易类型语义着色（UI 重构 Spec §6 AppAmountText）
+    final amountTone = switch (tx.type) {
+      TransactionType.expense => AppAmountTone.expense,
+      TransactionType.income => AppAmountTone.income,
+      TransactionType.transfer => AppAmountTone.neutral,
     };
     final local = tx.occurredAt.toLocal();
     final time =
@@ -149,7 +151,7 @@ class _BillTile extends StatelessWidget {
       ),
       title: Text(name),
       subtitle: Text(tx.note == null || tx.note!.isEmpty ? time : '$time · ${tx.note}'),
-      trailing: Text(amount, style: theme.textTheme.titleSmall?.copyWith(color: amountColor)),
+      trailing: AppAmountText.minor(tx.amountMinor, masked: masked, tone: amountTone),
       dense: true,
     );
   }

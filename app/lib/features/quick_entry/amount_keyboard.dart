@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../shared/theme/app_theme.dart';
+
 /// 自绘数字键盘（Spec §3.1 / BK-P0-001：禁用系统键盘弹起延迟）
 class AmountKeyboard extends StatelessWidget {
   const AmountKeyboard({super.key, required this.onKey, this.onConfirm});
@@ -74,11 +76,14 @@ class _Key extends StatelessWidget {
               ? Icon(label == '⌫' ? Icons.backspace_outlined : Icons.clear, size: 22)
               : Text(
                   label,
-                  style: TextStyle(
-                    fontSize: isConfirm ? 16 : 22,
-                    fontWeight: isConfirm ? FontWeight.bold : FontWeight.normal,
-                    color: isConfirm ? Theme.of(context).colorScheme.primary : null,
-                  ),
+                  // UI 重构（Spec §6）：字号收敛至字阶——数字 headline(22)/确定 title(17)
+                  style: isConfirm
+                      ? context.text.titleLarge?.copyWith(
+                          color: context.palette.primary,
+                        )
+                      : context.text.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w400,
+                        ),
                 ),
         ),
       ),

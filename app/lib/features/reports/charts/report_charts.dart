@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/utils/money_format.dart';
 import '../../../data/repositories/reports_repository.dart';
-
-const _palette = [
-  Color(0xFFFF7043), Color(0xFFFFB300), Color(0xFF66BB6A), Color(0xFF26C6DA),
-  Color(0xFF42A5F5), Color(0xFF7E57C2), Color(0xFFEC407A), Color(0xFF8D6E63),
-];
+import '../../../shared/theme/app_theme.dart';
+import '../../../shared/theme/chart_colors.dart';
 
 /// 可读刻度（审查 U-11）：大额转「x.xx万/x.xx百万」，小额原样；负值保留符号。
 /// 修正刻度错位：1万 = 1,000,000 minor，1百万 = 100,000,000 minor。
@@ -20,7 +17,7 @@ String _compactTick(int minor) {
 }
 
 /// 分类占比饼图（Spec §3.5；审查 U-11：扇区仅百分比，金额进外置图例；
-/// 脱敏态图例金额脱敏）
+/// 脱敏态图例金额脱敏）。序列色自 palette/语义色派生（UI 重构 BK-UI-007）
 class CategoryPieChart extends StatelessWidget {
   const CategoryPieChart({super.key, required this.slices, required this.hideAmounts});
 
@@ -32,6 +29,7 @@ class CategoryPieChart extends StatelessWidget {
     if (slices.isEmpty) {
       return const Center(child: Text('暂无数据'));
     }
+    final series = chartSeriesColors(context);
     final total = slices.fold<int>(0, (a, b) => a + b.amountMinor);
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -46,13 +44,15 @@ class CategoryPieChart extends StatelessWidget {
                 for (var i = 0; i < slices.length; i++)
                   PieChartSectionData(
                     value: slices[i].amountMinor.toDouble(),
-                    color: _palette[i % _palette.length],
+                    color: series[i % series.length],
                     title: hideAmounts
                         ? null
                         : total <= 0
                             ? null
                             : '${(slices[i].amountMinor * 100 ~/ total)}%',
-                    titleStyle: const TextStyle(fontSize: 12, color: Colors.white),
+                    titleStyle: context.text.bodySmall?.copyWith(
+                      color: onColorFor(series[i % series.length]),
+                    ),
                     radius: 64,
                   ),
               ],
@@ -74,7 +74,7 @@ class CategoryPieChart extends StatelessWidget {
                     width: 10,
                     height: 10,
                     decoration: BoxDecoration(
-                      color: _palette[i % _palette.length],
+                      color: series[i % series.length],
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -105,6 +105,8 @@ class PeriodBarChart extends StatelessWidget {
     if (buckets.isEmpty) {
       return const Center(child: Text('暂无数据'));
     }
+    final series = chartSeriesColors(context);
+    final axisStyle = context.text.bodySmall;
     final maxAmount = buckets.fold<int>(0, (a, b) => a > b.amountMinor ? a : b.amountMinor);
     return SizedBox(
       height: 220,
@@ -128,8 +130,7 @@ class PeriodBarChart extends StatelessWidget {
                       reservedSize: 52,
                       getTitlesWidget: (value, meta) {
                         if (value <= 0) return const SizedBox.shrink();
-                        return Text(_compactTick(value.toInt()),
-                            style: const TextStyle(fontSize: 12));
+                        return Text(_compactTick(value.toInt()), style: axisStyle);
                       },
                     ),
                   ),
@@ -143,7 +144,7 @@ class PeriodBarChart extends StatelessWidget {
                   if (index < 0 || index >= buckets.length) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(buckets[index].label, style: const TextStyle(fontSize: 12)),
+                    child: Text(buckets[index].label, style: axisStyle),
                   );
                 },
               ),
@@ -154,7 +155,7 @@ class PeriodBarChart extends StatelessWidget {
               BarChartGroupData(x: i, barRods: [
                 BarChartRodData(
                   toY: buckets[i].amountMinor.toDouble(),
-                  color: _palette[i % _palette.length],
+                  color: series[i % series.length],
                   width: 16,
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -186,6 +187,10 @@ class TrendLineChart extends StatelessWidget {
     if (totals.isEmpty) {
       return const Center(child: Text('暂无数据'));
     }
+    // 收支语义色（UI 重构 BK-UI-007：序列色语义化，浅深主题锁定）
+    final expenseColor = context.appColors.expense;
+    final incomeColor = context.appColors.income;
+    final axisStyle = context.text.bodySmall;
     final sampled = totals.length > maxPoints
         ? [
             for (var i = 0; i < totals.length; i += (totals.length / maxPoints).ceil())
@@ -231,9 +236,7 @@ class TrendLineChart extends StatelessWidget {
                   LineTooltipItem(
                     '${sampled[s.spotIndex].date}\n${formatMoney(s.y.round())}',
                     TextStyle(
-                      color: s.barIndex == 0
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.primary,
+                      color: s.barIndex == 0 ? expenseColor : incomeColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -250,8 +253,7 @@ class TrendLineChart extends StatelessWidget {
                       reservedSize: 52,
                       getTitlesWidget: (value, meta) {
                         if (value <= 0) return const SizedBox.shrink();
-                        return Text(_compactTick(value.toInt()),
-                            style: const TextStyle(fontSize: 12));
+                        return Text(_compactTick(value.toInt()), style: axisStyle);
                       },
                     ),
                   ),
@@ -270,8 +272,7 @@ class TrendLineChart extends StatelessWidget {
                   final parts = sampled[index].date.split('-');
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text('${parts[1]}-${parts[2]}',
-                        style: const TextStyle(fontSize: 10)),
+                    child: Text('${parts[1]}-${parts[2]}', style: axisStyle),
                   );
                 },
               ),
@@ -280,14 +281,14 @@ class TrendLineChart extends StatelessWidget {
           lineBarsData: [
             LineChartBarData(
               spots: expense,
-              color: Theme.of(context).colorScheme.error,
+              color: expenseColor,
               barWidth: 2,
               isCurved: true,
               dotData: const FlDotData(show: false),
             ),
             LineChartBarData(
               spots: income,
-              color: Theme.of(context).colorScheme.primary,
+              color: incomeColor,
               barWidth: 2,
               isCurved: true,
               dotData: const FlDotData(show: false),

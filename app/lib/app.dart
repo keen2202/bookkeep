@@ -27,8 +27,8 @@ import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/theme_settings_page.dart';
 import 'shared/theme/app_icons.dart';
-import 'shared/theme/app_theme.dart';
-import 'shared/theme/theme_settings.dart';
+import 'shared/theme/theme_controller.dart';
+import 'shared/theme/theme_transition.dart';
 
 /// 中文本地化配置（主入口与秒开模式的 MaterialApp 共用）
 const bookkeepLocalizationsDelegates = [
@@ -95,18 +95,22 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    // 个性化主题：种子色 + 外观模式 + 图标风格（设置页即时生效，全树热重建）
-    final themeSettings = ref.watch(themeSettingsProvider);
+    // 个性化主题：预制主题直出 / 自定义种子色（设置页即时生效，全树热重建）
+    final themeSettings = ref.watch(themeControllerProvider);
+    final themes = materialThemesFor(themeSettings);
     return MaterialApp(
       title: 'bookkeep',
       locale: const Locale('zh', 'CN'),
       localizationsDelegates: bookkeepLocalizationsDelegates,
       supportedLocales: bookkeepSupportedLocales,
-      // 审查 U-2：深色模式（themeMode: system 跟随系统），语义色经 AppColors 扩展
-      theme: buildTheme(Brightness.light, seedColor: themeSettings.seedColor),
-      darkTheme: buildTheme(Brightness.dark, seedColor: themeSettings.seedColor),
-      themeMode: themeSettings.mode,
-      builder: lockGateBuilder,
+      // UI 重构（Spec §4）：预制主题完整直出；custom 退回 fromSeed 旧路径
+      theme: themes.theme,
+      darkTheme: themes.darkTheme,
+      themeMode: themes.mode,
+      // 主题切换 250ms 过场（BK-UI-004）+ 隐私锁门禁
+      builder: (context, child) => ThemeTransition(
+        child: lockGateBuilder(context, child),
+      ),
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
         builder: (navContext) {
