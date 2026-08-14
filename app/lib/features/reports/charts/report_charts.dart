@@ -16,6 +16,47 @@ String _compactTick(int minor) {
   return '$sign${formatMoney(minor).replaceAll('¥', '')}';
 }
 
+/// X 轴标签压缩：桶间「共有」的部分对区分各桶没有贡献（跨年对比的同期后缀、
+/// 同年的年份前缀），剥离后仅保留区分维度，避免长日期标签在窄屏上相互重叠。
+/// - 跨年对比（各桶年份不同、同期相同）→ 仅保留年份：`2021-08-09` → `2021`；
+/// - 按月分桶（自定义范围，含跨年）→ 仅保留月：`2026-01` → `01`；
+/// - 其余（如「年」对比、按周）→ 保持原样。
+List<String> compactPeriodAxisLabels(List<String> labels) {
+  if (labels.length < 2) return List.of(labels);
+  final suffix = _commonSuffix(labels);
+  final yearPrefixed = labels.every(_startsWithYear);
+  // 跨年对比：年份变化、同期后缀固定 → 保留年份
+  if (yearPrefixed && suffix.length >= 2) {
+    return [
+      for (final l in labels) l.substring(0, l.length - suffix.length),
+    ];
+  }
+  // 按月分桶（YYYY-MM…）：剥离「YYYY-」年份前缀，保留月份
+  if (yearPrefixed && labels.every(_hasYearSeparator)) {
+    return [for (final l in labels) l.substring(5)];
+  }
+  return List.of(labels);
+}
+
+bool _startsWithYear(String label) {
+  if (label.length < 4) return false;
+  return int.tryParse(label.substring(0, 4)) != null;
+}
+
+bool _hasYearSeparator(String label) =>
+    label.length > 4 && label.codeUnitAt(4) == 0x2D; // '-'
+
+String _commonSuffix(List<String> labels) {
+  final first = labels.first;
+  var len = 0;
+  while (len < first.length) {
+    final c = first[first.length - 1 - len];
+    if (labels.any((l) => len >= l.length || l[l.length - 1 - len] != c)) break;
+    len++;
+  }
+  return first.substring(first.length - len);
+}
+
 /// 分类占比饼图（Spec §3.5；审查 U-11：扇区仅百分比，金额进外置图例；
 /// 脱敏态图例金额脱敏）。序列色自 palette/语义色派生（UI 重构 BK-UI-007）
 class CategoryPieChart extends StatelessWidget {
@@ -108,6 +149,9 @@ class PeriodBarChart extends StatelessWidget {
     final series = chartSeriesColors(context);
     final axisStyle = context.text.bodySmall;
     final maxAmount = buckets.fold<int>(0, (a, b) => a > b.amountMinor ? a : b.amountMinor);
+    final axisLabels = compactPeriodAxisLabels([
+      for (final b in buckets) b.label,
+    ]);
     return SizedBox(
       height: 220,
       child: BarChart(
@@ -130,7 +174,11 @@ class PeriodBarChart extends StatelessWidget {
                       reservedSize: 52,
                       getTitlesWidget: (value, meta) {
                         if (value <= 0) return const SizedBox.shrink();
-                        return Text(_compactTick(value.toInt()), style: axisStyle);
+                        return SideTitleWidget(
+                          meta: meta,
+                          space: 4,
+                          child: Text(_compactTick(value.toInt()), style: axisStyle),
+                        );
                       },
                     ),
                   ),
@@ -139,12 +187,14 @@ class PeriodBarChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                reservedSize: 32,
                 getTitlesWidget: (value, meta) {
                   final index = value.toInt();
                   if (index < 0 || index >= buckets.length) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(buckets[index].label, style: axisStyle),
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 4,
+                    child: Text(axisLabels[index], style: axisStyle),
                   );
                 },
               ),
