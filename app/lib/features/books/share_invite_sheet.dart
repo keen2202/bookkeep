@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../shared/widgets/app_button.dart';
 import '../sync/sync_api.dart';
 import 'books_page.dart' show accessToken, booksApi;
 
@@ -120,10 +121,16 @@ class _ShareInviteSheetState extends State<ShareInviteSheet> {
             onChanged: (v) => setState(() => _role = v ?? 'editor'),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
+          AppButton.primary(
             onPressed: _busy ? null : _generate,
-            icon: const Icon(Icons.link),
-            label: const Text('生成邀请链接'),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.link, size: 18),
+                SizedBox(width: 8),
+                Text('生成邀请链接'),
+              ],
+            ),
           ),
           if (_token != null) ...[
             const SizedBox(height: 12),
@@ -153,10 +160,16 @@ class _ShareInviteSheetState extends State<ShareInviteSheet> {
             decoration: const InputDecoration(labelText: '粘贴他人分享的 token'),
           ),
           const SizedBox(height: 12),
-          FilledButton.tonalIcon(
+          AppButton.secondary(
             onPressed: _busy ? null : _join,
-            icon: const Icon(Icons.login),
-            label: const Text('加入'),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.login, size: 18),
+                SizedBox(width: 8),
+                Text('加入'),
+              ],
+            ),
           ),
           if (_joinResult != null)
             Padding(

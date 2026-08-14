@@ -71,6 +71,22 @@ void main() {
     expect(read.manualAlpha, BackgroundSettings.defaults.manualAlpha);
   });
 
+  test('脏数据兜底：bg_overlay_mode 非法值回退 auto（审核 S3，解析层全键兜底）', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final repo = SettingsRepository(db);
+    await repo.setBackgroundSettings(
+        const BackgroundSettings(overlayMode: OverlayMode.manual));
+
+    // 直接写脏值模拟异常持久化
+    await db.into(db.appMeta).insert(
+          AppMetaCompanion.insert(key: 'bg_overlay_mode', value: 'not-a-mode'),
+          onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('not-a-mode'))),
+        );
+    final read = await repo.backgroundSettings();
+    expect(read.overlayMode, OverlayMode.auto);
+  });
+
   test('copyWith：clearImage 清除路径但保留其余字段', () {
     const s = BackgroundSettings(
       enabled: true,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/services/capture_candidate.dart';
+import '../../shared/widgets/app_button.dart';
 import 'capture_confirm_page.dart';
 import 'sms_parser.dart';
 
@@ -141,16 +142,28 @@ class _VoiceEntrySheetState extends State<VoiceEntrySheet> {
               maxLines: 3,
             ),
             const SizedBox(height: 12),
-            FilledButton.icon(
+            AppButton.primary(
               onPressed: _recognize,
-              icon: const Icon(Icons.mic),
-              label: const Text('语音识别'),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.mic, size: 18),
+                  SizedBox(width: 8),
+                  Text('语音识别'),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
-            FilledButton.tonalIcon(
+            AppButton.secondary(
               onPressed: _extract,
-              icon: const Icon(Icons.auto_awesome),
-              label: const Text('提取并确认'),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome, size: 18),
+                  SizedBox(width: 8),
+                  Text('提取并确认'),
+                ],
+              ),
             ),
             if (_hint != null)
               Padding(

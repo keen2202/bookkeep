@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/local/database_provider.dart';
@@ -39,17 +42,32 @@ class BackgroundController extends AsyncNotifier<BackgroundSettings> {
         return const PickResult.failure('未选择图片');
       }
       final file = await service.importImage(picked);
+      // P1 预缓存（Spec §2.4）：落盘后立即预热解码缓存，压缩首屏解码抖动，
+      // 支撑真机"选图到生效 ≤800ms"指标；失败静默（渲染侧 errorBuilder 兜底）
+      _precacheImage(file);
       final current = state.valueOrNull ?? BackgroundSettings.defaults;
       await _persist(current.copyWith(
         enabled: true,
         imagePath: '${BackgroundService.dirName}/${BackgroundService.fileName}',
       ));
+      // backgroundImageFileProvider / backgroundLuminanceProvider 均 watch 本
+      // controller（select valueOrNull），_persist 每次写入新实例即自动触发重解析/
+      // 重采样（含同路径覆盖选图）。不在 controller 内显式 invalidate：
+      // Riverpod 2.6 调试模式下会触发 CircularDependencyError（依赖方在
+      // 被依赖方执行期间被失效）。
       return PickResult.ok(file);
     } on FormatException catch (e) {
       return PickResult.failure('图片无法读取或已损坏：$e');
     } catch (e) {
       return PickResult.failure('选图失败：$e');
     }
+  }
+
+  /// 以真实解码预热 ImageCache（Spec §2.4 P1）；监听器立即注册保证加载被触发，
+  /// 结果不等待、失败静默
+  void _precacheImage(File file) {
+    final stream = FileImage(file).resolve(ImageConfiguration.empty);
+    stream.addListener(ImageStreamListener((_, _) {}, onError: (_, _) {}));
   }
 
   /// 重新采样当前图片亮度（主题明暗切换后遮罩重算，Spec §3.2）；
@@ -78,6 +96,8 @@ class BackgroundController extends AsyncNotifier<BackgroundSettings> {
   Future<void> clear() async {
     final current = state.valueOrNull ?? BackgroundSettings.defaults;
     await _persist(current.copyWith(enabled: false, clearImage: true));
+    // 图片文件 provider 经 watch 本 controller 自动随 settings 更新，
+    // 无需（也不能）在 controller 内显式 invalidate（依赖环，见 pickAndApply）
     ref.invalidate(backgroundLuminanceProvider);
     final service = ref.read(backgroundServiceProvider);
     await service.deleteImage();
@@ -103,4 +123,17 @@ final backgroundLuminanceProvider = FutureProvider<double?>((ref) async {
       .resolveImageFile(imagePath);
   if (docs == null) return null;
   return ref.read(backgroundServiceProvider).sampleLuminance(docs);
+});
+
+/// 当前背景图文件（绝对路径解析，审核 F2/R1）：
+/// 渲染侧（AppBackground / 外观页预览）一律消费本 provider 解析后的绝对路径
+/// `File`，消除"写盘绝对路径 / 读图相对路径"双轨（真机 CWD 不可靠，
+/// 相对路径可能静默渲染失败）。未启用 / 未选图 / 文件缺失返回 null
+/// （渲染侧走"无背景图"分支）。
+final backgroundImageFileProvider = FutureProvider<File?>((ref) async {
+  final settings =
+      ref.watch(backgroundControllerProvider.select((s) => s.valueOrNull));
+  final imagePath = settings?.imagePath;
+  if (settings == null || !settings.enabled || imagePath == null) return null;
+  return ref.read(backgroundServiceProvider).resolveImageFile(imagePath);
 });

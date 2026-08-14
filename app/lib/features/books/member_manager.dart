@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/widgets/app_button.dart';
 import '../sync/sync_api.dart';
 import 'books_api.dart';
 import 'books_page.dart' show accessToken, booksApi;
@@ -101,7 +102,7 @@ class _MemberManagerSheetState extends State<MemberManagerSheet> {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          AppButton.danger(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('移除'),
           ),

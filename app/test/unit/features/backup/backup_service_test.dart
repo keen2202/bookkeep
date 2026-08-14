@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:drift/drift.dart' hide isNotNull;
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,7 +9,9 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/tables/accounts_table.dart';
 import 'package:bookkeep_app/data/local/tables/sync_ops_table.dart';
 import 'package:bookkeep_app/data/local/tables/transactions_table.dart';
+import 'package:bookkeep_app/data/repositories/settings_repository.dart';
 import 'package:bookkeep_app/features/backup/backup_service.dart';
+import 'package:bookkeep_app/shared/theme/background/background_settings.dart';
 
 void main() {
   Future<AppDatabase> seedDb() async {
@@ -190,6 +192,44 @@ void main() {
       throwsA(isA<BackupCipherException>()),
     );
     await db.close();
+  });
+
+  test('备份排除 bg_* 键：快照不含背景键，恢复至新库后背景设置回退默认（审核 F6）',
+      () async {
+    final src = await seedDb();
+    // 写入完整背景设置（5 个 bg_* 键）
+    await SettingsRepository(src).setBackgroundSettings(
+      const BackgroundSettings(
+        enabled: true,
+        imagePath: 'background/bg.png',
+        overlayMode: OverlayMode.manual,
+        manualAlpha: 0.42,
+        blurEnabled: false,
+      ),
+    );
+    final backup = await BackupService(src).createBackup('口令');
+
+    // 快照明文显式断言：bg_* 键未入包（app_meta 行数由排除前缀收口）
+    final plain = await _decryptWith(BackupCipher(), backup, '口令');
+    expect(plain, isNot(contains('bg_enabled')));
+    expect(plain, isNot(contains('bg_image_path')));
+    expect(plain, isNot(contains('bg_overlay_mode')));
+    expect(plain, isNot(contains('bg_overlay_alpha')));
+    expect(plain, isNot(contains('bg_blur')));
+
+    // 恢复至全新库：无悬空背景态——背景设置回退默认
+    final target = AppDatabase(NativeDatabase.memory());
+    addTearDown(target.close);
+    await BackupService(target).restore(backup, '口令');
+    final restored = await SettingsRepository(target).backgroundSettings();
+    expect(restored.enabled, isFalse);
+    expect(restored.imagePath, isNull);
+    expect(restored.overlayMode, OverlayMode.auto);
+
+    // 业务数据仍完整恢复（排除只作用于 app_meta 前缀键）
+    final accounts = await target.select(target.accounts).get();
+    expect(accounts.single.name, '钱包');
+    await src.close();
   });
 }
 

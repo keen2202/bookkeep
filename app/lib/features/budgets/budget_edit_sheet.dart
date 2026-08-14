@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/local/database.dart';
 import '../../domain/services/budget_progress_calculator.dart';
 import '../../features/quick_entry/amount_parser.dart';
+import '../../shared/widgets/app_button.dart';
 import '../books/books_providers.dart' show budgetRepositoryProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'budget_providers.dart' show budgetsViewModelProvider, monthBudgetSummaryProvider;
@@ -127,7 +128,7 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          AppButton.danger(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('删除'),
           ),
@@ -208,15 +209,15 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
               },
             ),
             const SizedBox(height: 20),
-            FilledButton(
+            AppButton.primary(
+              block: true,
               onPressed: _saving ? null : _save,
               child: Text(_saving ? '保存中…' : '保存'),
             ),
             if (_isEdit) ...[
               const SizedBox(height: 8),
-              OutlinedButton(
+              AppButton.danger(
                 onPressed: _saving ? null : _delete,
-                style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
                 child: const Text('删除预算'),
               ),
             ],

@@ -216,37 +216,63 @@ void main() {
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       expect(find.text('使用背景图片'), findsOneWidget);
-      // 未选图：开关禁用，提示选图
+      // 未选图：开关禁用、提示选图、首次选图主按钮 + 预览占位存在（审核 F1）
       final switchTile = tester.widget<SwitchListTile>(
         find.widgetWithText(SwitchListTile, '使用背景图片'),
       );
       expect(switchTile.onChanged, isNull);
       expect(find.text('请先选择一张相册图片'), findsOneWidget);
+      expect(find.text('选择背景图片'), findsOneWidget);
+      expect(find.text('未设置背景'), findsOneWidget);
 
-      // 选图：fake zone 中 await 真实异步链（async 微任务/文件 IO）永不完成
-      // （preset 等纯 drift 用例不挂，是因为 drift 走 isolate 消息；文件 IO
-      // 走事件循环），故在 runAsync（真实 zone）内执行；夹具与 fake 服务的
-      // 文件操作已同步化避免二次挂起
-      final controller = ProviderScope.containerOf(
-        tester.element(find.byType(AppearancePage)),
-      ).read(backgroundControllerProvider.notifier);
-      final result = await tester.runAsync(controller.pickAndApply);
-      expect(result!.isSuccess, isTrue);
+      // 审核 R4：真实交互路径——点击「选择背景图片」主按钮驱动选图，
+      // 不再直调 controller.pickAndApply()。真实异步链（fake 服务文件 IO +
+      // drift 落库 + 提示条计时）在 runAsync（真实 zone）内完成，轮询
+      // 持久化结果直至落库（避免固定 sleep）
+      await tester.runAsync(() async {
+        await tester.tap(find.text('选择背景图片'));
+        await tester.pump();
+        final repo = SettingsRepository(db);
+        for (var i = 0; i < 200; i++) {
+          if ((await repo.backgroundSettings()).enabled) break;
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      });
+      await tester.pump();
+      // 收掉「背景图片已应用」提示条的计时器（真实 zone 计时器，防测试尾挂起）
+      tester
+          .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+          .clearSnackBars();
       await tester.pump();
 
-      // 应用成功：开关可用且开启，持久化落库
+      // 应用成功：开关可用且开启，持久化落库，遮罩/模糊控制区出现
       final updated = await SettingsRepository(db).backgroundSettings();
       expect(updated.enabled, isTrue);
       expect(updated.imagePath, 'background/bg.png');
       expect(find.text('遮罩'), findsOneWidget);
       expect(find.text('背景模糊'), findsOneWidget);
+      expect(find.text('更换图片'), findsOneWidget);
 
-      // 恢复默认：开关关闭、图片路径清除
-      await tester.runAsync(controller.clear);
+      // 恢复默认：仍走真实交互路径——点击「恢复默认」按钮（审核 R4）
+      await tester.scrollUntilVisible(find.text('恢复默认'), 120,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(find.text('恢复默认'));
+        await tester.pump();
+        final repo = SettingsRepository(db);
+        for (var i = 0; i < 200; i++) {
+          final s = await repo.backgroundSettings();
+          if (!s.enabled && s.imagePath == null) break;
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      });
       await tester.pumpAndSettle();
       final cleared = await SettingsRepository(db).backgroundSettings();
       expect(cleared.enabled, isFalse);
       expect(cleared.imagePath, isNull);
+      // 恢复后回到未选图态：主按钮重新出现
+      expect(find.text('选择背景图片'), findsOneWidget);
     });
 
     testWidgets('manual alpha slider updates live and persists', (tester) async {
@@ -327,6 +353,13 @@ class _FakeService extends BackgroundService {
     target.parent.createSync(recursive: true);
     target.writeAsBytesSync(await source.readAsBytes());
     return target;
+  }
+
+  /// 相对路径 → 临时目录绝对路径（与真实实现映射文档目录一致，审核 F2）
+  @override
+  Future<File?> resolveImageFile(String relativePath) async {
+    final target = File('${tempDir.path}/$relativePath');
+    return await target.exists() ? target : null;
   }
 
   @override

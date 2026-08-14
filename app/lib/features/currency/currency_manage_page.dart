@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/constants.dart';
 import '../../core/ledger_version.dart';
 import '../../data/local/database.dart';
+import '../../shared/widgets/app_button.dart';
 import 'currency_providers.dart';
 
 /// 汇率管理（审查 F-8）：手动录入/修改汇率；未设置汇率显式标注，
@@ -87,7 +88,7 @@ class _CurrencyTile extends ConsumerWidget {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('取消'),
           ),
-          FilledButton(
+          AppButton.primary(
             onPressed: () => Navigator.pop(dialogContext, controller.text),
             child: const Text('保存'),
           ),

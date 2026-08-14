@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:bookkeep_app/features/books/books_api.dart';
 import 'package:bookkeep_app/features/books/books_page.dart';
 import 'package:bookkeep_app/features/books/member_manager.dart';
+import 'package:bookkeep_app/shared/widgets/app_button.dart';
 
 const bookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
@@ -78,7 +79,7 @@ void main() {
     expect(find.text('移除 editor@x.com？'), findsOneWidget);
     expect(find.text('移除后其立即失去该账本访问权限'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, '移除'));
+    await tester.tap(find.widgetWithText(AppButton, '移除'));
     await tester.pumpAndSettle();
 
     expect(removedUserId, 'u2');
@@ -115,7 +116,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.person_remove_outlined).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '移除'));
+    await tester.tap(find.widgetWithText(AppButton, '移除'));
     await tester.pumpAndSettle();
 
     expect(find.text('仅 owner 可移除成员'), findsOneWidget);

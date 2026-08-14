@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import '../../data/local/database.dart';
 import '../../data/local/database_provider.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
@@ -318,7 +319,8 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
             decoration: const InputDecoration(labelText: '每期金额（元）'),
           ),
           const SizedBox(height: 16),
-          FilledButton(
+          AppButton.primary(
+            block: true,
             onPressed: accounts.isEmpty ? null : _save,
             child: const Text('保存规则'),
           ),

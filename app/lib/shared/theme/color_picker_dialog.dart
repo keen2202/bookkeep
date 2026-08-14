@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_button.dart';
 import 'app_theme.dart';
 
 /// 自绘 HSV 取色器（无第三方依赖）：SV 方块 + 色相滑条 + 实时预览/HEX
@@ -115,7 +116,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('取消'),
         ),
-        FilledButton(
+        AppButton.primary(
           onPressed: () => Navigator.pop(context, color),
           child: const Text('确定'),
         ),

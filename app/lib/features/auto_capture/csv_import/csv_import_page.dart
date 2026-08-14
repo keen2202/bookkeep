@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/services/capture_candidate.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../books/books_providers.dart' show transactionRepositoryProvider;
 import '../capture_confirm_page.dart';
 import '../import_service.dart';
@@ -80,10 +81,16 @@ class _CsvImportPageState extends ConsumerState<CsvImportPage> {
             Row(
               children: [
                 Expanded(
-                  child: FilledButton.icon(
+                  child: AppButton.primary(
                     onPressed: _parse,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('解析并去重'),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.upload_file, size: 18),
+                        SizedBox(width: 8),
+                        Text('解析并去重'),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -95,10 +102,16 @@ class _CsvImportPageState extends ConsumerState<CsvImportPage> {
               ),
             if (parsed != null && parsed.isNotEmpty) ...[
               const SizedBox(height: 12),
-              FilledButton.tonalIcon(
+              AppButton.secondary(
                 onPressed: _confirm,
-                icon: const Icon(Icons.fact_check_outlined),
-                label: Text('确认入账（${parsed.length} 笔）'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.fact_check_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Text('确认入账（${parsed.length} 笔）'),
+                  ],
+                ),
               ),
             ],
           ],

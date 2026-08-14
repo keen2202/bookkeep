@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -73,11 +72,10 @@ class AppBackground extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings =
-        ref.watch(backgroundControllerProvider.select((s) => s.valueOrNull));
-    final imagePath = settings?.imagePath;
-    final enabled = settings?.enabled ?? false;
-    if (settings == null || !enabled || imagePath == null) {
+    // 审核 F2：渲染侧消费 backgroundImageFileProvider（绝对路径解析），
+    // null（未启用/未选图/文件缺失）走"无背景图"分支
+    final imageFile = ref.watch(backgroundImageFileProvider).valueOrNull;
+    if (imageFile == null) {
       // 无背景图：状态栏图标按主题明暗（原 AppBarTheme 静态取值迁移至此）
       final dark = context.tokens.isDark;
       return _statusBarRegion(
@@ -86,9 +84,11 @@ class AppBackground extends ConsumerWidget {
       );
     }
 
+    final settings =
+        ref.watch(backgroundControllerProvider.select((s) => s.valueOrNull));
     final imageL = ref.watch(backgroundLuminanceProvider).valueOrNull;
     final visuals = backgroundVisuals(
-      settings: settings,
+      settings: settings ?? BackgroundSettings.defaults,
       imageL: imageL,
       palette: context.palette,
       dark: context.tokens.isDark,
@@ -104,9 +104,9 @@ class AppBackground extends ConsumerWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // ① 背景图（cacheWidth 限解码尺寸，Spec §5.4.5 / §10 内存）
+            // ① 背景图（绝对路径；cacheWidth 限解码尺寸，Spec §5.4.5 / §10 内存）
             Image.file(
-              File(imagePath),
+              imageFile,
               fit: BoxFit.cover,
               cacheWidth: decodeWidth,
               filterQuality: FilterQuality.medium,
@@ -115,7 +115,7 @@ class AppBackground extends ConsumerWidget {
             // ② 智能遮罩（主题 background 色，保证卡片层级不被冲淡）
             ColoredBox(color: context.palette.background.withValues(alpha: visuals.alpha)),
             // ③ 8px 高斯模糊（可关闭，Spec §5.2 / §10 性能）
-            if (settings.blurEnabled)
+            if (settings?.blurEnabled ?? false)
               BackdropFilter(
                 filter: ui.ImageFilter.blur(
                   sigmaX: blurSigma,

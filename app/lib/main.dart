@@ -21,7 +21,6 @@ import 'data/repositories/lock_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'features/auth_lock/biometric.dart';
 import 'features/auth_lock/lock_controller.dart';
-import 'features/auth_lock/lock_gate.dart';
 import 'features/books/books_providers.dart';
 import 'features/quick_entry/quick_entry_sheet.dart';
 import 'features/recurring/recurring_service.dart';
@@ -89,10 +88,11 @@ Future<void> main() async {
             localizationsDelegates: bookkeepLocalizationsDelegates,
             supportedLocales: bookkeepSupportedLocales,
             // UI 重构（Spec §4）：秒开入口复用同一主题解析（预制直出 / custom 兼容）
+            // 与主入口共用 appShellBuilder（审核 F7/A2：背景/过场/隐私锁观感一致）
             theme: materialThemesFor(themeSettings).theme,
             darkTheme: materialThemesFor(themeSettings).darkTheme,
             themeMode: materialThemesFor(themeSettings).mode,
-            builder: lockGateBuilder,
+            builder: appShellBuilder,
             home: const QuickEntrySheet(),
           )
         : const BookkeepApp(),

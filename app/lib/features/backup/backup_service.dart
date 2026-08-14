@@ -18,8 +18,9 @@ class BackupService {
   static const format = 'bookkeep-backup';
   static const version = 1;
 
-  /// 恢复时排除的 app_meta 键（设备身份/同步游标不得跨设备恢复）
-  static const _excludedMetaPrefixes = ['client_id', 'sync_last_seq_'];
+  /// 恢复时排除的 app_meta 键（设备身份/同步游标/背景偏好不得跨设备恢复；
+  /// 审核 F6：`bg_*` 随备份恢复会产生指向不存在图片的悬空背景态）
+  static const _excludedMetaPrefixes = ['client_id', 'sync_last_seq_', 'bg_'];
 
   // 父表在前（恢复按序插入；删除取 reversed 子表先删）。
   // 审查 F-4：补齐 currencies / recurring_rules / installment_plans / installment_schedules

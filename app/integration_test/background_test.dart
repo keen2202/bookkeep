@@ -45,7 +45,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
 
-    // ① 外观页：未选图状态
+    // ① 外观页：未选图状态（审核 F1：首次选图主按钮存在）
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
     await tester.tap(find.text('外观'));
@@ -53,9 +53,10 @@ void main() {
     await tester.scrollUntilVisible(find.text('使用背景图片'), 120,
         scrollable: find.byType(Scrollable).first);
     expect(find.text('请先选择一张相册图片'), findsOneWidget);
+    expect(find.text('选择背景图片'), findsOneWidget);
 
-    // ② 更换图片 → 系统相册（真机弹 PhotoPicker/相册，人工选图）
-    await tester.tap(find.text('更换图片'));
+    // ② 首次选图：未选图态主按钮 → 系统相册（真机弹 PhotoPicker/相册，人工选图）
+    await tester.tap(find.text('选择背景图片'));
     // 等待系统相册返回（人工选择后自动继续）
     await tester.pumpAndSettle(const Duration(seconds: 3));
     await tester.pump(const Duration(seconds: 2));

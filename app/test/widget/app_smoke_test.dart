@@ -6,7 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bookkeep_app/app.dart';
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/database_provider.dart';
+import 'package:bookkeep_app/features/auth_lock/lock_gate.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
+import 'package:bookkeep_app/shared/theme/background/app_background.dart';
+import 'package:bookkeep_app/shared/theme/theme_transition.dart';
 
 import 'categories_page_test.dart' show testSeed;
 
@@ -32,5 +35,27 @@ void main() {
     );
     expect(find.text('分类'), findsWidgets);
     expect(find.text('周期记账'), findsWidgets);
+  });
+
+  testWidgets('秒开分支：appShellBuilder 拼装 ThemeTransition + AppBackground + LockGate',
+      (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    // 与 main.dart 秒开分支同构：MaterialApp.builder 直接挂 appShellBuilder
+    await tester.pumpWidget(ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(db)],
+      child: MaterialApp(
+        builder: appShellBuilder,
+        home: const Scaffold(body: Center(child: Text('秒开内容'))),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 600));
+
+    // 内容可达且 shell 链完整（背景/隐私锁与主入口同构，审核 F7/A2）
+    expect(find.text('秒开内容'), findsOneWidget);
+    expect(find.byType(ThemeTransition), findsOneWidget);
+    expect(find.byType(AppBackground), findsOneWidget);
+    expect(find.byType(LockGate), findsOneWidget);
   });
 }

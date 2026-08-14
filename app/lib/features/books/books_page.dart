@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/constants/constants.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import '../sync/token_store.dart';
 import 'books_api.dart';
 import 'books_providers.dart';
@@ -114,7 +115,7 @@ class BooksPage extends ConsumerWidget {
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('取消'),
             ),
-            FilledButton(
+            AppButton.primary(
               onPressed: () async {
                 final name = nameCtrl.text.trim();
                 if (name.isEmpty) return;

@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
 import 'package:bookkeep_app/shared/theme/background/app_background.dart';
 import 'package:bookkeep_app/shared/theme/background/background_controller.dart';
+import 'package:bookkeep_app/shared/theme/background/background_service.dart';
 import 'package:bookkeep_app/shared/theme/background/background_settings.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 
@@ -46,13 +47,29 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  Widget harness(BackgroundSettings settings, {double? luminance}) {
+  Widget harness(
+    BackgroundSettings settings, {
+    double? luminance,
+    bool realFileProvider = false,
+    List<Override> extra = const [],
+  }) {
     return ProviderScope(
       overrides: [
         backgroundControllerProvider
             .overrideWith(() => _FakeController(settings)),
         if (luminance != null)
           backgroundLuminanceProvider.overrideWith((ref) async => luminance),
+        // 默认夹具：settings.imagePath 已是绝对路径，直接作为解析结果注入；
+        // realFileProvider: true 时走真实 backgroundImageFileProvider（解析用例）
+        if (!realFileProvider)
+          backgroundImageFileProvider.overrideWith((ref) {
+            final s = ref
+                .watch(backgroundControllerProvider.select((v) => v.valueOrNull));
+            final p = s?.imagePath;
+            if (s == null || !s.enabled || p == null) return null;
+            return File(p);
+          }),
+        ...extra,
       ],
       child: MaterialApp(
         theme: buildTheme(findPresetById('t1')!),
@@ -63,11 +80,21 @@ void main() {
   }
 
   Future<void> pumpApp(WidgetTester tester, Widget widget) async {
-    // 图片解码为真实异步 IO，在 runAsync 内完成避免挂起
+    // 图片解码/文件解析为真实异步 IO，在 runAsync（真实 zone）内完成避免挂起；
+    // 轮询背景图文件与亮度两个 provider 直至结算（确定性等待，替代固定 sleep，
+    // 覆盖真实 provider 的"controller 加载 → 重解析文件"异步链）
     await tester.runAsync(() async {
       await tester.pumpWidget(widget);
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      await tester.pump();
+      for (var i = 0; i < 200; i++) {
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(AppBackground)),
+        );
+        final fileState = container.read(backgroundImageFileProvider);
+        final lumState = container.read(backgroundLuminanceProvider);
+        if (!fileState.isLoading && !lumState.isLoading) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
     });
     // provider 完成通知在假异步区刷出（见 bg_debug_test 验证）
     await tester.pump();
@@ -141,4 +168,44 @@ void main() {
 
     expect(find.text('内容'), findsOneWidget);
   });
+
+  testWidgets('相对路径键值经 backgroundImageFileProvider 解析为绝对路径且文件存在',
+      (tester) async {
+    // 在 tempDir 下建立与持久化键值一致的相对路径文件（background/bg.png）
+    final dir = Directory('${tempDir.path}/background')..createSync(recursive: true);
+    File(imagePath).copySync('${dir.path}/bg.png');
+    final settings =
+        BackgroundSettings(enabled: true, imagePath: 'background/bg.png');
+
+    // 真实 provider 链路：settings 键值（相对路径）→ resolveImageFile → 绝对路径
+    await pumpApp(tester, harness(
+      settings,
+      luminance: 0.5,
+      realFileProvider: true,
+      extra: [
+        backgroundServiceProvider.overrideWithValue(_FakeResolveService(tempDir)),
+      ],
+    ));
+
+    expect(find.text('内容'), findsOneWidget);
+    final image = tester.widget<Image>(find.byType(Image));
+    // cacheWidth 会让 Image.file 将 FileImage 包进 ResizeImage，先解包再断言
+    var provider = image.image;
+    if (provider is ResizeImage) provider = provider.imageProvider;
+    final resolved = (provider as FileImage).file.path;
+    expect(resolved, '${tempDir.path}/background/bg.png');
+  });
+}
+
+/// fake 服务：resolveImageFile 映射到临时目录（与真实实现映射文档目录一致）
+class _FakeResolveService extends BackgroundService {
+  _FakeResolveService(this.tempDir);
+
+  final Directory tempDir;
+
+  @override
+  Future<File?> resolveImageFile(String relativePath) async {
+    final target = File('${tempDir.path}/$relativePath');
+    return await target.exists() ? target : null;
+  }
 }

@@ -40,6 +40,15 @@ const bookkeepLocalizationsDelegates = [
 
 const bookkeepSupportedLocales = [Locale('zh', 'CN')];
 
+/// 全局 shell builder（审核 F7/A2）：主题 250ms 过场 + 全局背景 + 隐私锁门禁。
+/// 主入口与秒开入口共用同一拼装链，保证两入口背景/过场观感一致
+/// （AppBackground 无背景时零开销，秒开纳入不产生额外成本，Spec §4.7 D1）。
+Widget appShellBuilder(BuildContext context, Widget? child) => ThemeTransition(
+      child: AppBackground(
+        child: lockGateBuilder(context, child),
+      ),
+    );
+
 /// App 根组件：底部导航（记账/账户/分类）+ 秒开模式入口
 class BookkeepApp extends ConsumerStatefulWidget {
   const BookkeepApp({super.key});
@@ -109,12 +118,9 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
       darkTheme: themes.darkTheme,
       themeMode: themes.mode,
       // 主题切换 250ms 过场（BK-UI-004）+ 全局背景（BK-UI-014，位于
-      // Navigator 之上，二级页/弹层共享同一背景）+ 隐私锁门禁
-      builder: (context, child) => ThemeTransition(
-        child: AppBackground(
-          child: lockGateBuilder(context, child),
-        ),
-      ),
+      // Navigator 之上，二级页/弹层共享同一背景）+ 隐私锁门禁；
+      // 与秒开入口共用 appShellBuilder（审核 F7/A2）
+      builder: appShellBuilder,
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
         builder: (navContext) {

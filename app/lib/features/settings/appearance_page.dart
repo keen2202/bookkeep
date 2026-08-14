@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -302,13 +300,20 @@ class _CustomThemeSheetState extends State<_CustomThemeSheet> {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.colorize),
-          label: const Text('自定义颜色'),
+        // 审核 F4：自定义颜色入口收敛至 AppButton.secondary（icon 并入 child Row）
+        AppButton.secondary(
           onPressed: () async {
             final picked = await ColorPickerDialog.show(context, initial: _seed);
             if (picked != null && mounted) setState(() => _seed = picked);
           },
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.colorize, size: 18),
+              SizedBox(width: AppSpacing.xs),
+              Text('自定义颜色'),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         AppButton.primary(
@@ -420,11 +425,13 @@ class _BackgroundSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 实时预览（遮罩后有效底色 + 透明度读数）
+        // 实时预览（遮罩后有效底色 + 透明度读数；未选图态为可点击占位，
+        // 点击等同「选择背景图片」，审核 F1）
         _BackgroundPreview(
           settings: settings,
           imageL: imageL,
           alpha: visuals.alpha,
+          onPick: () => _pickAndApply(context, ref),
         ),
         const SizedBox(height: AppSpacing.sm),
         SwitchListTile(
@@ -439,7 +446,18 @@ class _BackgroundSection extends ConsumerWidget {
               ? null
               : (v) => controller.setEnabled(v),
         ),
-        if (imagePath != null) ...[
+        // 审核 F1/R2 三态主操作区：
+        // ① 未选图（imagePath == null）：主按钮「选择背景图片」兜底首次选图
+        //    入口（旧实现"更换图片"不渲染 + 开关禁用，功能死锁）；
+        // ② 已选图：更换图片 + 恢复默认（现状不变）；开关可用
+        if (imagePath == null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          AppButton.primary(
+            block: true,
+            onPressed: () => _pickAndApply(context, ref),
+            child: const Text('选择背景图片'),
+          ),
+        ] else ...[
           const SizedBox(height: AppSpacing.xs),
           Row(
             children: [
@@ -508,23 +526,29 @@ class _BackgroundSection extends ConsumerWidget {
   }
 }
 
-/// 遮罩后底色实时预览
-class _BackgroundPreview extends StatelessWidget {
+/// 遮罩后底色实时预览；未选图态渲染占位（surfaceVariant 底 + 图标 + 文案），
+/// 点击等同「选择背景图片」（审核 F1）。渲染侧经 [backgroundImageFileProvider]
+/// 消费绝对路径文件（审核 F2/R1，消除相对路径读取）。
+class _BackgroundPreview extends ConsumerWidget {
   const _BackgroundPreview({
     required this.settings,
     required this.imageL,
     required this.alpha,
+    required this.onPick,
   });
 
   final BackgroundSettings settings;
   final double? imageL;
   final double alpha;
 
+  /// 未选图态点击（等同「选择背景图片」主按钮）
+  final VoidCallback onPick;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
-    final imagePath = settings.imagePath;
-    final hasImage = settings.enabled && imagePath != null;
+    final imageFile = ref.watch(backgroundImageFileProvider).valueOrNull;
+    final hasImage = imageFile != null;
     final effColor = hasImage
         ? Color.lerp(
             // 图（近似中灰占位）+ 主题底色按 α 混合（真实图在预览区直接渲染）
@@ -532,85 +556,105 @@ class _BackgroundPreview extends StatelessWidget {
             palette.background,
             alpha,
           )!
-        : palette.background;
+        : palette.surfaceVariant;
 
     return ClipRRect(
       borderRadius: AppRadius.mdAll,
-      child: Container(
-        height: 96,
-        decoration: BoxDecoration(
-          color: effColor,
-          borderRadius: AppRadius.mdAll,
-          border: Border.all(color: palette.border),
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasImage)
-              Image.file(
-                File(imagePath),
-                fit: BoxFit.cover,
-                cacheWidth: 400,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            if (hasImage)
-              ColoredBox(
-                color: palette.background.withValues(alpha: alpha),
-              ),
-            // 预览示意卡片（保证文字可读性示意）
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                child: Container(
-                  width: 120,
-                  padding: const EdgeInsets.all(AppSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: palette.surface,
-                    borderRadius: AppRadius.smAll,
-                  ),
+      child: GestureDetector(
+        onTap: hasImage ? null : onPick,
+        child: Container(
+          height: 96,
+          decoration: BoxDecoration(
+            color: effColor,
+            borderRadius: AppRadius.mdAll,
+            border: Border.all(color: palette.border),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (hasImage)
+                Image.file(
+                  imageFile,
+                  fit: BoxFit.cover,
+                  cacheWidth: 400,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              if (hasImage)
+                ColoredBox(
+                  color: palette.background.withValues(alpha: alpha),
+                ),
+              if (!hasImage)
+                Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 40,
-                        height: 4,
-                        color: palette.textPrimary,
-                      ),
-                      const SizedBox(height: 3),
-                      Container(
-                        width: 24,
-                        height: 3,
+                      Icon(
+                        Icons.image_outlined,
+                        size: 28,
                         color: palette.textSecondary,
                       ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text('未设置背景', style: context.text.bodySmall),
                     ],
                   ),
                 ),
-              ),
-            ),
-            // 遮罩透明度读数
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: palette.surface.withValues(alpha: 0.85),
-                    borderRadius: AppRadius.pillAll,
-                  ),
-                  child: Text(
-                    '遮罩 ${(alpha * 100).round()}%',
-                    style: context.text.labelSmall,
+              // 预览示意卡片（保证文字可读性示意）
+              if (hasImage)
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    child: Container(
+                      width: 120,
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: palette.surface,
+                        borderRadius: AppRadius.smAll,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 4,
+                            color: palette.textPrimary,
+                          ),
+                          const SizedBox(height: 3),
+                          Container(
+                            width: 24,
+                            height: 3,
+                            color: palette.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              // 遮罩透明度读数
+              if (hasImage)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: palette.surface.withValues(alpha: 0.85),
+                        borderRadius: AppRadius.pillAll,
+                      ),
+                      child: Text(
+                        '遮罩 ${(alpha * 100).round()}%',
+                        style: context.text.labelSmall,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

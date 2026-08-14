@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/widgets/app_button.dart';
 import 'lock_controller.dart';
 import 'pin_pad.dart';
 
@@ -112,10 +113,16 @@ class _LockScreenState extends ConsumerState<_LockScreen> {
                 Text('请输入 PIN 解锁', style: theme.textTheme.bodySmall),
                 if (_bioAvailable) ...[
                   const SizedBox(height: 16),
-                  FilledButton.tonalIcon(
+                  AppButton.secondary(
                     onPressed: _unlockBiometric,
-                    icon: const Icon(Icons.fingerprint),
-                    label: const Text('生物识别解锁'),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.fingerprint, size: 18),
+                        SizedBox(width: 8),
+                        Text('生物识别解锁'),
+                      ],
+                    ),
                   ),
                 ],
                 const SizedBox(height: 24),

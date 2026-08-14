@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/widgets/app_button.dart';
 import '../sync/sync_providers.dart';
 import '../sync/sync_state.dart';
 import '../sync/token_store.dart';
@@ -137,10 +138,18 @@ class _AccountSyncSectionState extends ConsumerState<AccountSyncSection> {
             child: Row(
               children: [
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: status.busy ? null : _submit,
-                    icon: const Icon(Icons.login),
-                    label: const Text('登录 / 注册'),
+                  // 审核 F4：接入 loading 态防重入（busy 时内置 spinner 并禁用）
+                  child: AppButton.primary(
+                    loading: status.busy,
+                    onPressed: _submit,
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.login, size: 18),
+                        SizedBox(width: 8),
+                        Text('登录 / 注册'),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -167,20 +176,35 @@ class _AccountSyncSectionState extends ConsumerState<AccountSyncSection> {
             child: Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: status.busy ? null : () {
+                  // 审核 F4：同文件内 OutlinedButton.icon/TextButton.icon 一并收敛
+                  child: AppButton.secondary(
+                    loading: status.busy,
+                    onPressed: () {
                       ref.read(syncStatusProvider.notifier).manualSync();
                     },
-                    icon: const Icon(Icons.sync),
-                    label: const Text('手动同步'),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sync, size: 18),
+                        SizedBox(width: 8),
+                        Text('手动同步'),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: TextButton.icon(
-                    onPressed: status.busy ? null : _logout,
-                    icon: const Icon(Icons.logout),
-                    label: const Text('退出登录'),
+                  child: AppButton.text(
+                    loading: status.busy,
+                    onPressed: _logout,
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.logout, size: 18),
+                        SizedBox(width: 8),
+                        Text('退出登录'),
+                      ],
+                    ),
                   ),
                 ),
               ],

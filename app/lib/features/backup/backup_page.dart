@@ -8,6 +8,7 @@ import '../../core/ledger_version.dart';
 import '../../core/security/backup_cipher.dart';
 import '../../data/local/database_provider.dart';
 import '../../data/local/tables/transactions_table.dart';
+import '../../shared/widgets/app_button.dart';
 import '../books/books_providers.dart' show booksViewModelProvider, currentBookIdProvider;
 import 'backup_service.dart';
 import 'export_service.dart';
@@ -142,10 +143,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         children: [
           Text('CSV 导出（当前账本支出明细）', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          FilledButton.tonalIcon(
+          AppButton.secondary(
             onPressed: _busy ? null : _exportCsv,
-            icon: const Icon(Icons.table_chart_outlined),
-            label: Text(_busy ? '处理中…' : '导出 CSV'),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.table_chart_outlined, size: 18),
+                const SizedBox(width: 8),
+                Text(_busy ? '处理中…' : '导出 CSV'),
+              ],
+            ),
           ),
           const Divider(height: 32),
           Text('加密备份（AES-256-GCM，口令经 PBKDF2 派生）',
@@ -158,10 +165,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             decoration: const InputDecoration(labelText: '备份口令'),
           ),
           const SizedBox(height: 8),
-          FilledButton.icon(
+          AppButton.primary(
             onPressed: _busy ? null : _createBackup,
-            icon: const Icon(Icons.lock_outline),
-            label: Text(_busy ? '处理中…' : '创建加密备份'),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, size: 18),
+                const SizedBox(width: 8),
+                Text(_busy ? '处理中…' : '创建加密备份'),
+              ],
+            ),
           ),
           const Divider(height: 32),
           Text('恢复备份（导入 → 校验 → 原子切换；口令错误不破坏现有数据）',
@@ -174,10 +187,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             decoration: const InputDecoration(labelText: '恢复口令'),
           ),
           const SizedBox(height: 8),
-          FilledButton.icon(
+          AppButton.primary(
             onPressed: _busy ? null : _restore,
-            icon: const Icon(Icons.restore),
-            label: Text(_busy ? '处理中…' : '从最新备份恢复'),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.restore, size: 18),
+                const SizedBox(width: 8),
+                Text(_busy ? '处理中…' : '从最新备份恢复'),
+              ],
+            ),
           ),
           const Divider(height: 32),
           Text('WebDAV 备份（仅 HTTPS 端点）', style: Theme.of(context).textTheme.titleMedium),
@@ -199,10 +218,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             decoration: const InputDecoration(labelText: '密码（可选）'),
           ),
           const SizedBox(height: 8),
-          FilledButton.tonalIcon(
+          AppButton.secondary(
             onPressed: _busy ? null : _webdavUpload,
-            icon: const Icon(Icons.cloud_upload_outlined),
-            label: Text(_busy ? '处理中…' : '上传加密备份到 WebDAV'),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_upload_outlined, size: 18),
+                const SizedBox(width: 8),
+                Text(_busy ? '处理中…' : '上传加密备份到 WebDAV'),
+              ],
+            ),
           ),
           if (_busy)
             const Padding(
