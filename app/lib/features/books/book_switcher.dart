@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/glass_icon.dart';
 import '../../data/local/database.dart';
 import 'books_page.dart';
 import 'books_providers.dart';
@@ -70,7 +71,7 @@ class BookSwitcher extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.menu_book_outlined),
+          const GlassIcon(icon: Icons.menu_book_outlined, size: 18, blur: false),
           const SizedBox(width: 4),
           Text(current.value?.name ?? '账本', style: Theme.of(context).textTheme.titleSmall),
         ],

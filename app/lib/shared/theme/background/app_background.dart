@@ -94,6 +94,7 @@ class AppBackground extends ConsumerWidget {
       dark: context.tokens.isDark,
     );
 
+    final imageRevision = ref.watch(backgroundRevisionProvider);
     final decodeWidth = (MediaQuery.sizeOf(context).width *
             MediaQuery.devicePixelRatioOf(context))
         .round();
@@ -104,26 +105,44 @@ class AppBackground extends ConsumerWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // ① 背景图（绝对路径；cacheWidth 限解码尺寸，Spec §5.4.5 / §10 内存）
-            Image.file(
-              imageFile,
-              fit: BoxFit.cover,
-              cacheWidth: decodeWidth,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-            // ② 智能遮罩（主题 background 色，保证卡片层级不被冲淡）
-            ColoredBox(color: context.palette.background.withValues(alpha: visuals.alpha)),
-            // ③ 8px 高斯模糊（可关闭，Spec §5.2 / §10 性能）
-            if (settings?.blurEnabled ?? false)
-              BackdropFilter(
-                filter: ui.ImageFilter.blur(
-                  sigmaX: blurSigma,
-                  sigmaY: blurSigma,
+            // 背景层整体包在 IgnorePointer 中：图/遮罩/模糊只做视觉，
+            // 不参与命中测试，确保 TabBar、FAB、按钮等交互元素不被遮挡。
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // ① 背景图（绝对路径；cacheWidth 限解码尺寸，Spec §5.4.5 / §10 内存）。
+                    // Key 绑定热重载版本号，确保同一路径覆盖选图后立即重新解码。
+                    Image(
+                      image: ResizeImage(
+                        RevisionFileImage(imageFile, revision: imageRevision),
+                        width: decodeWidth,
+                      ),
+                      key: ValueKey('bg-image-$imageRevision'),
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.medium,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                    // ② 智能遮罩（主题 background 色，保证卡片层级不被冲淡）
+                    ColoredBox(
+                      color: context.palette.background.withValues(alpha: visuals.alpha),
+                    ),
+                    // ③ 8px 高斯模糊（可关闭，Spec §5.2 / §10 性能）
+                    if (settings?.blurEnabled ?? false)
+                      BackdropFilter(
+                        filter: ui.ImageFilter.blur(
+                          sigmaX: blurSigma,
+                          sigmaY: blurSigma,
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                  ],
                 ),
-                child: const SizedBox.expand(),
               ),
-            child,
+            ),
+            // ④ 内容层始终位于最上层且可命中。
+            Positioned.fill(child: child),
           ],
         ),
       ),

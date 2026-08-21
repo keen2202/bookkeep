@@ -27,6 +27,7 @@ import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/appearance_page.dart';
 import 'shared/theme/app_icons.dart';
+import 'shared/theme/glass_icon.dart';
 import 'shared/theme/background/app_background.dart';
 import 'shared/theme/theme_controller.dart';
 import 'shared/theme/theme_transition.dart';
@@ -51,19 +52,35 @@ Widget appShellBuilder(BuildContext context, Widget? child) => ThemeTransition(
 
 /// App 根组件：底部导航（记账/账户/分类）+ 秒开模式入口
 class BookkeepApp extends ConsumerStatefulWidget {
-  const BookkeepApp({super.key});
+  const BookkeepApp({super.key, this.startInQuickEntry = false});
+
+  /// 冷启动秒开模式：首帧后自动打开快速记账页，并提供明确退出入口。
+  final bool startInQuickEntry;
 
   @override
   ConsumerState<BookkeepApp> createState() => _BookkeepAppState();
 }
 
 class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingObserver {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   int _tab = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.startInQuickEntry) {
+      // 秒开模式不再把 QuickEntrySheet 作为根路由，而是推到主界面之上：
+      // 这样快速记账页拥有可返回的主界面，用户可随时点击“退出”离开。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const QuickEntrySheet(),
+          ),
+        );
+      });
+    }
     // 同步合并落库后 bump 刷新总线（审查 F-1）：远端流水即时出现在报表/日历
     syncMergeBus.addListener(_onSyncMerged);
   }
@@ -109,6 +126,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
     final themeSettings = ref.watch(themeControllerProvider);
     final themes = materialThemesFor(themeSettings);
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'bookkeep',
       locale: const Locale('zh', 'CN'),
       localizationsDelegates: bookkeepLocalizationsDelegates,
@@ -145,7 +163,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
                 : FloatingActionButton(
                     onPressed: () => _openQuickEntry(navContext),
                     tooltip: '记一笔',
-                    child: const Icon(Icons.add),
+                    child: const GlassIcon(icon: Icons.add, size: 22),
                   ),
             bottomNavigationBar: NavigationBar(
               selectedIndex: _tab,
@@ -153,7 +171,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
               destinations: [
                 for (final m in AppModule.values)
                   NavigationDestination(
-                    icon: Icon(moduleIcon(m, themeSettings.iconPack)),
+                    icon: GlassIcon(icon: moduleIcon(m, themeSettings.iconPack), size: 20),
                     label: m.label,
                   ),
               ],
@@ -164,8 +182,9 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
               actions: [
                 ..._tabActions(navContext),
                 const BookSwitcher(),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined),
+                GlassIconButton(
+                  icon: Icons.settings_outlined,
+                  tooltip: '设置',
                   onPressed: () => _showSettings(navContext),
                 ),
               ],

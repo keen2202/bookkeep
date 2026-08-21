@@ -10,6 +10,7 @@ import '../../data/local/tables/categories_table.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/usecases/create_transaction.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/glass_icon.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/app_snack.dart';
@@ -103,6 +104,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     super.dispose();
   }
 
+  /// 退出快速记账：不强制完成记账，直接返回主界面。
+  /// 若当前为根路由（异常/测试环境）则执行 maybePop 兜底，不阻断退出。
+  void _exit() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      navigator.maybePop();
+    }
+  }
+
   Future<void> _save() async {
     // 审查 U-4：保存 busy 锁——连点「确定」不重复入账（controller 内也有 saving 互斥）
     if (_controller.saving) return;
@@ -140,7 +152,16 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         : [for (final e in accountsAsync.valueOrNull!.accounts) e.account];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('记一笔')),
+      appBar: AppBar(
+        title: const Text('记一笔'),
+        actions: [
+          TextButton.icon(
+            onPressed: _exit,
+            icon: const GlassIcon(icon: Icons.close, size: 16, blur: false),
+            label: const Text('退出'),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           SegmentedButton<TransactionType>(

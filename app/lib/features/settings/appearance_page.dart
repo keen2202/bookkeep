@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/theme/app_icons.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/glass_icon.dart';
 import '../../shared/theme/background/app_background.dart';
 import '../../shared/theme/background/background_controller.dart';
 import '../../shared/theme/background/background_settings.dart';
@@ -388,7 +389,7 @@ class _IconPackSection extends ConsumerWidget {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(moduleIcon(module, current.iconPack), size: 28),
+                  GlassIcon(icon: moduleIcon(module, current.iconPack), size: 20),
                   const SizedBox(height: AppSpacing.xs),
                   Text(module.label, style: context.text.labelSmall),
                 ],
@@ -548,6 +549,7 @@ class _BackgroundPreview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final imageFile = ref.watch(backgroundImageFileProvider).valueOrNull;
+    final imageRevision = ref.watch(backgroundRevisionProvider);
     final hasImage = imageFile != null;
     final effColor = hasImage
         ? Color.lerp(
@@ -573,10 +575,13 @@ class _BackgroundPreview extends ConsumerWidget {
             fit: StackFit.expand,
             children: [
               if (hasImage)
-                Image.file(
-                  imageFile,
+                Image(
+                  image: ResizeImage(
+                    RevisionFileImage(imageFile, revision: imageRevision),
+                    width: 400,
+                  ),
+                  key: ValueKey('bg-preview-$imageRevision'),
                   fit: BoxFit.cover,
-                  cacheWidth: 400,
                   errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
               if (hasImage)

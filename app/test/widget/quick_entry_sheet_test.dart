@@ -125,6 +125,18 @@ void main() {
     expect(txs.single.type, TransactionType.expense);
   });
 
+  testWidgets('快速记账页提供退出入口', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+
+    expect(find.text('退出'), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsOneWidget);
+  });
+
   testWidgets('invalid amount shows an error and does not save', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);

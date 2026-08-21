@@ -73,6 +73,40 @@ abstract final class AppElevation {
 }
 
 // ---------------------------------------------------------------------------
+// 玻璃拟态图标 Token（UI 图标重构，Glassmorphism）
+// ---------------------------------------------------------------------------
+abstract final class AppGlass {
+  /// 图标玻璃容器基准尺寸（不含内边距时的图标字号由调用方传入）
+  static const double iconContainerSize = 40;
+
+  /// 玻璃容器圆角（与卡片 md 对齐，保证轻盈统一）
+  static const double iconRadius = 12;
+
+  /// 玻璃背景高斯模糊半径（图标级 BackdropFilter 使用）
+  static const double iconBlurSigma = 10;
+
+  /// 玻璃描边宽度
+  static const double borderWidth = 1;
+
+  /// 浅色主题玻璃填充：白色 20% 通透层
+  static const Color fillLight = Color(0x33FFFFFF);
+
+  /// 深色主题玻璃填充：白色 10% 通透层（避免过亮破坏夜间氛围）
+  static const Color fillDark = Color(0x1AFFFFFF);
+
+  /// 浅色主题玻璃描边：白色 50% 高光
+  static const Color borderLight = Color(0x80FFFFFF);
+
+  /// 深色主题玻璃描边：白色 25% 微光
+  static const Color borderDark = Color(0x40FFFFFF);
+
+  /// 玻璃图标统一阴影：y=2、blur=10、8% 黑
+  static const List<BoxShadow> iconShadow = [
+    BoxShadow(offset: Offset(0, 2), blurRadius: 10, color: Color(0x14000000)),
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // 字体系统（设计文档 §3.2，七级字阶）
 // ---------------------------------------------------------------------------
 abstract final class AppText {

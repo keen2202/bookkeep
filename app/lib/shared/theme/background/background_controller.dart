@@ -18,6 +18,31 @@ final backgroundControllerProvider =
     AsyncNotifierProvider<BackgroundController, BackgroundSettings>(
         BackgroundController.new);
 
+/// 背景图热重载版本号：每次选图覆盖写入同一路径后自增，
+/// 用于让 AppBackground / 预览的 Image 获得新 Key，立即重新解码新图。
+/// 不持久化，仅会话内有效；重启后从磁盘读取，天然拿到最新文件。
+final backgroundRevisionProvider = StateProvider<int>((ref) => 0);
+
+/// 带热重载版本号的背景图 ImageProvider。
+/// 继承 [FileImage] 但将 [revision] 纳入相等性，确保同路径覆盖选图后
+/// 即使经过 ResizeImage 包装也不会命中旧缓存。
+class RevisionFileImage extends FileImage {
+  const RevisionFileImage(super.file, {required this.revision, super.scale = 1.0});
+
+  final int revision;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RevisionFileImage &&
+      other.runtimeType == runtimeType &&
+      other.file.path == file.path &&
+      other.scale == scale &&
+      other.revision == revision;
+
+  @override
+  int get hashCode => Object.hash(file.path, scale, revision);
+}
+
 /// 背景设置控制器（Spec §3.2）：选图 → 压缩落盘 → 采样 → 持久化；
 /// 独立 AsyncNotifier，避免阻塞主题切换（Spec D4）。
 class BackgroundController extends AsyncNotifier<BackgroundSettings> {
@@ -42,19 +67,22 @@ class BackgroundController extends AsyncNotifier<BackgroundSettings> {
         return const PickResult.failure('未选择图片');
       }
       final file = await service.importImage(picked);
-      // P1 预缓存（Spec §2.4）：落盘后立即预热解码缓存，压缩首屏解码抖动，
+      final nextRevision = ref.read(backgroundRevisionProvider) + 1;
+      // P1 预缓存（Spec §2.4）：以新 revision 预热解码缓存，压缩首屏解码抖动，
       // 支撑真机"选图到生效 ≤800ms"指标；失败静默（渲染侧 errorBuilder 兜底）
-      _precacheImage(file);
+      await _precacheImage(file, nextRevision);
       final current = state.valueOrNull ?? BackgroundSettings.defaults;
       await _persist(current.copyWith(
         enabled: true,
         imagePath: '${BackgroundService.dirName}/${BackgroundService.fileName}',
       ));
-      // backgroundImageFileProvider / backgroundLuminanceProvider 均 watch 本
-      // controller（select valueOrNull），_persist 每次写入新实例即自动触发重解析/
-      // 重采样（含同路径覆盖选图）。不在 controller 内显式 invalidate：
+      // 热重载：同路径覆盖时通过 revision 让 ImageProvider 不等同，
+      // 强制重新解码；backgroundImageFileProvider / backgroundLuminanceProvider
+      // 均 watch 本 controller（select valueOrNull），_persist 每次写入新实例即
+      // 自动触发重解析/重采样。不在 controller 内显式 invalidate：
       // Riverpod 2.6 调试模式下会触发 CircularDependencyError（依赖方在
       // 被依赖方执行期间被失效）。
+      ref.read(backgroundRevisionProvider.notifier).state = nextRevision;
       return PickResult.ok(file);
     } on FormatException catch (e) {
       return PickResult.failure('图片无法读取或已损坏：$e');
@@ -65,8 +93,13 @@ class BackgroundController extends AsyncNotifier<BackgroundSettings> {
 
   /// 以真实解码预热 ImageCache（Spec §2.4 P1）；监听器立即注册保证加载被触发，
   /// 结果不等待、失败静默
-  void _precacheImage(File file) {
-    final stream = FileImage(file).resolve(ImageConfiguration.empty);
+  Future<void> _precacheImage(File file, int revision) async {
+    final provider = RevisionFileImage(file, revision: revision);
+    // 同一路径覆盖选图时，先清掉旧 FileImage/旧 revision 缓存，再预热新图。
+    await FileImage(file).evict();
+    await RevisionFileImage(file, revision: revision - 1).evict();
+    await provider.evict();
+    final stream = provider.resolve(ImageConfiguration.empty);
     stream.addListener(ImageStreamListener((_, _) {}, onError: (_, _) {}));
   }
 

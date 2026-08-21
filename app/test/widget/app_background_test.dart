@@ -52,6 +52,7 @@ void main() {
     double? luminance,
     bool realFileProvider = false,
     List<Override> extra = const [],
+    Widget? home,
   }) {
     return ProviderScope(
       overrides: [
@@ -74,7 +75,7 @@ void main() {
       child: MaterialApp(
         theme: buildTheme(findPresetById('t1')!),
         builder: (context, child) => AppBackground(child: child!),
-        home: const Scaffold(body: Center(child: Text('内容'))),
+        home: home ?? const Scaffold(body: Center(child: Text('内容'))),
       ),
     );
   }
@@ -109,6 +110,48 @@ void main() {
     expect(find.byType(AnnotatedRegion<SystemUiOverlayStyle>), findsOneWidget);
   });
 
+  testWidgets('背景 revision 变化后 Image Key 与 Provider 同步刷新', (tester) async {
+    await pumpApp(tester, harness(
+      BackgroundSettings(enabled: true, imagePath: imagePath),
+      luminance: 0.5,
+    ));
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AppBackground)),
+    );
+    final before = tester.widget<Image>(find.byType(Image));
+    expect(before.key, const ValueKey('bg-image-0'));
+
+    container.read(backgroundRevisionProvider.notifier).state = 1;
+    await tester.pump();
+
+    final after = tester.widget<Image>(find.byType(Image));
+    expect(after.key, const ValueKey('bg-image-1'));
+    var provider = after.image;
+    if (provider is ResizeImage) provider = provider.imageProvider;
+    expect((provider as RevisionFileImage).revision, 1);
+  });
+
+  testWidgets('背景启用时不拦截内容点击', (tester) async {
+    var tapped = false;
+    await pumpApp(tester, harness(
+      BackgroundSettings(enabled: true, imagePath: imagePath),
+      luminance: 0.5,
+      home: Scaffold(
+        body: Center(
+          child: ElevatedButton(
+            onPressed: () => tapped = true,
+            child: const Text('点我'),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('点我'));
+    await tester.pump();
+    expect(tapped, isTrue);
+  });
+
   testWidgets('启用 + 智能遮罩：图/遮罩/模糊三层结构存在', (tester) async {
     await pumpApp(tester, harness(
       BackgroundSettings(enabled: true, imagePath: imagePath),
@@ -121,11 +164,14 @@ void main() {
     expect(find.byType(RepaintBoundary), findsWidgets);
 
     // 遮罩色 = 主题 background × α（极亮图浅色主题 α≈0.82+）
-    final stack = tester.widget<Stack>(
-      find.ancestor(of: find.byType(Image), matching: find.byType(Stack)).first,
-    );
-    final mask = stack.children
-        .whereType<ColoredBox>()
+    final stackFinder = find.ancestor(
+      of: find.byType(Image),
+      matching: find.byType(Stack),
+    ).first;
+    final mask = tester
+        .widgetList<ColoredBox>(
+          find.descendant(of: stackFinder, matching: find.byType(ColoredBox)),
+        )
         .firstWhere((c) => c.color.a > 0 && c.color.a < 1);
     expect(mask.color.a, greaterThanOrEqualTo(0.82));
   });
@@ -141,11 +187,14 @@ void main() {
       luminance: 0.9, // 智能映射会给出 0.82+，手动必须忽略
     ));
 
-    final stack = tester.widget<Stack>(
-      find.ancestor(of: find.byType(Image), matching: find.byType(Stack)).first,
-    );
-    final mask = stack.children
-        .whereType<ColoredBox>()
+    final stackFinder = find.ancestor(
+      of: find.byType(Image),
+      matching: find.byType(Stack),
+    ).first;
+    final mask = tester
+        .widgetList<ColoredBox>(
+          find.descendant(of: stackFinder, matching: find.byType(ColoredBox)),
+        )
         .firstWhere((c) => c.color.a > 0 && c.color.a < 1);
     expect(mask.color.a, closeTo(0.35, 0.001));
   });
@@ -189,7 +238,7 @@ void main() {
 
     expect(find.text('内容'), findsOneWidget);
     final image = tester.widget<Image>(find.byType(Image));
-    // cacheWidth 会让 Image.file 将 FileImage 包进 ResizeImage，先解包再断言
+    // cacheWidth 会让 Image 将 RevisionFileImage 包进 ResizeImage，先解包再断言
     var provider = image.image;
     if (provider is ResizeImage) provider = provider.imageProvider;
     final resolved = (provider as FileImage).file.path;

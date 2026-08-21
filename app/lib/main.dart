@@ -22,7 +22,6 @@ import 'data/repositories/settings_repository.dart';
 import 'features/auth_lock/biometric.dart';
 import 'features/auth_lock/lock_controller.dart';
 import 'features/books/books_providers.dart';
-import 'features/quick_entry/quick_entry_sheet.dart';
 import 'features/recurring/recurring_service.dart';
 import 'features/sync/sync_providers.dart';
 import 'shared/theme/theme_controller.dart';
@@ -82,20 +81,7 @@ Future<void> main() async {
             initiallyBiometric: initialLock.biometricEnabled,
           )),
     ],
-    child: secondsOpen
-        ? MaterialApp(
-            locale: const Locale('zh', 'CN'),
-            localizationsDelegates: bookkeepLocalizationsDelegates,
-            supportedLocales: bookkeepSupportedLocales,
-            // UI 重构（Spec §4）：秒开入口复用同一主题解析（预制直出 / custom 兼容）
-            // 与主入口共用 appShellBuilder（审核 F7/A2：背景/过场/隐私锁观感一致）
-            theme: materialThemesFor(themeSettings).theme,
-            darkTheme: materialThemesFor(themeSettings).darkTheme,
-            themeMode: materialThemesFor(themeSettings).mode,
-            builder: appShellBuilder,
-            home: const QuickEntrySheet(),
-          )
-        : const BookkeepApp(),
+    child: BookkeepApp(startInQuickEntry: secondsOpen),
   ));
 
   // 周期/分期自动补跑（审查 F-2）：首帧后异步执行，幂等（next_due 前移 +
