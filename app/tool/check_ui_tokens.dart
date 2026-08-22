@@ -23,8 +23,10 @@ final _rules = <(RegExp, String)>[
 /// 业务数据色逐条登记并注明理由，新增零容忍。
 final _whitelist = <String, String>{
   // —— Token/主题定义文件（设计文档 §6.4 豁免语义：色值/字号的唯一定义处）——
-  'shared/theme/theme_presets.dart:Color(0xFF': '8 套预制主题 104 个 Token 色值定义（Token 层唯一真源）',
-  'shared/theme/app_theme.dart:Color(0xFF': '语义色/图表色/种子色等 Token 定义',
+  // 玻璃拟态 v2 玻璃层 Token 含自定义 alpha（0x38/0x99/0xA6/0xB8/0xE0 前缀），
+  // 故 theme_presets/app_theme 放宽为 Color(0x 前缀整体豁免（仍限 Token 定义文件）
+  'shared/theme/theme_presets.dart:Color(0x': '8 套预制主题 104 个 Token 色值 + 玻璃拟态玻璃层 Token（含自定义 alpha，Token 层唯一真源）',
+  'shared/theme/app_theme.dart:Color(0x': '语义色/图表色/种子色/自定义模式玻璃描边回退等 Token 定义',
   'shared/theme/theme_settings.dart:Color(0xFF': 'kThemePresets 自定义色板定义（Token 层）',
   'shared/theme/tokens.dart:Color(0x': '阴影等 Token 定义（Token 层）',
   'shared/theme/tokens.dart:fontSize:': '七级字阶 Token 定义（Token 层）',

@@ -50,7 +50,13 @@ class CashflowChart extends ConsumerWidget {
           return _shell(
             context,
             title,
-            const Center(child: Text('***', style: TextStyle(fontSize: 20))),
+            Center(
+              // 脱敏占位走字阶 Token（静态卡点禁裸字号）
+              child: Text('***',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      )),
+            ),
           );
         }
 
