@@ -151,4 +151,89 @@ void main() {
     expect((dark.cardTheme.shape! as RoundedRectangleBorder).side,
         isNot(BorderSide.none));
   });
+
+  // ── 玻璃拟态主题重构（Glassmorphism v2）──
+
+  test('玻璃 Token：8 套主题全量携带环境光与通透填充，强填充更实', () {
+    for (final preset in kThemePresetsV2) {
+      final p = preset.palette;
+      expect(p.ambient.length, 3, reason: '${preset.id} 环境光色斑应为 3 色');
+      expect(p.glassFill.a, lessThan(1.0), reason: '${preset.id} 卡片填充须半透明');
+      expect(p.glassFillStrong.a, greaterThan(p.glassFill.a),
+          reason: '${preset.id} 弹层强填充应比卡片更不透明');
+      expect(p.glassBorder.a, greaterThan(0), reason: '${preset.id} 高光描边可见');
+    }
+  });
+
+  test('玻璃对比度守卫：正文压在任意光斑上的磨砂混合面 ≥ WCAG AA', () {
+    double lum(Color c) {
+      double channel(double v) => v <= 0.03928
+          ? v / 12.92
+          : pow((v + 0.055) / 1.055, 2.4).toDouble();
+      return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
+    }
+
+    double contrast(Color a, Color b) {
+      final l1 = lum(a), l2 = lum(b);
+      final hi = l1 > l2 ? l1 : l2, lo = l1 > l2 ? l2 : l1;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    /// 玻璃填充与底层色的 alpha 混合（最差情况 = 光斑原色透出）
+    Color frostOver(Color fill, Color under) => Color.fromARGB(
+          255,
+          ((fill.r * fill.a + under.r * (1 - fill.a)) * 255).round(),
+          ((fill.g * fill.a + under.g * (1 - fill.a)) * 255).round(),
+          ((fill.b * fill.a + under.b * (1 - fill.a)) * 255).round(),
+        );
+
+    for (final preset in kThemePresetsV2) {
+      final p = preset.palette;
+      for (final (i, blob) in p.ambient.indexed) {
+        final blended = frostOver(p.glassFill, blob);
+        final primary = contrast(p.textPrimary, blended);
+        expect(primary, greaterThanOrEqualTo(4.5),
+            reason: '${preset.id} 光斑#$i 上主文案对比度 $primary < 4.5');
+        final secondary = contrast(p.textSecondary, blended);
+        expect(secondary, greaterThanOrEqualTo(3.0),
+            reason: '${preset.id} 光斑#$i 上次级文案对比度 $secondary < 3.0');
+      }
+    }
+  });
+
+  test('玻璃卡片装饰：磨砂填充 + 高光发丝描边，浅深主题同构', () {
+    for (final preset in kThemePresetsV2) {
+      final theme = buildTheme(preset);
+      expect(theme.cardTheme.color, preset.palette.glassFill,
+          reason: '${preset.id} Card 底色应为玻璃填充');
+      final side =
+          (theme.cardTheme.shape! as RoundedRectangleBorder).side;
+      expect(side.color, preset.palette.glassBorder,
+          reason: '${preset.id} Card 描边应为高光发丝线');
+      final decoration = theme.extension<AppTokens>()!.cardDecoration;
+      expect(decoration.color, preset.palette.glassFill);
+      expect(decoration.boxShadow, isNotNull, reason: '${preset.id} 保留悬浮阴影');
+    }
+  });
+
+  test('玻璃拟态：Scaffold 透明化让位背景层；弹层/导航用强填充', () {
+    for (final id in ['t1', 't5']) {
+      final theme = buildTheme(findPresetById(id)!);
+      expect(theme.scaffoldBackgroundColor, Colors.transparent,
+          reason: '$id 页面底色让位给环境光/背景图');
+      expect(theme.bottomSheetTheme.backgroundColor,
+          findPresetById(id)!.palette.glassFillStrong);
+      expect(theme.navigationBarTheme.backgroundColor,
+          findPresetById(id)!.palette.glassFillStrong);
+    }
+  });
+
+  test('调色板 lerp：环境光与玻璃字段随主题过渡插值', () {
+    final a = findPresetById('t1')!.palette;
+    final b = findPresetById('t6')!.palette;
+    final mid = a.lerp(b, 0.5);
+    expect(mid.ambient.length, 3);
+    expect(mid.glassFill.a, closeTo((a.glassFill.a + b.glassFill.a) / 2, 0.01));
+    expect(mid.primary, Color.lerp(a.primary, b.primary, 0.5)!);
+  });
 }

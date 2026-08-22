@@ -104,6 +104,34 @@ abstract final class AppGlass {
   static const List<BoxShadow> iconShadow = [
     BoxShadow(offset: Offset(0, 2), blurRadius: 10, color: Color(0x14000000)),
   ];
+
+  /// 玻璃卡片阴影（浅色）：y=4、blur=18、10% 黑，轻盈悬浮
+  static const List<BoxShadow> cardShadowLight = [
+    BoxShadow(offset: Offset(0, 4), blurRadius: 18, color: Color(0x1A000000)),
+  ];
+
+  /// 玻璃卡片阴影（深色）：y=4、blur=18、25% 黑，暗部光晕
+  static const List<BoxShadow> cardShadowDark = [
+    BoxShadow(offset: Offset(0, 4), blurRadius: 18, color: Color(0x40000000)),
+  ];
+
+  /// 玻璃卡片统一装饰（Glassmorphism v2）：
+  /// 半透明磨砂填充（透出环境光/背景图）+ 高光发丝描边 + 柔悬浮阴影。
+  ///
+  /// 性能说明（Spec §10）：背景层（环境光渐变或背景图+8px 全局模糊）已在
+  /// Navigator 之下预模糊，卡片自身不再叠加 BackdropFilter，保证长列表滚动
+  /// 不掉帧；通透感由 [ThemePalette.glassFill] 的 alpha 直接呈现。
+  static BoxDecoration glassCardDecoration({
+    required bool isDark,
+    required ThemePalette palette,
+  }) {
+    return BoxDecoration(
+      color: palette.glassFill,
+      borderRadius: AppRadius.mdAll,
+      border: Border.all(color: palette.glassBorder, width: borderWidth),
+      boxShadow: isDark ? cardShadowDark : cardShadowLight,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -222,11 +250,10 @@ class AppTokens extends ThemeExtension<AppTokens> {
         fontFeatures: AppText.tabularFigures,
       );
 
-  /// 卡片装饰（浅色阴影 / 深色描边）
-  BoxDecoration get cardDecoration => AppElevation.cardDecoration(
-        brightness: brightness,
-        surface: palette.surface,
-        border: palette.border,
+  /// 卡片装饰（玻璃拟态：磨砂填充 + 高光描边 + 悬浮阴影，浅深同构）
+  BoxDecoration get cardDecoration => AppGlass.glassCardDecoration(
+        isDark: isDark,
+        palette: palette,
       );
 
   @override

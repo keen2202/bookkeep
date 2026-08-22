@@ -16,6 +16,7 @@ import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/settings/appearance_page.dart';
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
+import 'package:bookkeep_app/shared/theme/background/ambient_gradient.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 import 'package:bookkeep_app/shared/widgets/app_amount_text.dart';
 import 'package:bookkeep_app/shared/widgets/app_card.dart';
@@ -83,9 +84,11 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
+    // 玻璃拟态（Glassmorphism v2）：Golden 与生产一致——页面之下先铺
+    // AmbientGradient 环境光层（生产由 AppBackground 提供，Scaffold 已透明）
     await tester.pumpWidget(MaterialApp(
       theme: buildTheme(preset),
-      home: home,
+      home: AmbientGradient(child: home),
     ));
     await tester.pump(const Duration(milliseconds: 300));
   }

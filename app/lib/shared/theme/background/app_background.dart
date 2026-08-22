@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_theme.dart';
 import '../theme_presets.dart';
+import 'ambient_gradient.dart';
 import 'background_controller.dart';
 import 'background_settings.dart';
 import 'luminance.dart';
@@ -56,8 +57,10 @@ BackgroundVisuals backgroundVisuals({
   );
 }
 
-/// 全局应用背景三层部件（BK-UI-014，设计文档 §5.1）：
-/// 背景图 → 智能遮罩（主题 background 色 × α）→ 8px 高斯模糊 → 内容层。
+/// 全局应用背景部件（BK-UI-014，设计文档 §5.1）：
+/// - 无背景图：主题环境光渐变（[AmbientGradient]，玻璃拟态默认光环境）；
+/// - 有背景图：背景图 → 智能遮罩（主题 background 色 × α）→ 8px 高斯模糊
+///   → 内容层。
 ///
 /// 接入位置：MaterialApp.builder（Navigator 之上），二级页与弹层共享同一
 /// 背景（跨页视觉连续，Spec §3.3）；[RepaintBoundary] 隔离背景层避免
@@ -76,11 +79,19 @@ class AppBackground extends ConsumerWidget {
     // null（未启用/未选图/文件缺失）走"无背景图"分支
     final imageFile = ref.watch(backgroundImageFileProvider).valueOrNull;
     if (imageFile == null) {
-      // 无背景图：状态栏图标按主题明暗（原 AppBarTheme 静态取值迁移至此）
+      // 无背景图：渲染主题环境光渐变（Glassmorphism v2 默认光环境，
+      // 设计文档 §5.1）；状态栏图标按主题明暗
       final dark = context.tokens.isDark;
       return _statusBarRegion(
         dark: dark ? Brightness.light : Brightness.dark,
-        child: child,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // RepaintBoundary 隔离渐变层：内容滚动不连带背景重绘
+            RepaintBoundary(child: AmbientGradient()),
+            Positioned.fill(child: child),
+          ],
+        ),
       );
     }
 

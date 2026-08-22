@@ -178,6 +178,15 @@ ThemeData _buildCustomTheme(Brightness brightness, Color seedColor) {
     textDisabled: scheme.outline,
     border: scheme.outlineVariant,
     divider: scheme.outlineVariant,
+    // 玻璃 Token（Glassmorphism v2）：由 M3 派生色合成，观感与预制主题同构
+    ambient: [
+      scheme.primaryContainer,
+      scheme.secondaryContainer,
+      scheme.surfaceContainerHighest,
+    ],
+    glassFill: scheme.surface.withValues(alpha: dark ? 0.72 : 0.65),
+    glassFillStrong: scheme.surface.withValues(alpha: dark ? 0.88 : 0.90),
+    glassBorder: dark ? const Color(0x38FFFFFF) : const Color(0x99FFFFFF),
   );
   final semantic = dark ? AppColors.dark : AppColors.light;
   return _assemble(
@@ -201,7 +210,9 @@ ThemeData _assemble({
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
-    scaffoldBackgroundColor: palette.background,
+    // 玻璃拟态（Glassmorphism v2）：Scaffold 透明化，页面底色让位给
+    // AppBackground 的环境光渐变 / 背景图+智能遮罩（设计文档 §5.1）。
+    scaffoldBackgroundColor: Colors.transparent,
     disabledColor: palette.textDisabled,
     hintColor: palette.textDisabled,
     extensions: [semantic, tokens],
@@ -217,24 +228,25 @@ ThemeData _assemble({
       surfaceTintColor: Colors.transparent,
       titleTextStyle: textTheme.titleLarge,
     ),
-    // 卡片：圆角 md；浅色海拔阴影 / 深色描边（设计文档 §3.3）
+    // 卡片：玻璃拟态（Glassmorphism v2，设计文档 §3.3/§5.4）——
+    // 半透明磨砂填充 + 高光发丝描边；浅色保留海拔阴影，深色阴影光晕。
     cardTheme: CardThemeData(
-      color: palette.surface,
+      color: palette.glassFill,
       elevation: dark ? 0 : 2,
-      shadowColor: palette.scrim.withValues(alpha: 0.08),
+      shadowColor: palette.scrim.withValues(alpha: 0.10),
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.mdAll,
-        side: dark ? BorderSide(color: palette.border) : BorderSide.none,
+        side: BorderSide(color: palette.glassBorder),
       ),
       clipBehavior: Clip.antiAlias,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: palette.surface,
+      backgroundColor: palette.glassFillStrong,
       indicatorColor: palette.primaryContainer,
       labelTextStyle: WidgetStatePropertyAll(textTheme.bodySmall),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: palette.surface,
+      backgroundColor: palette.glassFillStrong,
       modalBarrierColor: palette.scrim.withValues(alpha: 0.54),
       shape: RoundedRectangleBorder(borderRadius: AppRadius.sheetTop),
       elevation: 0,
@@ -272,7 +284,7 @@ ThemeData _assemble({
       ),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: palette.surface,
+      backgroundColor: palette.glassFillStrong,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.lgAll),
       titleTextStyle: textTheme.titleLarge,
       contentTextStyle: textTheme.bodyLarge,

@@ -140,12 +140,17 @@ class _PresetCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 色板缩略预览：背景 + 表面卡片 + 主色/收支语义色示意
+            // 色板缩略预览（Glassmorphism v2）：环境光渐变底 + 磨砂玻璃
+            // 卡片示意 + 主色/收支语义色示意
             Container(
               height: 40,
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: p.background,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: p.ambient.isEmpty ? [p.background] : p.ambient,
+                ),
                 borderRadius: AppRadius.smAll,
                 border: Border.all(color: p.border),
               ),
@@ -155,9 +160,9 @@ class _PresetCard extends StatelessWidget {
                     width: 32,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: p.surface,
+                      color: p.glassFill,
                       borderRadius: const BorderRadius.all(Radius.circular(4)),
-                      border: Border.all(color: p.border),
+                      border: Border.all(color: p.glassBorder),
                     ),
                     padding: const EdgeInsets.all(4),
                     child: Row(
@@ -603,7 +608,7 @@ class _BackgroundPreview extends ConsumerWidget {
                     ],
                   ),
                 ),
-              // 预览示意卡片（保证文字可读性示意）
+              // 预览示意卡片（玻璃磨砂质感 + 文字可读性示意）
               if (hasImage)
                 Align(
                   alignment: Alignment.bottomLeft,
@@ -613,8 +618,9 @@ class _BackgroundPreview extends ConsumerWidget {
                       width: 120,
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
-                        color: palette.surface,
+                        color: palette.glassFill,
                         borderRadius: AppRadius.smAll,
+                        border: Border.all(color: palette.glassBorder),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
