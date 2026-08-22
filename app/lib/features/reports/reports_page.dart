@@ -11,8 +11,11 @@ import 'charts/report_charts.dart';
 
 typedef ReportWindow = ({DateTime start, DateTime end});
 
-/// 报表汇率表（非主币种 → kRateScale 刻度；Spec §4.5 折算主币种）
+/// 报表汇率表（非主币种 → kRateScale 刻度；Spec §4.5 折算主币种）。
+/// watch 账本版本号：手动改汇率先 bump 版本（汇率管理页），
+/// 否则本 provider 缓存不失效，报表/日历将一直沿用旧汇率。
 final reportRatesProvider = FutureProvider<Map<String, int>>((ref) async {
+  ref.watch(ledgerVersionProvider);
   final service = ref.watch(exchangeRateServiceProvider);
   final db = ref.watch(databaseProvider);
   final currencies = await db.select(db.currencies).get();

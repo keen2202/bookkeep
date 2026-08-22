@@ -30,23 +30,14 @@ class CalendarPage extends ConsumerStatefulWidget {
 class _CalendarPageState extends ConsumerState<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
-  CalendarFormat _format = CalendarFormat.month;
 
-  /// 当前视图的按日聚合取数窗口：
-  /// month = 聚焦月；twoWeeks = 聚焦日所在周（周日起点，与 table_calendar
-  /// 默认 startingDayOfWeek 一致）起的 14 天（可能跨月）。
+  /// 当前视图的按日聚合取数窗口：聚焦月整月（月份懒加载，Spec §4.6）。
+  /// 月/双周切换已移除：双周视图需跨月取数、口径特殊且信息密度低，
+  /// 月历已完整覆盖需求；固定单格式也避免误触导致视图跳变。
   ReportWindow get _window {
-    if (_format == CalendarFormat.month) {
-      return (
-        start: DateTime(_focusedDay.year, _focusedDay.month),
-        end: DateTime(_focusedDay.year, _focusedDay.month + 1),
-      );
-    }
-    final weekStart = DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day)
-        .subtract(Duration(days: _focusedDay.weekday % 7));
     return (
-      start: weekStart,
-      end: weekStart.add(const Duration(days: 14)),
+      start: DateTime(_focusedDay.year, _focusedDay.month),
+      end: DateTime(_focusedDay.year, _focusedDay.month + 1),
     );
   }
 
@@ -83,14 +74,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         // 懒加载：仅请求当前视图窗口的按日聚合
         _MonthTotalsScope(
           key: ValueKey(
-              '${_format.name}|${window.start.year}-${window.start.month}-${window.start.day}'),
+              '${window.start.year}-${window.start.month}-${window.start.day}'),
           window: window,
-          format: _format,
           focusedDay: _focusedDay,
           selectedDay: _selectedDay,
           onSelected: (day) => setState(() => _selectedDay = day),
           onFocused: (day) => setState(() => _focusedDay = day),
-          onFormatChanged: (f) => setState(() => _format = f),
         ),
         Expanded(
           child: CashflowChart(day: _selectedDay),
@@ -104,21 +93,17 @@ class _MonthTotalsScope extends ConsumerWidget {
   const _MonthTotalsScope({
     super.key,
     required this.window,
-    required this.format,
     required this.focusedDay,
     required this.selectedDay,
     required this.onSelected,
     required this.onFocused,
-    required this.onFormatChanged,
   });
 
   final ReportWindow window;
-  final CalendarFormat format;
   final DateTime focusedDay;
   final DateTime selectedDay;
   final ValueChanged<DateTime> onSelected;
   final ValueChanged<DateTime> onFocused;
-  final ValueChanged<CalendarFormat> onFormatChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -135,12 +120,11 @@ class _MonthTotalsScope extends ConsumerWidget {
       lastDay: DateTime(2035, 12, 31),
       locale: 'zh_CN',
       rowHeight: 56,
-      calendarFormat: format,
-      availableCalendarFormats: const {
-        CalendarFormat.month: '月',
-        CalendarFormat.twoWeeks: '双周',
-      },
-      onFormatChanged: onFormatChanged,
+      // 月/双周切换按钮已取消（仅保留月视图）：双周窗口跨月取数、口径特殊，
+      // 且格式按钮易误触导致视图跳变；如需紧凑视图可后续以独立入口回归。
+      calendarFormat: CalendarFormat.month,
+      availableCalendarFormats: const {CalendarFormat.month: '月'},
+      headerStyle: const HeaderStyle(formatButtonVisible: false),
       focusedDay: focusedDay,
       selectedDayPredicate: (day) => isSameDay(day, selectedDay),
       // 单击 → 更新选中日并直达当日记账（日期预填）；viewer 只读不跳转
@@ -162,7 +146,10 @@ class _MonthTotalsScope extends ConsumerWidget {
         defaultBuilder: (context, day, _) => _dayCell(context, day, totalsByDay, masked),
         todayBuilder: (context, day, _) => _dayCell(context, day, totalsByDay, masked),
         selectedBuilder: (context, day, _) => _dayCell(context, day, totalsByDay, masked),
-        outsideBuilder: (context, day, _) => const SizedBox.shrink(),
+        // 空白日期修复：相邻月份日期不再整格留白，改渲染淡色日号
+        // （无金额、可点按跳转对应月份），月面观感连续完整。
+        outsideBuilder: (context, day, _) =>
+            _dayCell(context, day, totalsByDay, masked, dimmed: true),
       ),
     );
   }
@@ -171,8 +158,9 @@ class _MonthTotalsScope extends ConsumerWidget {
     BuildContext context,
     DateTime day,
     Map<String, DailyTotal> totalsByDay,
-    bool masked,
-  ) {
+    bool masked, {
+    bool dimmed = false,
+  }) {
     final theme = Theme.of(context);
     // 今天与选中态在 _dayCell 内统一判定，today/selected 两 builder 共用同一样式
     final isToday = isSameDay(day, DateTime.now());
@@ -181,45 +169,66 @@ class _MonthTotalsScope extends ConsumerWidget {
     final total = totalsByDay[key];
     final net = total == null ? 0 : total.incomeMinor - total.expenseMinor;
     // UI 重构（Spec §6）：选中/今日标记与金额色全部走 palette/语义色
-    final color = net > 0
+    final amountColor = net > 0
         ? context.appColors.income
         : net < 0
             ? context.appColors.expense
             : context.palette.textSecondary;
-    final onPrimary = context.palette.onPrimary;
-    return Container(
-      margin: const EdgeInsets.all(2),
-      decoration: isToday
-          ? BoxDecoration(
-              color: theme.colorScheme.primary,
-              shape: BoxShape.circle,
-            )
-          : isSelected
-              ? BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                )
-              : null,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('${day.day}',
-              style: (isToday ? context.text.bodyLarge : context.text.bodySmall)
-                  ?.copyWith(
-                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                color: isToday ? onPrimary : null,
-              )),
-          if (net != 0)
-            Text(
-              masked ? '*' : _compactMoney(net),
-              style: context.text.bodySmall?.copyWith(
-                // 审查 U-8：字号下限 12sp（WCAG 可读性）
-                color: isToday ? onPrimary : color,
-                fontWeight: FontWeight.w600,
+
+    // 选择效果变形修复：高亮改为固定直径的圆形标记（仅包裹日号），
+    // 不再以整格容器铺色——此前 BoxDecoration 会随日格宽度拉伸成椭圆/圆角矩形。
+    // 优先级：今日 > 选中（同日重叠时以主色今日样式呈现）。
+    final Color? markerColor = isToday
+        ? theme.colorScheme.primary
+        : isSelected
+            ? theme.colorScheme.primaryContainer
+            : null;
+    final Color numberColor = isToday
+        ? context.palette.onPrimary
+        : isSelected
+            ? theme.colorScheme.onPrimaryContainer
+            : dimmed
+                ? context.palette.textDisabled
+                : context.palette.textPrimary;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: markerColor == null
+              ? null
+              : BoxDecoration(color: markerColor, shape: BoxShape.circle),
+          child: Text(
+            '${day.day}',
+            style: (isToday || isSelected
+                    ? context.text.bodyMedium
+                    : context.text.bodySmall)
+                ?.copyWith(
+              fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+              color: numberColor,
+            ),
+          ),
+        ),
+        // 相邻月份的淡色日号不显示金额，避免与本月日格混淆
+        if (!dimmed && net != 0)
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                masked ? '*' : _compactMoney(net),
+                style: context.text.bodySmall?.copyWith(
+                  // 审查 U-8：字号下限 12sp（WCAG 可读性）
+                  color: isToday ? context.palette.onPrimary : amountColor,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 

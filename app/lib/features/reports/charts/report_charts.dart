@@ -6,16 +6,6 @@ import '../../../data/repositories/reports_repository.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/theme/chart_colors.dart';
 
-/// 可读刻度（审查 U-11）：大额转「x.xx万/x.xx百万」，小额原样；负值保留符号。
-/// 修正刻度错位：1万 = 1,000,000 minor，1百万 = 100,000,000 minor。
-String _compactTick(int minor) {
-  final abs = minor.abs();
-  final sign = minor < 0 ? '-' : '';
-  if (abs >= 100000000) return '$sign${(minor / 100000000).toStringAsFixed(1)}百万';
-  if (abs >= 1000000) return '$sign${(minor / 100000).toStringAsFixed(1)}万';
-  return '$sign${formatMoney(minor).replaceAll('¥', '')}';
-}
-
 /// X 轴标签压缩：桶间「共有」的部分对区分各桶没有贡献（跨年对比的同期后缀、
 /// 同年的年份前缀），剥离后仅保留区分维度，避免长日期标签在窄屏上相互重叠。
 /// - 跨年对比（各桶年份不同、同期相同）→ 仅保留年份：`2021-08-09` → `2021`；
@@ -149,6 +139,9 @@ class PeriodBarChart extends StatelessWidget {
     final series = chartSeriesColors(context);
     final axisStyle = context.text.bodySmall;
     final maxAmount = buckets.fold<int>(0, (a, b) => a > b.amountMinor ? a : b.amountMinor);
+    // x/y 轴比例均衡：显式「好看」刻度步长（约 4 档），避免 fl_chart 默认间隔
+    // 在极端量级下产生过密刻度或柱高与刻度错位的观感
+    final yInterval = niceAxisStep((maxAmount == 0 ? 1 : maxAmount) * 1.2 / 4);
     final axisLabels = compactPeriodAxisLabels([
       for (final b in buckets) b.label,
     ]);
@@ -172,12 +165,13 @@ class PeriodBarChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 52,
+                      interval: yInterval,
                       getTitlesWidget: (value, meta) {
                         if (value <= 0) return const SizedBox.shrink();
                         return SideTitleWidget(
                           meta: meta,
                           space: 4,
-                          child: Text(_compactTick(value.toInt()), style: axisStyle),
+                          child: Text(compactTickLabel(value.round()), style: axisStyle),
                         );
                       },
                     ),
@@ -271,6 +265,7 @@ class TrendLineChart extends StatelessWidget {
       for (final s in income) s.y,
     ].fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
     final labelStep = (sampled.length / 6).ceil().clamp(1, 99);
+    final yInterval = niceAxisStep(maxY / 4);
 
     return SizedBox(
       height: 220,
@@ -301,9 +296,10 @@ class TrendLineChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 52,
+                      interval: yInterval,
                       getTitlesWidget: (value, meta) {
                         if (value <= 0) return const SizedBox.shrink();
-                        return Text(_compactTick(value.toInt()), style: axisStyle);
+                        return Text(compactTickLabel(value.round()), style: axisStyle);
                       },
                     ),
                   ),

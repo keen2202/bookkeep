@@ -5,8 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/repository_exceptions.dart';
-import '../../core/ledger_version.dart';
-import '../../data/local/database.dart';
+import '../../core/ledger_version.dart';import '../../data/local/database.dart';
 import '../../domain/models/category_seed.dart';
 import '../../shared/utils/category_icon.dart';
 import '../books/books_providers.dart'
@@ -85,16 +84,17 @@ class _CategoryListState extends ConsumerState<_CategoryList> {
           onToggle: () => setState(() {
             if (!_collapsed.add(parent.id)) _collapsed.remove(parent.id);
           }),
-          onMore: widget.viewer || parent.isSystem
-              ? null
-              : () => _showActions(context, ref, parent),
+          onMore: widget.viewer ? null : () => _showActions(context, ref, parent),
         ),
         if (!_collapsed.contains(parent.id))
           for (final child in categories.where((c) => c.parentId == parent.id))
             ListTile(
               leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
               title: Text(child.name),
-              trailing: child.isSystem || widget.viewer
+              // 编辑/删除入口（含系统分类，软删除保留历史流水分类名快照）：
+              // 点击整行或右侧菜单均可打开操作弹层；viewer 只读隐藏
+              onTap: widget.viewer ? null : () => _showActions(context, ref, child),
+              trailing: widget.viewer
                   ? null
                   : IconButton(
                       icon: const Icon(Icons.more_vert),
@@ -131,20 +131,49 @@ class _CategoryListState extends ConsumerState<_CategoryList> {
         ),
       ),
     );
-    if (!context.mounted) return;
+    if (!context.mounted || action == null) return;
+    var changed = false;
     switch (action) {
       case 'edit':
         await CategoryEditSheet.show(context, category: category);
+        changed = true;
       case 'delete':
+        // 删除需二次确认（Spec §3.3：删除被引用分类有提示且历史可见）
+        final confirmed = await _confirmDelete(context, category);
+        if (!confirmed) return;
         try {
           await repo.deleteCategory(category.id);
-        } on CategoryInUseException catch (e) {
+          changed = true;
+        } on RepositoryException catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
           }
         }
     }
-    ref.invalidate(categoriesViewModelProvider);
+    if (changed) ref.invalidate(categoriesViewModelProvider);
+  }
+
+  Future<bool> _confirmDelete(BuildContext context, Category category) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除分类'),
+        content: Text('删除「${category.name}」后该分类不再可选；'
+            '已有流水不受影响，保留原分类显示。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 }
 

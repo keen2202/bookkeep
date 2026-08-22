@@ -183,7 +183,8 @@ class CategoryRepository {
     });
   }
 
-  /// 软删除。仍被流水引用时拒绝（Spec §3.3：删除被引用分类需提示）。
+  /// 软删除。仍被流水引用时拒绝（Spec §3.3：删除被引用分类需提示）；
+  /// 存在未删除子分类时同样拒绝（防止父级删除后子分类失联不可见）。
   Future<void> deleteCategory(int id) async {
     final referenced = await (db.select(db.transactions)
           ..where((t) => t.categoryId.equals(id) & t.deletedAt.isNull()))
@@ -191,6 +192,13 @@ class CategoryRepository {
         .then((rows) => rows.isNotEmpty);
     if (referenced) {
       throw CategoryInUseException();
+    }
+    final hasChildren = await (db.select(db.categories)
+          ..where((t) => t.parentId.equals(id) & t.deletedAt.isNull()))
+        .get()
+        .then((rows) => rows.isNotEmpty);
+    if (hasChildren) {
+      throw CategoryHasChildrenException();
     }
     await db.transaction(() async {
       final category = await getCategory(id);

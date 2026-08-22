@@ -24,3 +24,6 @@ build/
 .workbuddy/
 /apk/
 .fsdk/
+
+# 本地 Flutter SDK 符号链接树（只读挂载 SDK 的可写包装，勿提交）
+.flutter-sdk/

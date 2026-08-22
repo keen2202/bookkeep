@@ -149,10 +149,65 @@ void main() {
     ));
     await pumpUntil(tester, find.text('删除'));
     await tester.pump(const Duration(milliseconds: 400)); // 弹窗入场动画完成
-    await tester.tap(find.text('删除'));
-    await pumpUntilGone(tester, find.text('删除')); // 弹窗关闭
+    await tester.tap(find.text('删除')); // 操作弹层关闭，确认弹窗弹出（其内亦有「删除」）
+    await pumpUntil(tester, find.text('删除分类'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('删除').last); // 确认删除
+    await pumpUntilGone(tester, find.text('删除分类')); // 确认弹窗关闭
     await pumpUntilGone(tester, find.text('临时')); // 列表刷新完成
     expect(find.text('临时'), findsNothing);
+  });
+
+  testWidgets('system categories expose edit and delete actions', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntil(tester, find.text('早餐'));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 编辑入口对系统分类可用（此前 isSystem 完全屏蔽增删改）
+    await tester.tap(find.descendant(
+      of: find.widgetWithText(ListTile, '早餐'),
+      matching: find.byIcon(Icons.more_vert),
+    ));
+    await pumpUntil(tester, find.text('编辑'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('编辑'));
+    await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
+    await tester.pumpAndSettle(); // 编辑弹层入场动画完成（否则保存按钮尚在屏外）
+    await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '早点铺');
+    await tester.tap(find.widgetWithText(AppButton, '保存'));
+    await pumpUntilGone(tester, find.widgetWithText(TextFormField, '分类名称'));
+
+    expect(find.text('早点铺'), findsOneWidget);
+    expect(find.text('早餐'), findsNothing);
+  });
+
+  testWidgets('deleting a parent with children is blocked with a hint', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntil(tester, find.text('餐饮'));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 「餐饮」含子分类（早餐/晚餐）→ 删除应被拒绝并提示
+    await tester.tap(find.descendant(
+      of: find.widgetWithText(ListTile, '餐饮'),
+      matching: find.byIcon(Icons.more_vert),
+    ));
+    await pumpUntil(tester, find.text('删除'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('删除')); // 操作弹层关闭，确认弹窗弹出
+    await pumpUntil(tester, find.text('删除分类'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('删除').last); // 确认删除 → 仓库拒绝并提示
+    await pumpUntilGone(tester, find.text('删除分类'));
+    await pumpUntil(tester, find.textContaining('包含子分类'));
+    // 分类仍在列表中
+    expect(find.text('餐饮'), findsOneWidget);
+    expect(find.text('早餐'), findsOneWidget);
   });
 
   testWidgets('collapsing a parent header hides its children', (tester) async {

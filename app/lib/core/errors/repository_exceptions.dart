@@ -17,3 +17,8 @@ class CategoryInUseException extends RepositoryException {
   CategoryInUseException()
       : super('该分类仍被流水使用，不能删除（历史流水将保留原分类名）');
 }
+
+/// 分类包含未删除的子分类，需先处理子分类（防止删除父级后子分类失联）
+class CategoryHasChildrenException extends RepositoryException {
+  CategoryHasChildrenException() : super('该分类包含子分类，请先删除其子分类');
+}

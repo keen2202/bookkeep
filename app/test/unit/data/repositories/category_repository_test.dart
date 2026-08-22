@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:drift/drift.dart' hide isNotNull;
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -200,4 +200,52 @@ void main() {
     final updatePayload = jsonDecode(ops[1].payload) as Map<String, dynamic>;
     expect(updatePayload['name'], '宠物用品');
   });
+
+  test('system categories can be renamed and soft-deleted (enqueue u/d ops)', () async {
+    final raw = await rootBundle.loadString('assets/seed/categories_seed.json');
+    final seed = CategorySeed.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    await repo.installSeeds(seed);
+
+    // 取一个叶子级系统分类（无子分类）
+    final all = await repo.listCategories();
+    final leaf = all.firstWhere((c) => c.isSystem && !all.any((x) => x.parentId == c.id));
+
+    await repo.updateCategory(leaf.id, name: '改名分类', color: 0xFF00FF00);
+    await repo.deleteCategory(leaf.id);
+
+    expect(await repo.listCategories(), isNot(contains(predicate<Category>((c) => c.id == leaf.id))));
+    final deleted = await repo.getCategory(leaf.id);
+    expect(deleted.deletedAt, isNotNull);
+
+    // 系统分类的改名/删除同样入队同步 op（多设备最终一致）
+    final ops = await db.select(db.syncOps).get();
+    expect(ops.map((o) => o.op).toList(), [SyncOpCode.u, SyncOpCode.d]);
+    final updatePayload = jsonDecode(ops[0].payload) as Map<String, dynamic>;
+    expect(updatePayload['is_system'], true);
+    expect(updatePayload['name'], '改名分类');
+  });
+
+  test('refuses to delete a parent that still has active children', () async {
+    final raw = await rootBundle.loadString('assets/seed/categories_seed.json');
+    final seed = CategorySeed.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    await repo.installSeeds(seed);
+
+    final all = await repo.listCategories();
+    final parent = all.firstWhere((c) => all.any((x) => x.parentId == c.id));
+
+    // 子分类存在 → 拒绝删除父级（防止父删后子分类失联不可见）
+    await expectLater(
+      repo.deleteCategory(parent.id),
+      throwsA(isA<CategoryHasChildrenException>()),
+    );
+    expect((await repo.getCategory(parent.id)).deletedAt, isNull);
+
+    // 先逐个删除子分类，随后父级可正常删除
+    for (final child in all.where((c) => c.parentId == parent.id).toList()) {
+      await repo.deleteCategory(child.id);
+    }
+    await repo.deleteCategory(parent.id);
+    expect((await repo.getCategory(parent.id)).deletedAt, isNotNull);
+  });
 }
+
