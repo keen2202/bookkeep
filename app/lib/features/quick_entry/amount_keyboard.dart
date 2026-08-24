@@ -5,10 +5,22 @@ import '../../shared/theme/app_theme.dart';
 
 /// 自绘数字键盘（Spec §3.1 / BK-P0-001：禁用系统键盘弹起延迟）
 class AmountKeyboard extends StatelessWidget {
-  const AmountKeyboard({super.key, required this.onKey, this.onConfirm});
+  const AmountKeyboard({
+    super.key,
+    required this.onKey,
+    this.onConfirm,
+    this.onBackspace,
+    this.onClear,
+  });
 
+  /// 数字 / '.' / '+' / '-'
   final ValueChanged<String> onKey;
   final VoidCallback? onConfirm;
+
+  /// ⌫ 退格 / C 清除（独立回调：动作键不经 [onKey] 字符过滤，
+  /// 否则 pressKey 无法识别会被静默丢弃——修复退格/清除键失灵）
+  final VoidCallback? onBackspace;
+  final VoidCallback? onClear;
 
   static const _rows = [
     ['7', '8', '9', '⌫'],
@@ -31,7 +43,15 @@ class AmountKeyboard extends StatelessWidget {
               Row(
                 children: [
                   for (final key in row)
-                    Expanded(child: _Key(label: key, onKey: onKey, onConfirm: onConfirm)),
+                    Expanded(
+                      child: _Key(
+                        label: key,
+                        onKey: onKey,
+                        onConfirm: onConfirm,
+                        onBackspace: onBackspace,
+                        onClear: onClear,
+                      ),
+                    ),
                 ],
               ),
           ],
@@ -42,11 +62,19 @@ class AmountKeyboard extends StatelessWidget {
 }
 
 class _Key extends StatelessWidget {
-  const _Key({required this.label, required this.onKey, required this.onConfirm});
+  const _Key({
+    required this.label,
+    required this.onKey,
+    required this.onConfirm,
+    this.onBackspace,
+    this.onClear,
+  });
 
   final String label;
   final ValueChanged<String> onKey;
   final VoidCallback? onConfirm;
+  final VoidCallback? onBackspace;
+  final VoidCallback? onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +93,10 @@ class _Key extends StatelessWidget {
           HapticFeedback.selectionClick();
           if (isConfirm) {
             onConfirm?.call();
+          } else if (label == '⌫') {
+            onBackspace?.call();
+          } else if (label == 'C') {
+            onClear?.call();
           } else {
             onKey(label);
           }

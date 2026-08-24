@@ -11,13 +11,15 @@ import '../../shared/widgets/app_empty.dart';
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart' show currentRoleProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
+import 'bill_detail_sheet.dart' show showBillDetailSheet;
 import 'bills_grouping.dart';
 import 'bills_providers.dart';
 
 const _weekdayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 /// 账单详情页（默认主页）：按天分组展示每一笔记账（分类/时间/金额），
-/// 组头显示当天支出与收入合计。无内层 Scaffold/AppBar/FAB（审查 U-1）
+/// 组头显示当天支出与收入合计。点按行打开详情弹层可修改/删除（viewer 只读）。
+/// 无内层 Scaffold/AppBar/FAB（审查 U-1）
 class BillsPage extends ConsumerWidget {
   const BillsPage({super.key});
 
@@ -57,7 +59,13 @@ class BillsPage extends ConsumerWidget {
             final row = rows[i];
             return row.isHeader
                 ? _DayHeader(day: row.day!, masked: masked)
-                : _BillTile(tx: row.tx!, categories: categories, masked: masked);
+                : _BillTile(
+                    tx: row.tx!,
+                    categories: categories,
+                    masked: masked,
+                    // viewer 权限矩阵：只读，不提供修改/删除入口
+                    onTap: viewer ? null : () => showBillDetailSheet(context, tx: row.tx!),
+                  );
           },
         );
       },
@@ -114,11 +122,19 @@ class _DayHeader extends StatelessWidget {
 }
 
 class _BillTile extends StatelessWidget {
-  const _BillTile({required this.tx, required this.categories, required this.masked});
+  const _BillTile({
+    required this.tx,
+    required this.categories,
+    required this.masked,
+    this.onTap,
+  });
 
   final Transaction tx;
   final Map<int, Category> categories;
   final bool masked;
+
+  /// 点按打开账单详情（修改/删除）；null = 只读（viewer）
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -154,6 +170,7 @@ class _BillTile extends StatelessWidget {
       subtitle: Text(tx.note == null || tx.note!.isEmpty ? time : '$time · ${tx.note}'),
       trailing: AppAmountText.minor(tx.amountMinor, masked: masked, tone: amountTone),
       dense: true,
+      onTap: onTap,
     );
   }
 }

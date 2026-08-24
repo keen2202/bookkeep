@@ -37,12 +37,22 @@ Future<void> openQuickEntrySheet(BuildContext context, {DateTime? initialDate}) 
   }
 }
 
+/// 共享导航：打开账单编辑页（账单详情页「修改」入口共用），
+/// 预填既有记账数据，保存成功回传 true
+Future<bool> openBillEditor(BuildContext context, EditTarget target) {
+  return Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => QuickEntrySheet(editTarget: target)),
+      ).then((saved) => saved == true);
+}
+
 /// 极速记账页（Spec §3.1 / BK-P0-001）：+ → 类型 → 数字键盘 → 分类/账户 → 保存；
-/// [initialDate] 从日历跳转时预填记账日期（默认当前时刻）
+/// [initialDate] 从日历跳转时预填记账日期（默认当前时刻）；
+/// [editTarget] 编辑模式：预填既有流水，保存走更新路径（账单页「修改」入口）
 class QuickEntrySheet extends ConsumerStatefulWidget {
-  const QuickEntrySheet({super.key, this.initialDate});
+  const QuickEntrySheet({super.key, this.initialDate, this.editTarget});
 
   final DateTime? initialDate;
+  final EditTarget? editTarget;
 
   @override
   ConsumerState<QuickEntrySheet> createState() => _QuickEntrySheetState();
@@ -50,6 +60,7 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
 
 class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   late QuickEntryController _controller;
+  late final TextEditingController _noteController;
 
   @override
   void initState() {
@@ -59,10 +70,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       createTransaction: CreateTransaction(ref.read(transactionRepositoryProvider)),
       transactionRepository: ref.read(transactionRepositoryProvider),
       accountRepository: ref.read(accountRepositoryProvider),
+      editTarget: widget.editTarget,
       initialOccurredAt: widget.initialDate,
     );
     _controller.addListener(_onController);
-    _loadDefaults();
+    _noteController = TextEditingController(text: _controller.note);
+    // 编辑模式直接以既有数据为准，不加载/覆盖 lastDefaults 默认回填
+    if (widget.editTarget == null) _loadDefaults();
   }
 
   Future<void> _loadDefaults() async {
@@ -101,6 +115,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   void dispose() {
     _controller.removeListener(_onController);
     _controller.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -153,7 +168,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('记一笔'),
+        title: Text(widget.editTarget != null ? '编辑账单' : '记一笔'),
         actions: [
           TextButton.icon(
             onPressed: _exit,
@@ -165,10 +180,23 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       body: Column(
         children: [
           SegmentedButton<TransactionType>(
-            segments: const [
-              ButtonSegment(value: TransactionType.expense, label: Text('支出')),
-              ButtonSegment(value: TransactionType.income, label: Text('收入')),
-              ButtonSegment(value: TransactionType.transfer, label: Text('转账')),
+            segments: [
+              ButtonSegment(
+                value: TransactionType.expense,
+                label: const Text('支出'),
+                enabled: !_controller.typeLocked,
+              ),
+              ButtonSegment(
+                value: TransactionType.income,
+                label: const Text('收入'),
+                enabled: !_controller.typeLocked,
+              ),
+              ButtonSegment(
+                value: TransactionType.transfer,
+                label: const Text('转账'),
+                // 编辑收支时禁选转账（单行流水不可转双边结构，需删除重记）
+                enabled: _controller.transferOptionEnabled && !_controller.typeLocked,
+              ),
             ],
             selected: {_controller.type},
             onSelectionChanged: (s) => _controller.setType(s.first),
@@ -188,7 +216,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           Expanded(
             child: ListView(
               children: [
-                const BudgetSummaryCard(),
+                if (widget.editTarget == null) const BudgetSummaryCard(),
+                if (widget.editTarget != null) _buildNoteField(),
                 _buildSelections(
                   accounts: accounts,
                   accountsLoading: accountsAsync.isLoading,
@@ -203,8 +232,26 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           AmountKeyboard(
             onKey: _controller.pressKey,
             onConfirm: _save,
+            onBackspace: _controller.backspace,
+            onClear: _controller.clear,
           ),
         ],
+      ),
+    );
+  }
+
+  /// 备注字段（编辑模式）：账单列表展示备注，编辑需可改
+  Widget _buildNoteField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm),
+      child: TextField(
+        controller: _noteController,
+        onChanged: _controller.setNote,
+        decoration: const InputDecoration(
+          labelText: '备注',
+          hintText: '点击填写备注（可选）',
+        ),
+        textInputAction: TextInputAction.done,
       ),
     );
   }
