@@ -22,7 +22,8 @@ class BudgetProgressBar extends StatelessWidget {
         value: (progress.percent / 100).clamp(0.0, 1.0),
         minHeight: 6,
         color: color,
-        backgroundColor: color.withValues(alpha: 0.15),
+        // v3（GLS-007）：轨道线 divider α0.5，与图表网格同源
+        backgroundColor: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
       ),
     );
   }

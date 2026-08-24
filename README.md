@@ -43,6 +43,15 @@ bookkeep/
 - **data/** — Drift 数据库（13 张表，schema v7 迁移链）、按实体划分的 Repository（transaction/account/category/budget/book/currency/settings/reports/lock）、`OpLogger` 操作日志
 - **domain/** — 实体模型、值对象、服务（`AccountBalanceCalculator`、`BudgetProgressCalculator`、`CategoryResolver`、`LwwResolver`）、用例（`create_transaction`）
 - **features/** — 按功能分模块：quick_entry、accounts、categories、budgets、reports、calendar、books、auto_capture、recurring、currency、backup、auth_lock、sync
+
+- **shared/theme/** — 玻璃拟态视觉体系（Glassmorphism v3，BK-GLS 系列）：
+  - `glass/glass_layers.dart` — L1–L4 层级参数表与唯一解析入口 `resolveGlassSpec()`（σ/填充α/描边α 三参数随层单调）；
+  - `glass/glass_panel.dart` — `GlassPanel` 通用玻璃容器（standard 档 fill-only 零 saveLayer；high 档 bounded-blur 双保险裁剪；hover/press 三态过渡；图表容器 `innerSheen` 微反光）；
+  - `glass/glass_quality.dart` — 画质三档（高保真/标准/省电）+ 环境光个性化（5 个 app_meta 键持久化）；
+  - `glass/ambient_motion.dart` — 36s 椭圆轨道漂移 + push/pop 脉冲 + Tab 呼吸；`disableAnimations`/省电/后台/锁定四条件降级矩阵；
+  - `contrast_guard.dart` — 光斑强度对比度联动（WCAG AA 自动钳制 + 外观页徽标说明）；
+  - 一致性门禁：`tool/check_glass_consistency.sh`（BackdropFilter 唯一出口 + features 层禁直引旧 Token），CI 强制。
+  - 设计依据：`docs/19~21` 玻璃拟态全链路三件套；走查与性能归档：`docs/report/gls-v3/`。
 - **shared/** — 通用组件（`category_picker` 两级选择器等）
 
 状态管理使用 Riverpod：`currentBookIdProvider` 注入账本上下文（查询强制过滤、写路径打标、sync_ops 按账本分区）；`amountMaskProvider` 统一注入锁定脱敏。

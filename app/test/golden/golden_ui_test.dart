@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show Value;
@@ -15,6 +16,7 @@ import 'package:bookkeep_app/features/bills/bills_page.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/settings/appearance_page.dart';
+import 'package:bookkeep_app/features/settings/component_gallery_page.dart';
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
 import 'package:bookkeep_app/shared/theme/background/ambient_gradient.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
@@ -46,33 +48,45 @@ void main() {
     await catRepo.installSeeds(testSeed);
     final cats = await catRepo.listCategories();
     final breakfastId = cats.firstWhere((c) => c.name == '早餐').id;
-    final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-          bookId: testBookId,
-          accountType: AccountType.cash,
-          name: '钱包',
-          currency: 'CNY',
-          createdAt: DateTime.utc(2026, 8, 1),
-        ));
-    await db.into(db.transactions).insert(TransactionsCompanion.insert(
-          bookId: testBookId,
-          accountId: accountId,
-          categoryId: Value(breakfastId),
-          type: TransactionType.expense,
-          amountMinor: -2550,
-          currency: 'CNY',
-          occurredAt: DateTime(2026, 8, 10, 8, 30),
-          updatedAt: DateTime.utc(2026, 8, 10),
-        ));
-    await db.into(db.transactions).insert(TransactionsCompanion.insert(
-          bookId: testBookId,
-          accountId: accountId,
-          categoryId: Value(breakfastId),
-          type: TransactionType.income,
-          amountMinor: 10000,
-          currency: 'CNY',
-          occurredAt: DateTime(2026, 8, 9, 12, 0),
-          updatedAt: DateTime.utc(2026, 8, 9),
-        ));
+    final accountId = await db
+        .into(db.accounts)
+        .insert(
+          AccountsCompanion.insert(
+            bookId: testBookId,
+            accountType: AccountType.cash,
+            name: '钱包',
+            currency: 'CNY',
+            createdAt: DateTime.utc(2026, 8, 1),
+          ),
+        );
+    await db
+        .into(db.transactions)
+        .insert(
+          TransactionsCompanion.insert(
+            bookId: testBookId,
+            accountId: accountId,
+            categoryId: Value(breakfastId),
+            type: TransactionType.expense,
+            amountMinor: -2550,
+            currency: 'CNY',
+            occurredAt: DateTime(2026, 8, 10, 8, 30),
+            updatedAt: DateTime.utc(2026, 8, 10),
+          ),
+        );
+    await db
+        .into(db.transactions)
+        .insert(
+          TransactionsCompanion.insert(
+            bookId: testBookId,
+            accountId: accountId,
+            categoryId: Value(breakfastId),
+            type: TransactionType.income,
+            amountMinor: 10000,
+            currency: 'CNY',
+            occurredAt: DateTime(2026, 8, 9, 12, 0),
+            updatedAt: DateTime.utc(2026, 8, 9),
+          ),
+        );
     return db;
   }
 
@@ -84,12 +98,18 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    // 玻璃拟态（Glassmorphism v2）：Golden 与生产一致——页面之下先铺
-    // AmbientGradient 环境光层（生产由 AppBackground 提供，Scaffold 已透明）
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(preset),
-      home: AmbientGradient(child: home),
-    ));
+    // 玻璃拟态（Glassmorphism v2→v3）：Golden 与生产一致——页面之下先铺
+    // AmbientGradient 环境光层（生产由 AppBackground 提供，Scaffold 已透明）；
+    // v3 环境光为 ConsumerWidget（动效 provider 接线），统一包 ProviderScope。
+    // 全部 Golden 以 standard 档渲染（Spec §10 覆盖策略声明）。
+    // v3：AmbientGradient 为 ConsumerWidget——仅为其提供独立作用域
+    // （零 override，不与业务页内层 override 作用域交叉，riverpod 作用域语义安全）
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(preset),
+        home: AmbientGradient(child: home),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 300));
   }
 
@@ -104,77 +124,149 @@ void main() {
     group('${preset.id} ${preset.name}', () {
       testWidgets('账单主页', (tester) async {
         final db = await seedBillsDb();
-        await pumpGolden(tester, preset, ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            currentBookIdProvider.overrideWith((ref) => testBookId),
-            categorySeedProvider.overrideWith((ref) async => testSeed),
-          ],
-          child: const Scaffold(body: BillsPage()),
-        ));
+        await pumpGolden(
+          tester,
+          preset,
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              currentBookIdProvider.overrideWith((ref) => testBookId),
+              categorySeedProvider.overrideWith((ref) async => testSeed),
+            ],
+            child: const Scaffold(body: BillsPage()),
+          ),
+        );
         await expectGolden(tester, '${preset.id}_bills');
       });
 
       testWidgets('账单卡片', (tester) async {
-        await pumpGolden(tester, preset, Scaffold(
-          body: Builder(
-            builder: (context) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  AppCard(
-                    child: Row(
-                      children: [
-                        Icon(Icons.receipt_long_outlined,
-                            size: 20, color: context.palette.textSecondary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text('餐饮 / 早餐',
-                              style: context.text.titleLarge),
-                        ),
-                        AppAmountText.minor(-2550,
-                            signed: false, tone: AppAmountTone.expense),
-                      ],
+        await pumpGolden(
+          tester,
+          preset,
+          Scaffold(
+            body: Builder(
+              builder: (context) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    AppCard(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: 20,
+                            color: context.palette.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '餐饮 / 早餐',
+                              style: context.text.titleLarge,
+                            ),
+                          ),
+                          AppAmountText.minor(
+                            -2550,
+                            signed: false,
+                            tone: AppAmountTone.expense,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  AppCard(
-                    child: Row(
-                      children: [
-                        Icon(Icons.attach_money,
-                            size: 20, color: context.palette.textSecondary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text('工资', style: context.text.titleLarge),
-                        ),
-                        AppAmountText.minor(10000,
-                            signed: true, tone: AppAmountTone.income),
-                      ],
+                    const SizedBox(height: 8),
+                    AppCard(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.attach_money,
+                            size: 20,
+                            color: context.palette.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text('工资', style: context.text.titleLarge),
+                          ),
+                          AppAmountText.minor(
+                            10000,
+                            signed: true,
+                            tone: AppAmountTone.income,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ));
+        );
         await expectGolden(tester, '${preset.id}_bill_card');
       });
 
       testWidgets('外观页', (tester) async {
         final db = AppDatabase(NativeDatabase.memory());
         addTearDown(db.close);
-        await pumpGolden(tester, preset, ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            currentBookIdProvider.overrideWith((ref) => testBookId),
-            categorySeedProvider.overrideWith((ref) async => testSeed),
-          ],
-          child: const AppearancePage(),
-        ));
+        await pumpGolden(
+          tester,
+          preset,
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              currentBookIdProvider.overrideWith((ref) => testBookId),
+              categorySeedProvider.overrideWith((ref) async => testSeed),
+            ],
+            child: const AppearancePage(),
+          ),
+        );
         await expectGolden(tester, '${preset.id}_appearance');
       });
     });
   }
+
+  // ── Glassmorphism v3 扩面（BK-GLS-017，Spec §10 覆盖策略）──
+
+  group('v3 样板间全展区 ×{T1,T6}（standard 档渲染声明）', () {
+    for (final id in ['t1', 't6']) {
+      final preset = findPresetById(id)!;
+      testWidgets('$id 组件样板间（含玻璃层级/状态矩阵/环境光/色带探针）', (tester) async {
+        await pumpGolden(tester, preset, const ComponentGalleryPage());
+        await expectGolden(tester, '${id}_gallery');
+      });
+    }
+  });
+
+  group('v3 样板间(T1) × 自定义背景图 fixture', () {
+    testWidgets('bg_probe 多色渐变探针图 + 智能遮罩 + 样板间内容', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final t1 = findPresetById('t1')!;
+      // 复刻生产 AppBackground 图像路径分层：背景图 → 智能遮罩 → 内容层；
+      // 图源为入库 fixture test/fixtures/bg_probe.png（生成器见
+      // generate_bg_fixture_test.dart）
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(t1),
+          home: AmbientGradient(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image(
+                  image: FileImage(File('test/fixtures/bg_probe.png')),
+                  fit: BoxFit.cover,
+                ),
+                ColoredBox(
+                  color: t1.palette.background.withValues(alpha: 0.30),
+                ),
+                const Scaffold(body: ComponentGalleryPage()),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      await expectGolden(tester, 't1_gallery_bgpicture');
+    });
+  });
 }
 
 /// 0.5% 容差 golden 比较器（Spec §9），SDK 官方示例模式
@@ -183,11 +275,11 @@ class _TolerantGoldenFileComparator extends LocalFileComparator {
   _TolerantGoldenFileComparator(
     super.testFile, {
     required double precisionTolerance,
-  })  : assert(
-          0 <= precisionTolerance && precisionTolerance <= 1,
-          'precisionTolerance must be between 0 and 1',
-        ),
-        _precisionTolerance = precisionTolerance;
+  }) : assert(
+         0 <= precisionTolerance && precisionTolerance <= 1,
+         'precisionTolerance must be between 0 and 1',
+       ),
+       _precisionTolerance = precisionTolerance;
 
   /// 允许的像素差异占比（0=完全相同，1=完全不同的图）
   final double _precisionTolerance;

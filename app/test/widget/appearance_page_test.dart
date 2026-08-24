@@ -16,6 +16,7 @@ import 'package:bookkeep_app/features/settings/appearance_page.dart';
 import 'package:bookkeep_app/shared/theme/background/background_controller.dart';
 import 'package:bookkeep_app/shared/theme/background/background_service.dart';
 import 'package:bookkeep_app/shared/theme/background/background_settings.dart';
+import 'package:bookkeep_app/shared/theme/glass/glass_quality.dart';
 import 'package:bookkeep_app/shared/theme/theme_controller.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 import 'package:bookkeep_app/shared/theme/theme_settings.dart';
@@ -141,6 +142,56 @@ void main() {
 
     final persisted = await SettingsRepository(db).themeSettings();
     expect(persisted.iconPack, IconPack.rounded);
+  });
+
+  // ── Glassmorphism v3（GLS-014）：玻璃质感 + 环境光两组设置 ──
+
+  testWidgets('画质三档切换：即时生效并持久化（往返）', (tester) async {
+    final db = await harnessDb();
+    await pumpPage(tester, pageHarness(db));
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AppearancePage)),
+    );
+    expect(container.read(glassPrefsProvider).quality, GlassQuality.standard);
+
+    await tester.scrollUntilVisible(find.text('省电'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    // 玻璃质感分段控件：点「省电」
+    await tester.tap(find.text('省电'));
+    await tester.pumpAndSettle();
+    expect(container.read(glassPrefsProvider).quality, GlassQuality.saver);
+    // 持久化复核（新 repo 读同一内存库）
+    final stored = await SettingsRepository(db).glassPrefs();
+    expect(stored.quality, GlassQuality.saver);
+    // 说明文案切换
+    expect(find.text('省电模式将关闭环境光动效并降低弹层模糊'), findsOneWidget);
+  });
+
+  testWidgets('环境光开关与强度：状态更新并写库；钳制徽标按需出现', (tester) async {
+    final db = await harnessDb();
+    await pumpPage(tester, pageHarness(db));
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AppearancePage)),
+    );
+
+    await tester.scrollUntilVisible(find.text('页面切换位移'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    // 关动态漂移
+    await tester.tap(find.text('动态漂移'));
+    await tester.pumpAndSettle();
+    expect(container.read(glassPrefsProvider).motionEnabled, isFalse);
+    // 强度切「浓郁」
+    await tester.tap(find.text('浓郁'));
+    await tester.pumpAndSettle();
+    expect(container.read(glassPrefsProvider).intensity, AmbientIntensity.rich);
+
+    final stored = await SettingsRepository(db).glassPrefs();
+    expect(stored.motionEnabled, isFalse);
+    expect(stored.intensity, AmbientIntensity.rich);
+    // T1 预设下 rich 无需钳制 → 徽标不出现
+    expect(find.text('已自动限制强度以保持对比度'), findsNothing);
   });
 
   testWidgets('settings sheet entry opens the appearance page', (tester) async {

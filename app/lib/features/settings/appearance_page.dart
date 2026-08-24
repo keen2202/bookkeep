@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/theme/app_icons.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/contrast_guard.dart';
+import '../../shared/theme/glass/glass_quality.dart' as gq;
 import '../../shared/theme/glass_icon.dart';
 import '../../shared/theme/background/app_background.dart';
 import '../../shared/theme/background/background_controller.dart';
@@ -18,9 +20,10 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/app_snack.dart';
 
-/// "外观"设置页（BK-UI-015，Spec §7）：
+/// "外观"设置页（BK-UI-015，Spec §7；Glassmorphism v3 GLS-014 扩容）：
 /// 主题方案（8 套预制网格 + 自定义入口）/ 图标风格 / 个性背景（开关/换图/
-/// 遮罩模式滑杆 + 实时预览 + 对比度评级/模糊开关）。
+/// 遮罩模式滑杆 + 实时预览 + 对比度评级/模糊开关）/ 玻璃质感（画质三档）/
+/// 环境光（动效开关 / 光斑强度三档 + ContrastGuard 钳制徽标 / 导航脉冲）。
 class AppearancePage extends ConsumerWidget {
   const AppearancePage({super.key});
 
@@ -44,6 +47,13 @@ class AppearancePage extends ConsumerWidget {
           _BackgroundSection(
             settings: background ?? BackgroundSettings.defaults,
           ),
+          const SizedBox(height: AppSpacing.lg),
+          // Glassmorphism v3（GLS-014）：两组新设置
+          const _SectionTitle('玻璃质感'),
+          const _GlassQualitySection(),
+          const SizedBox(height: AppSpacing.lg),
+          const _SectionTitle('环境光'),
+          const _AmbientLightSection(),
         ],
       ),
     );
@@ -716,6 +726,130 @@ class _ContrastRating extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.w600,
             )),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 玻璃质感（Glassmorphism v3，GLS-014）：画质三档，即时生效并持久化
+// ---------------------------------------------------------------------------
+class _GlassQualitySection extends ConsumerWidget {
+  const _GlassQualitySection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(gq.glassPrefsProvider);
+    final controller = ref.read(gq.glassPrefsProvider.notifier);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SegmentedButton<gq.GlassQuality>(
+          segments: [
+            for (final q in gq.GlassQuality.values)
+              ButtonSegment(value: q, label: Text(q.label)),
+          ],
+          selected: {prefs.quality},
+          onSelectionChanged: (s) => controller.setQuality(s.first),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          // Spec §7 说明文案
+          prefs.quality == gq.GlassQuality.saver
+              ? '省电模式将关闭环境光动效并降低弹层模糊'
+              : prefs.quality.description,
+          style: context.text.bodySmall?.copyWith(
+            color: context.palette.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 环境光（GLS-014）：动效开关 / 光斑强度三档 + 钳制徽标 / 页面切换位移
+// ---------------------------------------------------------------------------
+class _AmbientLightSection extends ConsumerWidget {
+  const _AmbientLightSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(gq.glassPrefsProvider);
+    final controller = ref.read(gq.glassPrefsProvider.notifier);
+    final palette = context.palette;
+    // ContrastGuard 钳制徽标（Spec §4.5）：clamp 生效时向用户说明
+    final effectiveIntensity = ContrastGuard.effectiveIntensity(
+      palette: palette,
+      requested: prefs.intensity,
+    );
+    final clamped = effectiveIntensity != prefs.intensity;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('动态漂移'),
+          subtitle: Text('环境光斑沿椭圆轨道缓慢游移（36s/圈）',
+              style: context.text.bodySmall),
+          value: prefs.motionEnabled,
+          onChanged: (v) => controller.setMotionEnabled(v),
+        ),
+        Text('光斑强度', style: context.text.titleSmall),
+        const SizedBox(height: AppSpacing.sm),
+        SegmentedButton<gq.AmbientIntensity>(
+          segments: [
+            for (final i in gq.AmbientIntensity.values)
+              ButtonSegment(value: i, label: Text(i.label)),
+          ],
+          selected: {prefs.intensity},
+          onSelectionChanged: (s) => controller.setIntensity(s.first),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          children: [
+            if (clamped) ...[
+              // 「已自动限制强度以保持对比度」徽标（Spec §7）
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: context.appColors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: context.appColors.warning.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Text(
+                  '已自动限制强度以保持对比度',
+                  style: context.text.labelSmall?.copyWith(
+                    color: context.appColors.warning,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+            ],
+            Expanded(
+              child: Text(
+                '个性化让位于可读性时自动钳制（WCAG AA）',
+                style: context.text.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('页面切换位移'),
+          subtitle: Text('push/pop 时全体光斑沿导航方向位移 +3%',
+              style: context.text.bodySmall),
+          value: prefs.navPulse,
+          onChanged: (v) => controller.setNavPulse(v),
+        ),
       ],
     );
   }

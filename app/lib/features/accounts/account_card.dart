@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/accounts_table.dart';
+import '../../shared/theme/glass_icon.dart';
 import '../auth_lock/lock_controller.dart';
 
 const _typeIcons = {
@@ -38,10 +39,14 @@ class AccountCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    // Glassmorphism v3（GLS-010 散点收敛）：Card → 主题玻璃卡片（cardTheme
+    // 已按 L1 层级解析）；前导头像 → GlassIcon（与卡片同一 Token 源，
+    // 禁止纯黑图标置于玻璃容器）
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          child: Icon(accountTypeIcon(account.accountType)),
+        leading: GlassIcon(
+          icon: accountTypeIcon(account.accountType),
+          size: 20,
         ),
         title: Text(account.name),
         subtitle: Text(accountTypeLabel(account.accountType)),

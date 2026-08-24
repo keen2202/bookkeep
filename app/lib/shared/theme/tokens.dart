@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'glass/glass_layers.dart';
+import 'glass/glass_quality.dart';
 import 'theme_presets.dart';
 
 /// 设计 Token 层（BK-UI-001，设计文档 §3）：
@@ -73,7 +75,7 @@ abstract final class AppElevation {
 }
 
 // ---------------------------------------------------------------------------
-// 玻璃拟态图标 Token（UI 图标重构，Glassmorphism）
+// 玻璃拟态 Token（Glassmorphism v2 图标基准 → v3 层级函数消费端）
 // ---------------------------------------------------------------------------
 abstract final class AppGlass {
   /// 图标玻璃容器基准尺寸（不含内边距时的图标字号由调用方传入）
@@ -82,23 +84,28 @@ abstract final class AppGlass {
   /// 玻璃容器圆角（与卡片 md 对齐，保证轻盈统一）
   static const double iconRadius = 12;
 
-  /// 玻璃背景高斯模糊半径（图标级 BackdropFilter 使用）
+  /// 玻璃背景高斯模糊半径上限（图标级 BackdropFilter；v3 起实际 σ 由
+  /// [resolveGlassSpec] 按画质档解析，standard 档归零走 fill-only）
   static const double iconBlurSigma = 10;
 
-  /// 玻璃描边宽度
+  /// 玻璃描边宽度（Spec §2.1：恒 1 逻辑像素）
   static const double borderWidth = 1;
 
-  /// 浅色主题玻璃填充：白色 20% 通透层
+  /// 浅色 L1 基准填充（兼容别名；= rgba(255,255,255,0.20) 需求给定基准。
+  /// v3 新代码请使用 `resolveGlassSpec(tier: GlassTier.panel)`）
   static const Color fillLight = Color(0x33FFFFFF);
 
-  /// 深色主题玻璃填充：白色 10% 通透层（避免过亮破坏夜间氛围）
+  /// 深色主题玻璃填充旧常量（兼容保留，不再被组件消费；
+  /// v3 深色填充 = palette.surface × 层级 α，带主题色温非纯黑）
   static const Color fillDark = Color(0x1AFFFFFF);
 
-  /// 浅色主题玻璃描边：白色 50% 高光
-  static const Color borderLight = Color(0x80FFFFFF);
+  /// 浅色玻璃描边（D5 兼容别名：已收敛至 Spec §2.1 规范值 L1 浅 α0.20；
+  /// 旧漂移值 0x99FFFFFF 已清零）
+  static const Color borderLight = Color(0x33FFFFFF);
 
-  /// 深色主题玻璃描边：白色 25% 微光
-  static const Color borderDark = Color(0x40FFFFFF);
+  /// 深色玻璃描边（D5 兼容别名：L1 深 α0.16 实值；旧漂移值 0x38FFFFFF
+  /// 已清零——合成对比度仅约 1.4:1 不可见，见 Spec §2.4 验算）
+  static const Color borderDark = Color(0x29FFFFFF);
 
   /// 玻璃图标统一阴影：y=2、blur=10、8% 黑
   static const List<BoxShadow> iconShadow = [
@@ -115,20 +122,30 @@ abstract final class AppGlass {
     BoxShadow(offset: Offset(0, 4), blurRadius: 18, color: Color(0x40000000)),
   ];
 
-  /// 玻璃卡片统一装饰（Glassmorphism v2）：
-  /// 半透明磨砂填充（透出环境光/背景图）+ 高光发丝描边 + 柔悬浮阴影。
+  /// 玻璃卡片统一装饰（Glassmorphism v3）：
+  /// 半透明磨砂填充 + 高光发丝描边 + 柔悬浮阴影，取值全部来自
+  /// [resolveGlassSpec]（L1 panel 层级函数，D5 唯一入口）。
   ///
-  /// 性能说明（Spec §10）：背景层（环境光渐变或背景图+8px 全局模糊）已在
-  /// Navigator 之下预模糊，卡片自身不再叠加 BackdropFilter，保证长列表滚动
-  /// 不掉帧；通透感由 [ThemePalette.glassFill] 的 alpha 直接呈现。
+  /// 性能说明（Spec §10）：背景层已在 Navigator 之下预渲染，卡片自身
+  /// σ 按画质档解析——standard/saver 档为 fill-only 零 saveLayer，
+  /// 保证长列表滚动不掉帧。
   static BoxDecoration glassCardDecoration({
     required bool isDark,
     required ThemePalette palette,
+    GlassQuality quality = GlassQuality.standard,
+    bool imageBackgroundMode = false,
   }) {
+    final spec = resolveGlassSpec(
+      tier: GlassTier.panel,
+      brightness: isDark ? Brightness.dark : Brightness.light,
+      palette: palette,
+      quality: quality,
+      imageBackgroundMode: imageBackgroundMode,
+    );
     return BoxDecoration(
-      color: palette.glassFill,
+      color: spec.fill,
       borderRadius: AppRadius.mdAll,
-      border: Border.all(color: palette.glassBorder, width: borderWidth),
+      border: Border.all(color: spec.borderColor, width: borderWidth),
       boxShadow: isDark ? cardShadowDark : cardShadowLight,
     );
   }
@@ -222,13 +239,22 @@ abstract final class AppText {
 }
 
 // ---------------------------------------------------------------------------
-// AppTokens：随主题携带的 Token 扩展（Spec §4.2/§4.3）
+// AppTokens：随主题携带的 Token 扩展（Spec §4.2/§4.3 + v3 玻璃画质档）
 // ---------------------------------------------------------------------------
 class AppTokens extends ThemeExtension<AppTokens> {
-  const AppTokens({required this.palette, required this.brightness});
+  const AppTokens({
+    required this.palette,
+    required this.brightness,
+    this.glassQuality = GlassQuality.standard,
+  });
 
   final ThemePalette palette;
   final Brightness brightness;
+
+  /// 玻璃画质三档（v3）：随主题携带，GlassPanel/AppCard/GlassIcon 从
+  /// ThemeExtension 读取（不依赖 ProviderScope，纯组件测试可直渲染）。
+  /// 默认 standard（D6），main() 启动时按持久化设置重建主题注入。
+  final GlassQuality glassQuality;
 
   bool get isDark => brightness == Brightness.dark;
 
@@ -250,17 +276,23 @@ class AppTokens extends ThemeExtension<AppTokens> {
         fontFeatures: AppText.tabularFigures,
       );
 
-  /// 卡片装饰（玻璃拟态：磨砂填充 + 高光描边 + 悬浮阴影，浅深同构）
+  /// 卡片装饰（玻璃拟态 v3：层级函数解析的填充/描边/阴影）
   BoxDecoration get cardDecoration => AppGlass.glassCardDecoration(
         isDark: isDark,
         palette: palette,
+        quality: glassQuality,
       );
 
   @override
-  AppTokens copyWith({ThemePalette? palette, Brightness? brightness}) {
+  AppTokens copyWith({
+    ThemePalette? palette,
+    Brightness? brightness,
+    GlassQuality? glassQuality,
+  }) {
     return AppTokens(
       palette: palette ?? this.palette,
       brightness: brightness ?? this.brightness,
+      glassQuality: glassQuality ?? this.glassQuality,
     );
   }
 
@@ -270,6 +302,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
     return AppTokens(
       palette: palette.lerp(other.palette, t),
       brightness: t < 0.5 ? brightness : other.brightness,
+      // 画质档离散切换：过场中点后取目标档（σ 分支不插值，避免中间态节点结构漂移）
+      glassQuality: t < 0.5 ? glassQuality : other.glassQuality,
     );
   }
 }

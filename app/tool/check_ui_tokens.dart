@@ -27,6 +27,17 @@ final _whitelist = <String, String>{
   // 故 theme_presets/app_theme 放宽为 Color(0x 前缀整体豁免（仍限 Token 定义文件）
   'shared/theme/theme_presets.dart:Color(0x': '8 套预制主题 104 个 Token 色值 + 玻璃拟态玻璃层 Token（含自定义 alpha，Token 层唯一真源）',
   'shared/theme/app_theme.dart:Color(0x': '语义色/图表色/种子色/自定义模式玻璃描边回退等 Token 定义',
+  // —— Glassmorphism v3（BK-GLS 系列）：层级表/面板前景为玻璃 Token 唯一真源，
+  //    同享 §6.4「Token 定义文件豁免」语义；注释中引用的规范值一并豁免 ——
+  'shared/theme/glass/glass_layers.dart:Color(0x': 'L1–L4 层级参数表 Token（描边基准 rgba(255,255,255,0.2) 与阴影色，Spec §2.1 唯一真源）',
+  'shared/theme/glass/glass_panel.dart:Color(0x': '面板前景高光/innerSheen 白基 Token（GlassGuardScope 兜底同源）',
+  'shared/theme/glass_icon.dart:Color(0x': '图标容器填充 v2 兼容基线（白 α0.20 / 深 α0.10，GLS-008）',
+  'shared/theme/contrast_guard.dart:Color(0xFFFFFFFF)': '最坏情况合成的白/黑锚点（数学常量，非 UI 用色）',
+  'shared/theme/tokens.dart:0x': 'AppGlass v2 兼容别名与阴影 Token 定义（旧漂移值已收敛至 §2.1 表）',
+  'shared/widgets/app_text_field.dart:0x1FFFFFFF': '文档注释引用 inputDecorationTheme 规范值（非代码用色）',
+  'shared/theme/app_theme.dart:0x1FFFFFFF': '文档注释/组装器引用输入框玻璃填充规范值（Token 层）',
+  'shared/theme/glass/glass_layers.dart:0x': '层级表注释引用基准 rgba 与旧漂移收敛记录（Token 层唯一真源）',
+  'shared/theme/theme_presets.dart:0x99FFFFFF': '文档注释引用旧漂移值收敛记录（非代码用色）',
   'shared/theme/theme_settings.dart:Color(0xFF': 'kThemePresets 自定义色板定义（Token 层）',
   'shared/theme/tokens.dart:Color(0x': '阴影等 Token 定义（Token 层）',
   'shared/theme/tokens.dart:fontSize:': '七级字阶 Token 定义（Token 层）',

@@ -3,19 +3,17 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
+import 'glass/glass_layers.dart';
 import 'tokens.dart';
 
-/// 玻璃拟态图标容器（UI 图标重构）。
+/// 玻璃拟态图标容器（UI 图标重构；Glassmorphism v3 GLS-008）。
 ///
-/// 规范（与 `AppGlass` Token 对应）：
-/// - 填充：浅色主题白色 20%、深色主题白色 10%（通透玻璃质感）；
-/// - 描边：白色 50% / 25% 高光边，1px；
-/// - 模糊：容器内 10px 高斯模糊，让底层内容透出磨砂效果；
-/// - 阴影：y=2、blur=10、8% 黑，制造轻盈悬浮感；
-/// - 圆角：12px，与卡片圆角体系一致。
+/// v3：填充/描边/σ 改读 `resolveGlassSpec(panel)`——与卡片完全同源
+/// （Spec §5.3），σ 按画质档解析（standard/saver 档 fill-only 无磨砂节点，
+/// [blur]=false 可强制关闭）。旧 [AppGlass] 常量保留兼容但不再消费。
 ///
-/// 该组件是应用内图标玻璃化承载的统一出口；底部导航、FAB、顶栏操作等
-/// 关键图标均通过它渲染，保证图标视觉语言一致。
+/// 规范：1px 白系描边、12px 圆角（与卡片体系一致）、y=2 blur=10 8% 黑阴影；
+/// 图标本体颜色继承 IconTheme 或语义色，禁止纯黑置于玻璃容器上。
 class GlassIcon extends StatelessWidget {
   const GlassIcon({
     super.key,
@@ -41,36 +39,41 @@ class GlassIcon extends StatelessWidget {
   /// 图标颜色；不传时继承外层 IconTheme（可由 NavigationBar/AppBar 等自动着色）
   final Color? color;
 
-  /// 是否启用 BackdropFilter 磨砂（小图标/低端机可关闭）
+  /// 是否允许 BackdropFilter 磨砂；true 时仍受画质档裁决
+  /// （standard/saver 档 L1 为 fill-only，实际不产生模糊节点）
   final bool blur;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.tokens.isDark;
-    final fill = isDark ? AppGlass.fillDark : AppGlass.fillLight;
-    final border = isDark ? AppGlass.borderDark : AppGlass.borderLight;
+    final tokens = context.tokens;
+    final spec = resolveGlassSpec(
+      tier: GlassTier.panel,
+      brightness: tokens.brightness,
+      palette: tokens.palette,
+      quality: tokens.glassQuality,
+    );
+    // 小图标容器按 v2 基线保留更通透的白基填充观感：
+    // 浅色 = 白 α0.20（L1 high 基准）/ 深色 = surface α0.66 过厚，取白 α0.10
+    final isDark = tokens.isDark;
+    final fill = isDark ? const Color(0x1AFFFFFF) : Colors.white.withValues(alpha: 0.20);
     final r = radius ?? AppGlass.iconRadius;
     final borderRadius = BorderRadius.circular(r);
 
-    final glass = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: borderRadius,
-        border: Border.all(color: border, width: AppGlass.borderWidth),
-        boxShadow: AppGlass.iconShadow,
-      ),
-      child: Icon(
-        icon,
-        size: size,
-        color: color,
-      ),
-    );
+    if (!blur || spec.isFillOnly) {
+      return Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: borderRadius,
+          border:
+              Border.all(color: spec.borderColor, width: AppGlass.borderWidth),
+          boxShadow: AppGlass.iconShadow,
+        ),
+        child: Icon(icon, size: size, color: color),
+      );
+    }
 
-    if (!blur) return glass;
-
-    // 开启磨砂时：外层负责阴影，内层 ClipRRect + BackdropFilter 负责玻璃模糊，
-    // 避免 Clip 裁掉阴影。
+    // 高保真档：外层阴影 → ClipRRect → BackdropFilter → 玻璃面
     return Container(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
@@ -80,21 +83,20 @@ class GlassIcon extends StatelessWidget {
         borderRadius: borderRadius,
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(
-            sigmaX: AppGlass.iconBlurSigma,
-            sigmaY: AppGlass.iconBlurSigma,
+            sigmaX: spec.sigmaX,
+            sigmaY: spec.sigmaY,
           ),
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
               color: fill,
               borderRadius: borderRadius,
-              border: Border.all(color: border, width: AppGlass.borderWidth),
+              border: Border.all(
+                color: spec.borderColor,
+                width: AppGlass.borderWidth,
+              ),
             ),
-            child: Icon(
-              icon,
-              size: size,
-              color: color,
-            ),
+            child: Icon(icon, size: size, color: color),
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import '../../core/ledger_version.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/glass_icon.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
 import '../../shared/widgets/app_amount_text.dart';
@@ -149,11 +150,8 @@ class _BillDetailSheetState extends ConsumerState<BillDetailSheet> {
           padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.md),
           child: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: iconColor.withValues(alpha: 0.15),
-                foregroundColor: iconColor,
-                child: Icon(icon, size: 22),
-              ),
+              // GLS-010 散点收敛：CircleAvatar → GlassIcon（L1 Token 同源）
+              GlassIcon(icon: icon, size: 22, color: iconColor),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(

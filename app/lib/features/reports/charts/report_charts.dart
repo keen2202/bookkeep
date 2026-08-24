@@ -6,6 +6,26 @@ import '../../../data/repositories/reports_repository.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/theme/chart_colors.dart';
 
+/// 图表通用网格线（Glassmorphism v3，Spec §5.4 / GLS-007）：
+/// `palette.divider` α0.5，刻度清晰度不受画质档影响。
+FlGridData glassGridData(BuildContext context, {bool vertical = false}) {
+  final color = context.palette.divider.withValues(alpha: 0.5);
+  return FlGridData(
+    show: true,
+    drawVerticalLine: vertical,
+    getDrawingHorizontalLine: (_) => FlLine(color: color, strokeWidth: 1),
+    getDrawingVerticalLine: (_) => FlLine(color: color, strokeWidth: 1),
+  );
+}
+
+/// 「光透过图表」语义色渐变（Spec §5.4）：柱/折线下方 α0.12 → 0，
+/// 不受画质档影响（标准档图表玻璃感三支柱之一）
+LinearGradient chartAreaGradient(Color color) => LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [color.withValues(alpha: 0.12), color.withValues(alpha: 0)],
+    );
+
 /// X 轴标签压缩：桶间「共有」的部分对区分各桶没有贡献（跨年对比的同期后缀、
 /// 同年的年份前缀），剥离后仅保留区分维度，避免长日期标签在窄屏上相互重叠。
 /// - 跨年对比（各桶年份不同、同期相同）→ 仅保留年份：`2021-08-09` → `2021`；
@@ -151,6 +171,8 @@ class PeriodBarChart extends StatelessWidget {
         BarChartData(
           // 跨年对比允许某年无数据（0 柱）；maxY 兜底避免 0 刻度
           maxY: (maxAmount == 0 ? 1 : maxAmount).toDouble() * 1.2,
+          // v3 网格线：divider α0.5（GLS-007，刻度不受档位影响）
+          gridData: glassGridData(context),
           barTouchData: BarTouchData(
             enabled: !hideAmounts,
             touchTooltipData: BarTouchTooltipData(
@@ -199,7 +221,8 @@ class PeriodBarChart extends StatelessWidget {
               BarChartGroupData(x: i, barRods: [
                 BarChartRodData(
                   toY: buckets[i].amountMinor.toDouble(),
-                  color: series[i % series.length],
+                  // 「光透过图表」：柱身自上而下语义色 → α0.12 渐变（GLS-007）
+                  gradient: chartAreaGradient(series[i % series.length]),
                   width: 16,
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -288,7 +311,7 @@ class TrendLineChart extends StatelessWidget {
               ],
             ),
           ),
-          gridData: const FlGridData(show: true, drawVerticalLine: false),
+          gridData: glassGridData(context),
           titlesData: FlTitlesData(
             leftTitles: hideAmounts
                 ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
@@ -331,6 +354,11 @@ class TrendLineChart extends StatelessWidget {
               barWidth: 2,
               isCurved: true,
               dotData: const FlDotData(show: false),
+              // 「光透过图表」：线下语义色 α0.12→0 渐变填充（GLS-007）
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: chartAreaGradient(expenseColor),
+              ),
             ),
             LineChartBarData(
               spots: income,
@@ -338,6 +366,10 @@ class TrendLineChart extends StatelessWidget {
               barWidth: 2,
               isCurved: true,
               dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: chartAreaGradient(incomeColor),
+              ),
             ),
           ],
         ),

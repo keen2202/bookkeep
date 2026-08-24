@@ -24,6 +24,7 @@ import 'features/auth_lock/lock_controller.dart';
 import 'features/books/books_providers.dart';
 import 'features/recurring/recurring_service.dart';
 import 'features/sync/sync_providers.dart';
+import 'shared/theme/glass/glass_quality.dart';
 import 'shared/theme/theme_controller.dart';
 
 Future<void> main() async {
@@ -57,6 +58,9 @@ Future<void> main() async {
   final secondsOpen = await settingsRepo.secondsOpenMode();
   // 个性化主题：启动即注入持久化设置（秒开分支共用同一实例）
   final themeSettings = await settingsRepo.themeSettings();
+  // 玻璃拟态 v3（GLS-014）：玻璃质感 + 环境光设置启动注入（5 个新键，
+  // 缺失回退默认 standard）
+  final glassPrefs = await settingsRepo.glassPrefs();
   // 隐私锁初始状态：进程被杀重进仍锁（Spec §3.6 / BK-P0-006 / BK-T-008）
   final lockRepo = LockRepository(db);
   final initialLock = await lockRepo.initialState();
@@ -74,6 +78,7 @@ Future<void> main() async {
       databaseProvider.overrideWithValue(db),
       currentBookIdProvider.overrideWith((ref) => currentBook),
       themeControllerProvider.overrideWith(() => ThemeController(initial: themeSettings)),
+      glassPrefsProvider.overrideWith(() => GlassPrefsController(initial: glassPrefs)),
       lockControllerProvider.overrideWith((ref) => LockController(
             lockRepo,
             LocalAuthBiometric(),

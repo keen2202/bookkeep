@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
+import '../reports/charts/report_charts.dart' show chartAreaGradient, glassGridData;
+import '../../shared/theme/glass/glass_layers.dart';
+import '../../shared/theme/glass/glass_panel.dart';
 import '../auth_lock/lock_controller.dart';
 import 'calendar_page.dart' show calendarDailyTotalsProvider;
 
@@ -74,7 +77,7 @@ class CashflowChart extends ConsumerWidget {
               LineChartData(
                 minY: -bound,
                 maxY: bound,
-                gridData: const FlGridData(show: true, drawVerticalLine: false),
+                gridData: glassGridData(context),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
@@ -133,7 +136,8 @@ class CashflowChart extends ConsumerWidget {
                       show: true,
                       cutOffY: 0,
                       applyCutOffY: true,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      // v3：线下语义色 α0.12→0 渐变（GLS-007）
+                      gradient: chartAreaGradient(theme.colorScheme.primary),
                     ),
                   ),
                 ],
@@ -171,9 +175,12 @@ class CashflowChart extends ConsumerWidget {
   }
 
   Widget _shell(BuildContext context, String title, Widget child) {
-    return Card(
-      margin: const EdgeInsets.all(8),
-      child: Padding(
+    // Glassmorphism v3（GLS-007）：容器统一 GlassPanel(panel, innerSheen)
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: GlassPanel(
+        tier: GlassTier.panel,
+        innerSheen: true,
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

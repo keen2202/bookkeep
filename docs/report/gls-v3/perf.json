@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "doc": "BK-GLS-018 性能实测（Spec AC-06）",
+    "status": "methodology_ready__device_run_pending",
+    "note": "本文件为自动化落盘目标格式。当前环境无 Android 真机，四场景实测待主测中端机执行 flutter drive 后回填 measured 字段；nightly perf job 接入后自动覆盖。",
+    "generated_at": "2026-08-24"
+  },
+  "device_baseline": {
+    "primary": {
+      "class": "mid-range Android (Snapdragon 695/765 tier, e.g. Pixel 6a / Redmi Note 12)",
+      "model": null,
+      "os": null,
+      "recorded": false
+    },
+    "reference": "flagship device as upper bound (optional)"
+  },
+  "toolchain": {
+    "profile": "flutter run --profile + DevTools Performance (manual spot-check)",
+    "automation": "flutter drive + integration_test Timeline (frame build/raster p95, dropped frame ratio)",
+    "output": "docs/report/gls-v3/perf.json"
+  },
+  "scenarios": [
+    {
+      "id": "S1",
+      "name": "reports_page_10k_first_frame",
+      "budget_ms": 500,
+      "comparison": "v2 baseline not regress",
+      "measured_ms_p50": null,
+      "measured_ms_p95": null,
+      "pass": null
+    },
+    {
+      "id": "S2",
+      "name": "bills_200_fling_x10_avg_frame_build",
+      "budget_vs_v2_delta_pct_max": 5,
+      "v2_baseline_ms": null,
+      "measured_ms": null,
+      "delta_pct": null,
+      "pass": null
+    },
+    {
+      "id": "S3",
+      "name": "five_tabs_switch_x10_no_frame_spike",
+      "budget": "no sudden dropped-frame burst vs baseline",
+      "dropped_frames": null,
+      "p95_frame_build_ms": null,
+      "pass": null
+    },
+    {
+      "id": "S4",
+      "name": "gallery_idle_60s_background_raster",
+      "budget_raster_ms_avg_max": 2,
+      "measured_raster_ms_avg": null,
+      "pass": null
+    }
+  ],
+  "monitoring": {
+    "nightly_perf_job": "planned: record-only first release; escalate to CI gate after two consecutive releases regressing >10%",
+    "escalation_rule": "two consecutive versions with >10% regression -> gate"
+  },
+  "architecture_notes": [
+    "standard quality (default) renders L1/L2 fill-only (zero BackdropFilter nodes) — S1/S2 cost dominated by content layer, glass overhead bounded by ForegroundDecoration single drawRect per panel (<0.1ms, <=8 panels)",
+    "ambient motion repaints only the L0 RepaintBoundary canvas via CustomPainter(repaint: controller); widget tree is not rebuilt during drift/pulse/breathe",
+    "saver quality disables all ambient motion and reduces overlay blur to sigma*0.6 — fallback if mid-range devices miss budgets"
+  ]
+}

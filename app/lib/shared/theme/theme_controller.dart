@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database_provider.dart';
 import '../../data/repositories/settings_repository.dart';
+import 'glass/glass_quality.dart';
 import 'app_theme.dart';
 import 'theme_presets.dart';
 import 'theme_settings.dart';
@@ -53,12 +54,15 @@ final themeControllerProvider =
 
 /// 由 ThemeSettings 解析 MaterialApp 主题三要素（app.dart / main.dart 秒开分支共用）：
 /// - 预制主题：theme/darkTheme 同取该主题直出，mode 锁定为预设明暗（完整观感不随系统漂移）；
-/// - 自定义模式：浅/深双槽位 fromSeed，mode 沿用用户设置（跟随系统生效）。
+/// - 自定义模式：浅/深双槽位 fromSeed，mode 沿用用户设置（跟随系统生效）；
+/// - [quality]：玻璃画质三档（v3 D6 默认 standard），注入组件主题的
+///   σ 分支与填充补偿；App watch glassPrefsProvider 变化即整体重建。
 ({ThemeData theme, ThemeData darkTheme, ThemeMode mode}) materialThemesFor(
-    ThemeSettings s) {
+    ThemeSettings s,
+    {GlassQuality quality = GlassQuality.standard}) {
   final preset = s.preset;
   if (preset != null) {
-    final t = buildTheme(preset);
+    final t = buildTheme(preset, quality: quality);
     return (
       theme: t,
       darkTheme: t,
@@ -66,8 +70,14 @@ final themeControllerProvider =
     );
   }
   return (
-    theme: buildTheme(null, customSeed: s.seedColor, customMode: ThemeMode.light),
-    darkTheme: buildTheme(null, customSeed: s.seedColor, customMode: ThemeMode.dark),
+    theme: buildTheme(null,
+        customSeed: s.seedColor,
+        customMode: ThemeMode.light,
+        quality: quality),
+    darkTheme: buildTheme(null,
+        customSeed: s.seedColor,
+        customMode: ThemeMode.dark,
+        quality: quality),
     mode: s.mode,
   );
 }

@@ -9,6 +9,7 @@ import 'core/ledger_version.dart';
 import 'data/local/database_provider.dart';
 import 'data/repositories/settings_repository.dart';
 import 'features/accounts/accounts_page.dart';
+import 'features/auth_lock/lock_controller.dart';
 import 'features/auth_lock/lock_gate.dart';
 import 'features/auth_lock/lock_settings.dart';
 import 'features/auto_capture/csv_import/csv_import_page.dart' show AutoCaptureSettingsEntry;
@@ -27,6 +28,9 @@ import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/appearance_page.dart';
 import 'shared/theme/app_icons.dart';
+import 'shared/theme/glass/glass_quality.dart' show glassPrefsProvider;
+import 'shared/theme/glass/ambient_motion.dart';
+import 'shared/theme/glass/glass_panel.dart';
 import 'shared/theme/glass_icon.dart';
 import 'shared/theme/background/app_background.dart';
 import 'shared/theme/theme_controller.dart';
@@ -64,6 +68,11 @@ class BookkeepApp extends ConsumerStatefulWidget {
 class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   int _tab = 0;
+
+  /// 环境光路由观察者（app 生命周期单实例；push/pop → 光斑脉冲，GLS-012）
+  static final AmbientRouteObserver _ambientRouteObserver = AmbientRouteObserver(
+    onPulse: (direction) => AmbientMotion.instance.pulse(direction: direction),
+  );
 
   @override
   void initState() {
@@ -122,9 +131,12 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    // 个性化主题：预制主题直出 / 自定义种子色（设置页即时生效，全树热重建）
+    // 个性化主题：预制主题直出 / 自定义种子色（设置页即时生效，全树热重建）；
+    // v3：玻璃画质档变化同样触发主题整体重建（σ 分支/填充补偿随档生效）
     final themeSettings = ref.watch(themeControllerProvider);
-    final themes = materialThemesFor(themeSettings);
+    final glassQuality = ref.watch(
+        glassPrefsProvider.select((p) => p.quality));
+    final themes = materialThemesFor(themeSettings, quality: glassQuality);
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: 'bookkeep',
@@ -135,10 +147,16 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
       theme: themes.theme,
       darkTheme: themes.darkTheme,
       themeMode: themes.mode,
+      // v3（GLS-012）：环境光路由观察者——push/pop 触发光斑位移脉冲
+      navigatorObservers: [_ambientRouteObserver],
       // 主题切换 250ms 过场（BK-UI-004）+ 全局背景（BK-UI-014，位于
       // Navigator 之上，二级页/弹层共享同一背景）+ 隐私锁门禁；
       // 与秒开入口共用 appShellBuilder（审核 F7/A2）
-      builder: appShellBuilder,
+      // v3（GLS-013）：锁定态作用域注入（AmbientGradient 据此静止）
+      builder: (context, child) => AmbientLockScope(
+            locked: ref.watch(lockControllerProvider.select((s) => s.locked)),
+            child: appShellBuilder(context, child),
+          ),
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
         builder: (navContext) {
@@ -167,7 +185,11 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
                   ),
             bottomNavigationBar: NavigationBar(
               selectedIndex: _tab,
-              onDestinationSelected: (i) => setState(() => _tab = i),
+              onDestinationSelected: (i) {
+                // v3（GLS-012）：Tab 切换触发环境光呼吸（×0.5→1.0，500ms）
+                AmbientMotion.instance.breathe();
+                setState(() => _tab = i);
+              },
               destinations: [
                 for (final m in AppModule.values)
                   NavigationDestination(

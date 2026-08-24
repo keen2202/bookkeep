@@ -12,12 +12,11 @@ import 'package:bookkeep_app/features/books/share_invite_sheet.dart';
 
 const bookId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-/// FilledButton.icon/tonalIcon 返回私有子类，find.byType(FilledButton) 精确匹配不到，
-/// 需按基类 ButtonStyleButton 匹配
+/// v3 玻璃化（GLS-006）：AppButton 非文字变体改自绘玻璃管线（不再是
+/// ButtonStyleButton 子类），按文案直接命中按钮中心
 Future<void> tapGenerateButton(WidgetTester tester) async {
-  await tester.tap(
-    find.ancestor(of: find.text('生成邀请链接'), matching: find.bySubtype<ButtonStyleButton>()),
-  );
+  // 页面标题（titleMedium）与按钮文案同名：取最后一个命中按钮标签
+  await tester.tap(find.text('生成邀请链接').last);
   await tester.pumpAndSettle();
 }
 

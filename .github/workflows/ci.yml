@@ -59,4 +59,7 @@ jobs:
       - run: flutter analyze
       # UI 重构静态卡点（BK-UI-011 / Spec §9）：features/ 禁裸色值/裸字号
       - run: dart run tool/check_ui_tokens.dart
+      # 玻璃拟态 v3 一致性门禁（BK-GLS-011 / Spec §8）：BackdropFilter 唯一出口
+      # + features 层禁 AppGlass.fill*/border* 直引
+      - run: bash ../tool/check_glass_consistency.sh
       - run: flutter test --coverage

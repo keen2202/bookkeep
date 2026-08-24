@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/glass/glass_layers.dart';
+import '../../shared/theme/glass/glass_panel.dart';
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart' show currentRoleProvider;
 import 'budget_manage_sheet.dart';
@@ -77,15 +79,16 @@ class BudgetSummaryCard extends ConsumerWidget {
 
   Widget _card(BuildContext context,
       {required VoidCallback? onTap, required Widget child}) {
+    // Glassmorphism v3（GLS-010 散点收敛）：Card → GlassPanel，
+    // 图表类容器启用 innerSheen（底部微反光，Spec §5.4）
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(padding: const EdgeInsets.all(12), child: child),
-        ),
+      child: GlassPanel(
+        tier: GlassTier.panel,
+        innerSheen: true,
+        onTap: onTap,
+        padding: const EdgeInsets.all(12),
+        child: child,
       ),
     );
   }

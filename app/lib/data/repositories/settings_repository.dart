@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 
 import '../../shared/theme/background/background_settings.dart';
+import '../../shared/theme/glass/glass_quality.dart';
 import '../../shared/theme/theme_settings.dart';
 import '../local/database.dart';
 
@@ -23,6 +24,13 @@ class SettingsRepository {
   static const _bgOverlayModeKey = 'bg_overlay_mode';
   static const _bgOverlayAlphaKey = 'bg_overlay_alpha';
   static const _bgBlurKey = 'bg_blur';
+
+  // 玻璃拟态 v3（GLS-014）：玻璃质感与环境光 5 个新键（Spec §4.3/§2.3）
+  static const _glassQualityKey = 'glass_quality';
+  static const _ambientMotionEnabledKey = 'ambient_motion_enabled';
+  static const _ambientIntensityKey = 'ambient_intensity';
+  static const _ambientNavPulseKey = 'ambient_nav_pulse';
+  static const _ambientImagePulseKey = 'ambient_image_pulse';
 
   Future<bool> secondsOpenMode() async {
     final rows =
@@ -126,6 +134,43 @@ class SettingsRepository {
       put(_bgOverlayModeKey, settings.overlayMode.name);
       put(_bgOverlayAlphaKey, '${settings.manualAlpha}');
       put(_bgBlurKey, '${settings.blurEnabled}');
+    });
+  }
+
+  /// 玻璃质感 + 环境光设置（Glassmorphism v3，GLS-014）：
+  /// 全键缺失回退默认（standard / 开动效 / standard 强度 / 脉冲开 / 图像脉冲关）
+  Future<GlassPrefs> glassPrefs() async {
+    final rows = await (db.select(db.appMeta)
+          ..where((t) => t.key.isIn({
+                _glassQualityKey,
+                _ambientMotionEnabledKey,
+                _ambientIntensityKey,
+                _ambientNavPulseKey,
+                _ambientImagePulseKey,
+              })))
+        .get();
+    final map = {for (final r in rows) r.key: r.value};
+    return GlassPrefs(
+      quality: GlassQuality.parse(map[_glassQualityKey]),
+      motionEnabled: map[_ambientMotionEnabledKey] != 'false',
+      intensity: AmbientIntensity.parse(map[_ambientIntensityKey]),
+      navPulse: map[_ambientNavPulseKey] != 'false',
+      imagePulse: map[_ambientImagePulseKey] == 'true',
+    );
+  }
+
+  Future<void> setGlassPrefs(GlassPrefs prefs) async {
+    await db.batch((batch) {
+      void put(String key, String value) {
+        batch.insert(db.appMeta, AppMetaCompanion.insert(key: key, value: value),
+            onConflict: DoUpdate((_) => AppMetaCompanion(value: Value(value))));
+      }
+
+      put(_glassQualityKey, prefs.quality.name);
+      put(_ambientMotionEnabledKey, '${prefs.motionEnabled}');
+      put(_ambientIntensityKey, prefs.intensity.name);
+      put(_ambientNavPulseKey, '${prefs.navPulse}');
+      put(_ambientImagePulseKey, '${prefs.imagePulse}');
     });
   }
 

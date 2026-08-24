@@ -41,23 +41,31 @@ void main() {
     await catRepo.installSeeds(testSeed);
     final cats = await catRepo.listCategories();
     final breakfastId = cats.firstWhere((c) => c.name == '早餐').id;
-    final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
-          bookId: testBookId,
-          accountType: AccountType.cash,
-          name: '钱包',
-          currency: 'CNY',
-          createdAt: DateTime.utc(2026, 8, 1),
-        ));
-    await db.into(db.transactions).insert(TransactionsCompanion.insert(
-          bookId: testBookId,
-          accountId: accountId,
-          categoryId: Value(breakfastId),
-          type: TransactionType.expense,
-          amountMinor: -2550,
-          currency: 'CNY',
-          occurredAt: DateTime(2026, 8, 10, 8, 30),
-          updatedAt: DateTime.utc(2026, 8, 10),
-        ));
+    final accountId = await db
+        .into(db.accounts)
+        .insert(
+          AccountsCompanion.insert(
+            bookId: testBookId,
+            accountType: AccountType.cash,
+            name: '钱包',
+            currency: 'CNY',
+            createdAt: DateTime.utc(2026, 8, 1),
+          ),
+        );
+    await db
+        .into(db.transactions)
+        .insert(
+          TransactionsCompanion.insert(
+            bookId: testBookId,
+            accountId: accountId,
+            categoryId: Value(breakfastId),
+            type: TransactionType.expense,
+            amountMinor: -2550,
+            currency: 'CNY',
+            occurredAt: DateTime(2026, 8, 10, 8, 30),
+            updatedAt: DateTime.utc(2026, 8, 10),
+          ),
+        );
     return db;
   }
 
@@ -80,14 +88,19 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    // 玻璃拟态（Glassmorphism v2）：与 golden_ui_test 相同——页面之下先铺
-    // AmbientGradient 环境光层（生产由 AppBackground 提供，Scaffold 已透明）
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(preset),
-      home: AmbientGradient(child: home),
-    ));
+    // 玻璃拟态（Glassmorphism v2→v3）：与 golden_ui_test 相同——页面之下先铺
+    // AmbientGradient 环境光层；v3 统一 standard 档渲染 + ProviderScope
+    // v3：AmbientGradient 仅消费无副作用默认值（画质档/动效控制器/锁定桥），
+    // 无需外层 ProviderScope；业务页自带内层 override 作用域（与基线一致）
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(preset),
+        home: AmbientGradient(child: home),
+      ),
+    );
     // 报表图表动画/异步数据加载完成后稳定渲染
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    // v3 环境光动效常驻 Ticker（漂移）：golden 断言静态帧，不 settle 无限动画
+    await tester.pump(const Duration(milliseconds: 300));
   }
 
   Future<void> expectGolden(WidgetTester tester, String name) async {
@@ -101,22 +114,31 @@ void main() {
     group('${preset.id} ${preset.name} Tab 观感', () {
       testWidgets('分类页', (tester) async {
         final db = await seedDb();
-        await pumpGolden(tester, preset,
-            await harness(db, const CategoriesPage()));
+        await pumpGolden(
+          tester,
+          preset,
+          await harness(db, const CategoriesPage()),
+        );
         await expectGolden(tester, '${preset.id}_categories');
       });
 
       testWidgets('周期记账页', (tester) async {
         final db = await seedDb();
-        await pumpGolden(tester, preset,
-            await harness(db, const RecurringPage()));
+        await pumpGolden(
+          tester,
+          preset,
+          await harness(db, const RecurringPage()),
+        );
         await expectGolden(tester, '${preset.id}_recurring');
       });
 
       testWidgets('报表页', (tester) async {
         final db = await seedDb();
-        await pumpGolden(tester, preset,
-            await harness(db, const ReportsPage()));
+        await pumpGolden(
+          tester,
+          preset,
+          await harness(db, const ReportsPage()),
+        );
         await expectGolden(tester, '${preset.id}_reports');
       });
     });
@@ -128,11 +150,11 @@ class _TolerantGoldenFileComparator extends LocalFileComparator {
   _TolerantGoldenFileComparator(
     super.testFile, {
     required double precisionTolerance,
-  })  : assert(
-          0 <= precisionTolerance && precisionTolerance <= 1,
-          'precisionTolerance must be between 0 and 1',
-        ),
-        _precisionTolerance = precisionTolerance;
+  }) : assert(
+         0 <= precisionTolerance && precisionTolerance <= 1,
+         'precisionTolerance must be between 0 and 1',
+       ),
+       _precisionTolerance = precisionTolerance;
 
   final double _precisionTolerance;
 

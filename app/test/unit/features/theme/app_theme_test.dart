@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 import 'package:bookkeep_app/shared/theme/theme_settings.dart';
+import 'package:bookkeep_app/shared/theme/glass/glass_layers.dart';
+import 'package:bookkeep_app/shared/theme/glass/glass_quality.dart';
 import 'package:bookkeep_app/shared/theme/tokens.dart';
 
 void main() {
@@ -152,17 +154,40 @@ void main() {
         isNot(BorderSide.none));
   });
 
-  // ── 玻璃拟态主题重构（Glassmorphism v2）──
+  // ── 玻璃拟态主题重构（Glassmorphism v2 → v3，GLS-004）──
+  // 存量断言修改原因：v3 ambient 由 3 色扩为 4 色（右上锚位补第 4 色，
+  // Spec §6.2）；glass 系字段退役为派生值；弹层/导航改按层级解析填充。
 
-  test('玻璃 Token：8 套主题全量携带环境光与通透填充，强填充更实', () {
+  test('玻璃 Token：8 套主题全量携带 4 元素环境光与通透填充，强填充更实', () {
     for (final preset in kThemePresetsV2) {
       final p = preset.palette;
-      expect(p.ambient.length, 3, reason: '${preset.id} 环境光色斑应为 3 色');
+      expect(p.ambient.length, 4, reason: '${preset.id} 环境光色斑应为 4 色');
       expect(p.glassFill.a, lessThan(1.0), reason: '${preset.id} 卡片填充须半透明');
       expect(p.glassFillStrong.a, greaterThan(p.glassFill.a),
           reason: '${preset.id} 弹层强填充应比卡片更不透明');
       expect(p.glassBorder.a, greaterThan(0), reason: '${preset.id} 高光描边可见');
     }
+  });
+
+  test('v3 环境光第 4 色：GLS-004 checklist 定值逐项锁定', () {
+    final expected = <String, Color>{
+      't1': const Color(0xFFBFE8DC),
+      't2': const Color(0xFFCCE4FA),
+      't3': const Color(0xFFD9CBF2),
+      't4': const Color(0xFFFFE7BF),
+      't5': const Color(0xFF3E4A57),
+      't6': const Color(0xFF1B6E8C),
+      't7': const Color(0xFF2E6E34),
+      't8': const Color(0xFF6E2A8C),
+    };
+    for (final preset in kThemePresetsV2) {
+      expect(preset.palette.ambient[3], expected[preset.id],
+          reason: '${preset.id} 第 4 色（右上锚位）');
+    }
+    // T5/T7/T8 背景提亮定值（Spec §6.2）
+    expect(findPresetById('t5')!.palette.background, const Color(0xFF13171C));
+    expect(findPresetById('t7')!.palette.background, const Color(0xFF101713));
+    expect(findPresetById('t8')!.palette.background, const Color(0xFF171126));
   });
 
   test('玻璃对比度守卫：正文压在任意光斑上的磨砂混合面 ≥ WCAG AA', () {
@@ -201,39 +226,132 @@ void main() {
     }
   });
 
-  test('玻璃卡片装饰：磨砂填充 + 高光发丝描边，浅深主题同构', () {
+  test('玻璃卡片装饰：层级函数解析填充/描边，浅深主题同构', () {
+    // v3：AppTokens.cardDecoration 与 cardTheme 均改由 resolveGlassSpec 解析
+    // （standard 档含 L1 补偿），palette.glassFill 为 high 基准兼容别名
     for (final preset in kThemePresetsV2) {
       final theme = buildTheme(preset);
-      expect(theme.cardTheme.color, preset.palette.glassFill,
-          reason: '${preset.id} Card 底色应为玻璃填充');
+      final panelSpec = resolveGlassSpec(
+        tier: GlassTier.panel,
+        brightness: preset.brightness,
+        palette: preset.palette,
+        quality: GlassQuality.standard,
+      );
+      expect(theme.cardTheme.color, panelSpec.fill,
+          reason: '${preset.id} Card 底色应为 standard 档 L1 玻璃填充');
       final side =
           (theme.cardTheme.shape! as RoundedRectangleBorder).side;
-      expect(side.color, preset.palette.glassBorder,
-          reason: '${preset.id} Card 描边应为高光发丝线');
+      expect(side.color, panelSpec.borderColor,
+          reason: '${preset.id} Card 描边应为 L1 规范值');
       final decoration = theme.extension<AppTokens>()!.cardDecoration;
-      expect(decoration.color, preset.palette.glassFill);
+      expect(decoration.color, panelSpec.fill);
       expect(decoration.boxShadow, isNotNull, reason: '${preset.id} 保留悬浮阴影');
     }
   });
 
-  test('玻璃拟态：Scaffold 透明化让位背景层；弹层/导航用强填充', () {
+  test('玻璃拟态：Scaffold 透明化让位背景层；弹层/导航按层级解析填充', () {
+    // v3（GLS-005）：导航栏 = L2 dock 填充、底部弹层/对话框 = L3 overlay 填充
     for (final id in ['t1', 't5']) {
-      final theme = buildTheme(findPresetById(id)!);
+      final preset = findPresetById(id)!;
+      final theme = buildTheme(preset);
       expect(theme.scaffoldBackgroundColor, Colors.transparent,
           reason: '$id 页面底色让位给环境光/背景图');
-      expect(theme.bottomSheetTheme.backgroundColor,
-          findPresetById(id)!.palette.glassFillStrong);
-      expect(theme.navigationBarTheme.backgroundColor,
-          findPresetById(id)!.palette.glassFillStrong);
+      expect(
+        theme.bottomSheetTheme.backgroundColor,
+        resolveGlassSpec(
+          tier: GlassTier.overlay,
+          brightness: preset.brightness,
+          palette: preset.palette,
+          quality: GlassQuality.standard,
+        ).fill,
+        reason: '$id 弹层为 L3 浮层填充',
+      );
+      expect(
+        theme.navigationBarTheme.backgroundColor,
+        resolveGlassSpec(
+          tier: GlassTier.dock,
+          brightness: preset.brightness,
+          palette: preset.palette,
+          quality: GlassQuality.standard,
+        ).fill,
+        reason: '$id 导航栏为 L2 吸附层填充',
+      );
+      expect(theme.dialogTheme.backgroundColor,
+          theme.bottomSheetTheme.backgroundColor,
+          reason: '$id 对话框同为 L3 填充');
     }
   });
 
-  test('调色板 lerp：环境光与玻璃字段随主题过渡插值', () {
+  test('v3 组件主题：卡片 L1 描边/填充 + 输入框玻璃填充 + SnackBar L4', () {
+    for (final dark in [false, true]) {
+      final preset = findPresetById(dark ? 't5' : 't1')!;
+      final theme = buildTheme(preset);
+      final panelSpec = resolveGlassSpec(
+        tier: GlassTier.panel,
+        brightness: preset.brightness,
+        palette: preset.palette,
+        quality: GlassQuality.standard,
+      );
+      expect(theme.cardTheme.color, panelSpec.fill);
+      expect((theme.cardTheme.shape! as RoundedRectangleBorder).side.color,
+          panelSpec.borderColor);
+      expect(theme.cardTheme.clipBehavior, Clip.antiAlias);
+      // 输入框玻璃填充：浅 0x1FFFFFFF / 深 0x0FFFFFFF
+      expect(theme.inputDecorationTheme.fillColor,
+          dark ? const Color(0x0FFFFFFF) : const Color(0x1FFFFFFF));
+      // SnackBar = L4 悬浮提示层
+      final floatingSpec = resolveGlassSpec(
+        tier: GlassTier.floating,
+        brightness: preset.brightness,
+        palette: preset.palette,
+        quality: GlassQuality.standard,
+      );
+      expect(theme.snackBarTheme.backgroundColor, floatingSpec.fill);
+      // 下拉菜单容器 = L3 填充，elevation 归零（阴影归层级体系）
+      expect(theme.popupMenuTheme.color, theme.dialogTheme.backgroundColor);
+    }
+  });
+
+  test('v3 背景纯色禁令：8 预设 background 无一为纯黑/纯白', () {
+    // Spec §4.7 字面区间 (0.01, 0.99) 与其自身冻结值冲突：
+    // 规范冻结的 T5 提亮值 #13171C 的 WCAG 相对亮度实为 0.0084（<0.01），
+    // T7/T8 同理。按 §2.4「表格值为规范源（canonical）」原则，冻结值优先；
+    // 本测试以可执行下界锁定「非纯黑/纯白」意图（>0.005 且 <0.995），
+    // 并逐项断言冻结值不被回归。该冲突已记录 docs/report/gls-v3/spike.md。
+    for (final preset in kThemePresetsV2) {
+      final lum = glassRelativeLuminance(preset.palette.background);
+      expect(lum, greaterThan(0.005), reason: '${preset.id} 背景过暗');
+      expect(lum, lessThan(0.995), reason: '${preset.id} 背景过亮');
+    }
+    expect(findPresetById('t5')!.palette.background, const Color(0xFF13171C));
+  });
+
+  test('custom 派生背景钳制：深色种子 surface 过暗时自动提亮入合法区间', () {
+    for (final seed in kThemePresets) {
+      final dark = buildCustom(Brightness.dark, seed)
+          .extension<AppTokens>()!
+          .palette;
+      final lum = glassRelativeLuminance(dark.background);
+      expect(lum, greaterThan(0.01),
+          reason: 'seed $seed 深色派生背景应被 clampBackgroundLuminance 提亮');
+      expect(lum, lessThan(0.99));
+      final light = buildCustom(Brightness.light, seed)
+          .extension<AppTokens>()!
+          .palette;
+      final lightLum = glassRelativeLuminance(light.background);
+      expect(lightLum, greaterThan(0.01));
+      expect(lightLum, lessThan(0.99));
+    }
+  });
+
+  test('调色板 lerp：环境光随主题过渡插值；glass 派生字段按明暗离散切换', () {
     final a = findPresetById('t1')!.palette;
     final b = findPresetById('t6')!.palette;
     final mid = a.lerp(b, 0.5);
-    expect(mid.ambient.length, 3);
-    expect(mid.glassFill.a, closeTo((a.glassFill.a + b.glassFill.a) / 2, 0.01));
+    expect(mid.ambient.length, 4);
+    // glass 系为派生值：brightness 在 t=0.5 处切换到目标侧（既有约定），
+    // 故 α 取 b 侧派生分支而非算术中点
+    expect(mid.glassFill.a, closeTo(b.glassFill.a, 0.01));
     expect(mid.primary, Color.lerp(a.primary, b.primary, 0.5)!);
   });
 }
