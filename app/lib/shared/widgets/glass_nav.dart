@@ -76,42 +76,51 @@ class _GlassAppBarState extends State<GlassAppBar> {
       borderRadius: BorderRadius.zero,
       shadows: false,
       padding: EdgeInsets.zero,
-      // Stack 固定总高 = kToolbarHeight：工具栏行占满，分隔线以
-      // Positioned 叠加于底缘——亚像素舍入不产生 RenderFlex 溢出
-      child: SizedBox(
-        height: kToolbarHeight,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            NavigationToolbar(
-              leading: widget.leading,
-              middle: DefaultTextStyle.merge(
-                style: context.text.titleLarge,
-                child: widget.title ?? const SizedBox.shrink(),
+      // edge-to-edge（main.dart：透明状态栏；Android 15+/16 强制全屏绘制）：
+      // 玻璃层通铺到状态栏下方保持磨砂观感，工具栏行经 [SafeArea] 下移系统
+      // 状态栏高度——对齐内建 AppBar 的 primary 行为，修复标题/动作按钮与
+      // 手机状态栏重合。preferredSize 保持 kToolbarHeight：Scaffold 会把
+      // 状态栏高度追加进 appBar 槽位可用高度，此处自然高度恰好填满。
+      child: SafeArea(
+        bottom: false,
+        // Stack 固定总高 = kToolbarHeight：工具栏行占满，分隔线以
+        // Positioned 叠加于底缘——亚像素舍入不产生 RenderFlex 溢出
+        child: SizedBox(
+          height: kToolbarHeight,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              NavigationToolbar(
+                leading: widget.leading,
+                middle: DefaultTextStyle.merge(
+                  style: context.text.titleLarge,
+                  child: widget.title ?? const SizedBox.shrink(),
+                ),
+                trailing:
+                    Row(mainAxisSize: MainAxisSize.min, children: widget.actions),
+                centerMiddle: false,
+                middleSpacing: AppSpacing.sm,
               ),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: widget.actions),
-              centerMiddle: false,
-              middleSpacing: AppSpacing.sm,
-            ),
-            // 滚动联动分隔线：静止隐藏 → 滚动渐显（200ms）
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: AnimatedContainer(
-                duration: GlassMotion.state,
-                curve: GlassMotion.curve,
-                height: 0.5,
-                color: palette.divider.withValues(
-                  alpha: widget.showDivider
-                      ? (dark
-                          ? GlassTableTokens.headerDividerAlphaDark
-                          : GlassTableTokens.headerDividerAlphaLight)
-                      : 0,
+              // 滚动联动分隔线：静止隐藏 → 滚动渐显（200ms）
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: AnimatedContainer(
+                  duration: GlassMotion.state,
+                  curve: GlassMotion.curve,
+                  height: 0.5,
+                  color: palette.divider.withValues(
+                    alpha: widget.showDivider
+                        ? (dark
+                            ? GlassTableTokens.headerDividerAlphaDark
+                            : GlassTableTokens.headerDividerAlphaLight)
+                        : 0,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
