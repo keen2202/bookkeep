@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/chart_colors.dart';
-import '../../shared/theme/glass/glass_layers.dart';
-import '../../shared/theme/glass/glass_panel.dart';
-import '../../shared/theme/glass/glass_quality.dart' as gq;
+import '../../shared/theme/glass_tokens.dart';
 import '../../shared/theme/theme_presets.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/widgets/app_amount_text.dart';
@@ -15,9 +13,15 @@ import '../../shared/widgets/app_empty.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/app_snack.dart';
 import '../../shared/widgets/app_text_field.dart';
+import '../../shared/widgets/glass_icon.dart';
+import '../../shared/widgets/glass_panel.dart';
+import '../../shared/widgets/glass_selection.dart';
+import '../../shared/widgets/glass_table.dart';
+import '../../shared/widgets/glass_nav.dart';
 
-/// 组件 Gallery 样板间（BK-UI-008，设计文档 §6.3）：
-/// 全组件 × 8 主题切换预览，供设计走查（不影响全局主题设置）。
+/// 组件 Gallery 样板间（延续 BK-UI-008）：全组件 × 8 主题切换预览，
+/// 供设计走查（不影响全局主题设置）。FGDS v1.0：展区对齐 Spec §4 组件
+/// 规格——玻璃层级 G1–G5、FG-ICON、FG-SEL、FG-TBL、FG-BTN 状态矩阵。
 class ComponentGalleryPage extends StatefulWidget {
   const ComponentGalleryPage({super.key});
 
@@ -27,18 +31,15 @@ class ComponentGalleryPage extends StatefulWidget {
 
 class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
   AppThemePreset _preset = kThemePresetsV2.first;
-  // 样板间独立画质预览（不影响全局设置）
-  gq.GlassQuality _quality = gq.GlassQuality.standard;
-  Offset _demoPulse = Offset.zero;
-  bool _probeSolidLine = false;
+  bool _selected = true;
 
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: buildTheme(_preset, quality: _quality),
+      data: buildTheme(_preset),
       child: Builder(
-        builder: (themedContext) => Scaffold(
-          appBar: AppBar(title: const Text('组件样板间')),
+        builder: (themedContext) => GlassScaffold(
+          title: const Text('组件样板间'),
           body: ListView(
             padding: AppSpacing.pagePadding,
             children: [
@@ -55,43 +56,34 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                     ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              // 画质档切换（样板间局部预览，GLS-015）
-              SegmentedButton<gq.GlassQuality>(
-                segments: [
-                  for (final q in gq.GlassQuality.values)
-                    ButtonSegment(value: q, label: Text(q.label)),
-                ],
-                selected: {_quality},
-                onSelectionChanged: (s) => setState(() => _quality = s.first),
-              ),
               const SizedBox(height: AppSpacing.lg),
-              // ── v3 新增展区①：玻璃层级（L1–L4 同屏 + 参数标注）──
+              // ── 展区①：玻璃层级（Spec §3 参数表，G1–G5 同屏 + 参数标注）──
               _Section(
-                title: '玻璃层级 L1–L4（同屏对比）',
+                title: '玻璃层级 G1–G5（同屏对比）',
                 child: Column(
                   children: [
-                    for (final tier in GlassTier.values)
+                    for (final level in GlassLevel.values)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                         child: GlassPanel(
-                          tier: tier,
+                          level: level,
                           borderRadius:
-                              BorderRadius.circular(tier == GlassTier.overlay ? AppRadius.lg : AppRadius.md),
+                              BorderRadius.circular(defaultRadius(level) == 0
+                                  ? AppRadius.md
+                                  : defaultRadius(level)),
                           padding: const EdgeInsets.all(AppSpacing.md),
                           child: Row(
                             children: [
                               Expanded(
                                 child: Text(
-                                  _tierLabel(tier),
+                                  _levelLabel(level),
                                   style: themedContext.text.titleSmall,
                                 ),
                               ),
                               Flexible(
                                 child: Text(
-                                  'σ${_sigmaLabel(themedContext, tier)} · '
-                                  'fill ${(resolveGlassSpec(tier: tier, brightness: themedContext.tokens.brightness, palette: themedContext.palette, quality: _quality).fill.a * 100).round()}%'
-                                  ' · border ${(resolveGlassSpec(tier: tier, brightness: themedContext.tokens.brightness, palette: themedContext.palette, quality: _quality).borderColor.a * 100).round()}%',
+                                  'σ${level.blur.round()} · '
+                                  'fill ${(resolveGlassSpec(level: level, brightness: themedContext.tokens.brightness).fill.a * 100).round()}%',
                                   style: themedContext.text.bodySmall?.copyWith(
                                     color: themedContext.palette.textSecondary,
                                   ),
@@ -104,130 +96,78 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                   ],
                 ),
               ),
-              // ── 展区②：交互状态矩阵（hover/focus/press）──
+              // ── 展区②：FG-ICON 图标容器（28/36/44 三档 + tint 变体）──
               _Section(
-                title: '交互状态矩阵',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                title: 'GlassIcon 图标容器（28 / 36 / 44 · tint 变体）',
+                child: Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        AppButton.primary(onPressed: () {}, child: const Text('hover 悬停试试')),
-                        AppButton.glass(onPressed: () {}, child: const Text('glass 变体')),
-                        AppButton.danger(onPressed: () {}, child: const Text('danger 玻璃')),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text('Tab 键聚焦：primary 2px 外环 + α0.18 光晕；按压 96% 缩放',
-                        style: themedContext.text.bodySmall?.copyWith(
-                          color: themedContext.palette.textSecondary,
-                        )),
-                    const SizedBox(height: AppSpacing.sm),
-                    const AppTextField(label: 'focus 光晕', hint: '聚焦查看 primary 光晕'),
+                    const GlassIcon(icon: Icons.home_outlined, size: GlassIconSize.s28),
+                    const GlassIcon(icon: Icons.receipt_long_outlined, size: GlassIconSize.s36),
+                    const GlassIcon(icon: Icons.add_circle_outline, size: GlassIconSize.s44),
+                    const GlassIcon(
+                        icon: Icons.category_outlined,
+                        size: GlassIconSize.s44,
+                        tint: true),
                   ],
                 ),
               ),
-              // ── 展区③：环境光演示（脉冲触发/暂停）──
+              // ── 展区③：FG-SEL 选中态四层叠加 ──
               _Section(
-                title: '环境光演示',
+                title: 'GlassSelection 选中态（FG-SEL 四层叠加，200ms 过渡）',
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        AppButton.secondary(
-                          onPressed: () =>
-                              setState(() => _demoPulse = const Offset(0, -1)),
-                          child: const Text('模拟 push 脉冲'),
-                        ),
-                        AppButton.secondary(
-                          onPressed: () =>
-                              setState(() => _demoPulse = const Offset(0, 1)),
-                          child: const Text('模拟 pop 脉冲'),
-                        ),
-                        AppButton.text(
-                          onPressed: () => setState(() => _demoPulse = Offset.zero),
-                          child: const Text('归位'),
-                        ),
-                      ],
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('选中态开关'),
+                      value: _selected,
+                      onChanged: (v) => setState(() => _selected = v),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    ClipRRect(
-                      borderRadius: AppRadius.mdAll,
-                      child: SizedBox(
-                        height: 120,
-                        child: CustomPaint(
-                          painter: _GalleryAmbientPainter(
-                            palette: themedContext.palette,
-                            pulse: _demoPulse,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '光斑位移演示：${_demoPulse == Offset.zero ? '静止' : _demoPulse.dy < 0 ? '向上 +3%' : '向下 +3%'}',
-                              style: themedContext.text.bodyMedium,
+                    for (var i = 0; i < 3; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                        child: ClipRRect(
+                          borderRadius: AppRadius.smAll,
+                          child: GlassSelection(
+                            selected: _selected && i == 0,
+                            borderRadius: AppRadius.smAll,
+                            child: Container(
+                              color: resolveGlassSpec(
+                                      level: GlassLevel.g2,
+                                      brightness: themedContext.tokens.brightness)
+                                  .fill,
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              child: Text('列表项 ${i + 1}',
+                                  style: themedContext.text.bodyLarge),
                             ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
-              // ── 展区④：色带探针（黑底放大高光条，Spec §3.2 防线④）──
+              // ── 展区④：交互状态矩阵 ──
               _Section(
-                title: '色带探针',
+                title: '交互状态矩阵（Spec §4.4 五态）',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      height: 80,
-                      decoration: const BoxDecoration(color: Colors.black),
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      alignment: Alignment.center,
-                      child: Container(
-                        height: 40,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: AppRadius.smAll,
-                          gradient: _probeSolidLine
-                              ? null
-                              : LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: const Alignment(0, 0.45),
-                                  colors: [
-                                    Colors.white.withValues(alpha: 0.25),
-                                    Colors.white.withValues(alpha: 0),
-                                  ],
-                                ),
-                          color: _probeSolidLine ? Colors.black : null,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
                     Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
                       children: [
-                        Text(
-                          _probeSolidLine
-                              ? 'solidLine：1px 实线 + 1px 半强线'
-                              : 'gradient：顶部高光渐变（α_top 0.25）',
-                          style: themedContext.text.bodySmall,
-                        ),
-                        AppButton.text(
-                          onPressed: () => setState(
-                              () => _probeSolidLine = !_probeSolidLine),
-                          child: Text(_probeSolidLine ? '切渐变' : '切 solidLine'),
-                        ),
+                        AppButton.primary(onPressed: () {}, child: const Text('主按钮')),
+                        AppButton.secondary(onPressed: () {}, child: const Text('hover 悬停试试')),
+                        AppButton.danger(onPressed: () {}, child: const Text('危险按钮')),
                       ],
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text('Tab 键聚焦：primary α0.50 外环；按压 scale 0.98',
+                        style: themedContext.text.bodySmall?.copyWith(
+                          color: themedContext.palette.textSecondary,
+                        )),
                   ],
                 ),
               ),
@@ -252,11 +192,24 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                 ),
               ),
               _Section(
-                title: 'AppCard 卡片',
+                title: 'AppCard 卡片与嵌套升档',
                 child: Column(
                   children: [
                     AppCard(
-                      child: Text('静态卡片', style: themedContext.text.bodyLarge),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('静态卡片（G2）', style: themedContext.text.bodyLarge),
+                          const SizedBox(height: AppSpacing.sm),
+                          // 嵌套演示：内层下一档填充值、零新增 BackdropFilter
+                          GlassPanel.nested(
+                            host: GlassLevel.g2,
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            child: Text('嵌套分组容器（G3 填充值 · 无二次模糊）',
+                                style: themedContext.text.bodyMedium),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     AppCard(
@@ -266,11 +219,32 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                           Icon(Icons.touch_app_outlined,
                               color: themedContext.palette.primary),
                           const SizedBox(width: AppSpacing.sm),
-                          Text('可点卡片（水波纹 + 按压 4%）',
+                          Text('可点卡片（pressed fill+scale 反馈）',
                               style: themedContext.text.bodyLarge),
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+              // ── 展区⑤：FG-TBL 表格 ──
+              _Section(
+                title: 'GlassTable 表格（斑马纹零模糊 · 行选中 FG-SEL）',
+                child: GlassTable(
+                  columns: const [
+                    GlassTableColumn(label: '分类'),
+                    GlassTableColumn(
+                        label: '金额', align: Alignment.centerRight),
+                  ],
+                  rows: [
+                    for (var i = 0; i < 4; i++)
+                      GlassTableRow(
+                        selected: i == 1,
+                        cells: [
+                          Text('示例分类 ${i + 1}'),
+                          AppAmountText.minor((i + 1) * -12345),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -307,7 +281,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                       onPressed: () => showAppSheet<void>(
                         themedContext,
                         title: '底部弹层',
-                        child: Text('拖拽柄 32×4、圆角 lg、背板 scrim 54%、下滑关闭。',
+                        child: Text('G4 玻璃 · 顶部圆角 20 · 遮罩 α0.32。',
                             style: themedContext.text.bodyLarge),
                       ),
                       child: const Text('底部弹层'),
@@ -316,7 +290,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                       onPressed: () => showAppConfirm(
                         themedContext,
                         title: '普通对话框',
-                        content: '标题 title + 内容 body + 按钮区右对齐。',
+                        content: 'G4 玻璃面板 + scrim 遮罩 α0.32。',
                       ),
                       child: const Text('对话框'),
                     ),
@@ -324,7 +298,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                       onPressed: () => showAppConfirm(
                         themedContext,
                         title: '危险确认',
-                        content: '危险操作确认键为 danger 样式。',
+                        content: '危险操作确认键为 danger 着色玻璃。',
                         danger: true,
                         confirmText: '删除',
                       ),
@@ -339,7 +313,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                       child: const Text('失败提示'),
                     ),
                     AppButton.secondary(
-                      onPressed: () => AppSnack.info(themedContext, '中性信息'),
+                      onPressed: () => AppSnack.info(themedContext, '信息提示'),
                       child: const Text('信息提示'),
                     ),
                   ],
@@ -361,7 +335,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                 ),
               ),
               _Section(
-                title: '图表序列色（palette 派生）',
+                title: '图表序列色（主色系派生）',
                 child: Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
@@ -380,11 +354,11 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                 ),
               ),
               _Section(
-                title: '字阶（七级）',
+                title: '字阶',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('displayAmount 34 大数字 ¥1,234.56',
+                    Text('大标题 28 大数字 ¥1,234.56',
                         style: themedContext.tokens.displayAmountStyle),
                     Text('headline 22 页面主标题',
                         style: themedContext.text.headlineSmall),
@@ -395,7 +369,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                         style: themedContext.text.bodyMedium),
                     Text('caption 12 时间戳/标签',
                         style: themedContext.text.bodySmall),
-                    Text('amount 17 等宽金额 ¥8,888.00',
+                    Text('amount 20 等宽金额 ¥8,888.00',
                         style: themedContext.tokens.amountStyle),
                   ],
                 ),
@@ -430,64 +404,10 @@ class _Section extends StatelessWidget {
   }
 }
 
-String _tierLabel(GlassTier tier) => switch (tier) {
-      GlassTier.panel => 'L1 内容面板 · 卡片/图表容器',
-      GlassTier.dock => 'L2 吸附层 · 导航栏/吸顶栏',
-      GlassTier.overlay => 'L3 浮层 · 弹窗/底部弹层',
-      GlassTier.floating => 'L4 悬浮提示 · SnackBar/FAB',
+String _levelLabel(GlassLevel level) => switch (level) {
+      GlassLevel.g1 => 'G1 图标容器层',
+      GlassLevel.g2 => 'G2 内容面板层 · 卡片/表格容器',
+      GlassLevel.g3 => 'G3 吸附层 · AppBar/底部导航/表头',
+      GlassLevel.g4 => 'G4 浮层 · 对话框/弹层/菜单',
+      GlassLevel.g5 => 'G5 轻提示 · Toast/FAB',
     };
-
-String _sigmaLabel(BuildContext context, GlassTier tier) {
-  final spec = resolveGlassSpec(
-    tier: tier,
-    brightness: context.tokens.brightness,
-    palette: context.palette,
-    quality: context.tokens.glassQuality,
-  );
-  return spec.sigmaX == 0 ? '0(fill-only)' : spec.sigmaX.round().toString();
-}
-
-/// 展区③演示画笔：黑底上按 pulse 方向平移的软化光斑（非生产管线）
-class _GalleryAmbientPainter extends CustomPainter {
-  _GalleryAmbientPainter({required this.palette, required this.pulse});
-
-  final ThemePalette palette;
-  final Offset pulse;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = palette.background);
-    final colors = [
-      ...palette.ambient.take(3),
-      if (palette.ambient.length > 3) palette.ambient[3],
-    ];
-    final anchors = [
-      const Alignment(-0.75, -0.85),
-      const Alignment(0.95, -0.05),
-      const Alignment(-0.15, 1.05),
-      const Alignment(0.75, 0.85),
-    ];
-    for (var i = 0; i < anchors.length; i++) {
-      var center = anchors[i].withinRect(Offset.zero & size);
-      center += pulse * size.shortestSide;
-      final rect = Rect.fromCenter(
-        center: center,
-        width: size.width * 0.7,
-        height: size.height * 1.2,
-      );
-      final gradient = RadialGradient(
-        colors: [
-          colors[i % colors.length].withValues(alpha: 0.85),
-          colors[i % colors.length].withValues(alpha: 0.38),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.55, 1.0],
-      );
-      canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GalleryAmbientPainter oldDelegate) =>
-      oldDelegate.pulse != pulse || oldDelegate.palette != palette;
-}

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/accounts_table.dart';
-import '../../shared/theme/glass_icon.dart';
+import '../../shared/widgets/glass_icon.dart';
 import '../auth_lock/lock_controller.dart';
 
 const _typeIcons = {
@@ -46,7 +46,7 @@ class AccountCard extends ConsumerWidget {
       child: ListTile(
         leading: GlassIcon(
           icon: accountTypeIcon(account.accountType),
-          size: 20,
+          size: GlassIconSize.s28,
         ),
         title: Text(account.name),
         subtitle: Text(accountTypeLabel(account.accountType)),

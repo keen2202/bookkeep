@@ -10,11 +10,12 @@ import '../../data/local/tables/categories_table.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/usecases/create_transaction.dart';
 import '../../shared/theme/app_theme.dart';
-import '../../shared/theme/glass_icon.dart';
+import '../../shared/widgets/glass_icon.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/app_snack.dart';
 import '../../shared/widgets/category_picker.dart';
+import '../../shared/widgets/glass_nav.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
 import '../accounts/accounts_providers.dart';
 import '../books/books_providers.dart'
@@ -166,17 +167,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         ? const <Account>[]
         : [for (final e in accountsAsync.valueOrNull!.accounts) e.account];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.editTarget != null ? '编辑账单' : '记一笔'),
-        actions: [
-          TextButton.icon(
-            onPressed: _exit,
-            icon: const GlassIcon(icon: Icons.close, size: 16, blur: false),
-            label: const Text('退出'),
-          ),
-        ],
-      ),
+    return GlassScaffold(
+      title: Text(widget.editTarget != null ? '编辑账单' : '记一笔'),
+      actions: [
+        TextButton.icon(
+          onPressed: _exit,
+          icon: const GlassIcon(icon: Icons.close, size: GlassIconSize.s28),
+          label: const Text('退出'),
+        ),
+      ],
       body: Column(
         children: [
           SegmentedButton<TransactionType>(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/services/capture_candidate.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/glass_nav.dart';
 import 'capture_confirm_page.dart';
 import 'sms_parser.dart';
 
@@ -126,8 +127,8 @@ class _VoiceEntrySheetState extends State<VoiceEntrySheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('语音记账')),
+    return GlassScaffold(
+      title: const Text('语音记账'),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

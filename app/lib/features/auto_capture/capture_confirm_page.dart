@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../../shared/widgets/glass_nav.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/services/capture_candidate.dart';
@@ -90,16 +91,14 @@ class _CaptureConfirmPageState extends ConsumerState<CaptureConfirmPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('确认入账（${widget.candidates.length} 笔）'),
-        actions: [
-          TextButton(
-            onPressed: _commit,
-            child: const Text('全部入账'),
-          ),
-        ],
-      ),
+    return GlassScaffold(
+      title: Text('确认入账（${widget.candidates.length} 笔）'),
+      actions: [
+        TextButton(
+          onPressed: _commit,
+          child: const Text('全部入账'),
+        ),
+      ],
       body: Column(
         children: [
           Padding(

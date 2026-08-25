@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/glass_nav.dart';
 import '../sync/sync_api.dart';
 import 'books_page.dart' show accessToken, booksApi;
 
@@ -104,8 +105,8 @@ class _ShareInviteSheetState extends State<ShareInviteSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('共享账本')),
+    return GlassScaffold(
+      title: const Text('共享账本'),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

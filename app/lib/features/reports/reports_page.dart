@@ -7,8 +7,8 @@ import '../../data/repositories/reports_repository.dart';
 import '../accounts/accounts_providers.dart' show exchangeRateServiceProvider;
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart' show reportsRepositoryProvider;
-import '../../shared/theme/glass/glass_layers.dart';
-import '../../shared/theme/glass/glass_panel.dart';
+import '../../shared/theme/glass_tokens.dart';
+import '../../shared/widgets/glass_panel.dart';
 import 'charts/report_charts.dart';
 
 typedef ReportWindow = ({DateTime start, DateTime end});
@@ -247,10 +247,9 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Glassmorphism v3（GLS-007）：图表容器统一 GlassPanel(panel, innerSheen)
+    // FGDS：图表容器统一 GlassPanel（G2，Spec §4.5）
     return GlassPanel(
-      tier: GlassTier.panel,
-      innerSheen: true,
+      level: GlassLevel.g2,
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,23 +1,34 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import '../theme/glass/glass_layers.dart';
-import '../theme/glass/glass_panel.dart';
+import '../theme/glass_tokens.dart';
 import '../theme/tokens.dart';
 
-/// 按钮变体（设计文档 §3.4；v3 新增 glass 玻璃变体）
-enum AppButtonVariant { primary, secondary, text, danger, glass }
+/// 按钮变体（FGDS v1.0，Spec §4.4）：
+/// - [AppButtonVariant.primary] 主操作：主题色着色玻璃（非实色，AC-07）；
+/// - [AppButtonVariant.secondary] 次级：无色玻璃（G2 基材五态矩阵）；
+/// - [AppButtonVariant.danger] 危险操作：danger 色着色玻璃；
+/// - [AppButtonVariant.text] 文字按钮。
+enum AppButtonVariant { primary, secondary, text, danger }
 
-/// 统一按钮（Spec §6 + Glassmorphism v3 §5.2）：高 48、圆角 md、
-/// 按压 96% 缩放 + 填充加深（150ms）、loading 内置 spinner 防重入。
+/// FG-BTN 统一按钮（Spec §4.4 状态参数矩阵；BK-FG-011）：
 ///
-/// v3 玻璃化升级（GLS-006）：
-/// - primary →「品牌色玻璃」（primary α0.90 叠白高光）；
-/// - secondary/glass → 中性玻璃（L2 吸附层填充）；
-/// - danger → expense α0.90 玻璃；
-/// - text 不变；
-/// - hover：描边 α+0.08 / 高光 +0.05（120ms）；focus：primary 2px 外环 +
-///   primary α0.18 blur8 外晕（150ms）；press：scale 0.96 + scrim +0.08。
+/// 次级玻璃按钮五态（浅色值；深色见 [GlassButtonTokens] 双值表）：
+///
+/// | 状态 | blur σ | fill α | 其他 |
+/// |------|--------|--------|------|
+/// | 默认 | 20 | 0.60(0.12) | G2 标准双层描边 |
+/// | Hover | 24 | 0.68(0.16) | 内高光 +0.05，150ms |
+/// | Pressed | 16 | 0.48(0.09) | scale 0.98 + 内阴影 |
+/// | Focus | 20 | 0.60(0.12) | +2px 外环 primary α0.50 |
+/// | 禁用 | 8 | 0.32(0.06) | 去高光、文字 disabled |
+///
+/// 主操作着色玻璃：blur σ20 不变；fill = primary α0.75(0.65)，文字 #FFFFFF
+/// 实色；hover/pressed 仅变 fill α（+0.08 / −0.10）与 scale；禁用 fill α0.30、
+/// 文字 α0.50。通用规格：高 44/32、圆角 12（胶囊可选）、水平 padding 20、
+/// 文字 15/600。全部数值来自 [GlassButtonTokens]（AC-01 单源）。
 class AppButton extends StatefulWidget {
   const AppButton({
     super.key,
@@ -26,24 +37,30 @@ class AppButton extends StatefulWidget {
     this.variant = AppButtonVariant.primary,
     this.loading = false,
     this.block = false,
+    this.compact = false,
+    this.capsule = false,
   });
 
-  /// 主按钮：品牌色玻璃（primary α0.90 + 白高光）
+  /// 主操作按钮：主题色着色玻璃
   const AppButton.primary({
     super.key,
     required this.child,
     this.onPressed,
     this.loading = false,
     this.block = false,
+    this.compact = false,
+    this.capsule = false,
   }) : variant = AppButtonVariant.primary;
 
-  /// 次按钮：中性玻璃（L2 填充）
+  /// 次级按钮：中性玻璃
   const AppButton.secondary({
     super.key,
     required this.child,
     this.onPressed,
     this.loading = false,
     this.block = false,
+    this.compact = false,
+    this.capsule = false,
   }) : variant = AppButtonVariant.secondary;
 
   /// 文字按钮
@@ -53,25 +70,20 @@ class AppButton extends StatefulWidget {
     this.onPressed,
     this.loading = false,
     this.block = false,
+    this.compact = false,
+    this.capsule = false,
   }) : variant = AppButtonVariant.text;
 
-  /// 危险操作：expense α0.90 玻璃
+  /// 危险操作按钮：danger 色着色玻璃
   const AppButton.danger({
     super.key,
     required this.child,
     this.onPressed,
     this.loading = false,
     this.block = false,
+    this.compact = false,
+    this.capsule = false,
   }) : variant = AppButtonVariant.danger;
-
-  /// 玻璃变体（v3 §5.2）：中性玻璃 + 真实磨砂（high 档 BackdropFilter σ16）
-  const AppButton.glass({
-    super.key,
-    required this.child,
-    this.onPressed,
-    this.loading = false,
-    this.block = false,
-  }) : variant = AppButtonVariant.glass;
 
   final Widget child;
   final VoidCallback? onPressed;
@@ -83,19 +95,22 @@ class AppButton extends StatefulWidget {
   /// 是否撑满父宽
   final bool block;
 
+  /// 紧凑档（高 32）
+  final bool compact;
+
+  /// 胶囊形态（全圆角）
+  final bool capsule;
+
   @override
   State<AppButton> createState() => _AppButtonState();
 }
 
 class _AppButtonState extends State<AppButton> {
+  bool _hover = false;
   bool _pressed = false;
   bool _focused = false;
 
-  void _setPressed(bool v) {
-    if (widget.variant == AppButtonVariant.text) return;
-    if (v == _pressed) return;
-    setState(() => _pressed = v);
-  }
+  bool get _enabled => widget.onPressed != null && !widget.loading;
 
   @override
   Widget build(BuildContext context) {
@@ -106,13 +121,15 @@ class _AppButtonState extends State<AppButton> {
   }
 
   // -------------------------------------------------------------------------
-  // 文字按钮（保持 v2 行为，不参与玻璃语言）
+  // 文字按钮
   // -------------------------------------------------------------------------
   Widget _buildTextButton(BuildContext context) {
     final palette = context.palette;
+    final height = widget.compact
+        ? GlassButtonTokens.heightCompact
+        : GlassButtonTokens.heightStandard;
     final style = ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(Size(64, 48)),
-      maximumSize: const WidgetStatePropertyAll(Size(double.infinity, 48)),
+      minimumSize: WidgetStatePropertyAll(Size(64, height)),
       shape: WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
       ),
@@ -127,7 +144,8 @@ class _AppButtonState extends State<AppButton> {
         ? SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2, color: palette.primary),
+            child:
+                CircularProgressIndicator(strokeWidth: 2, color: palette.primary),
           )
         : widget.child;
     return SizedBox(
@@ -142,144 +160,202 @@ class _AppButtonState extends State<AppButton> {
   }
 
   // -------------------------------------------------------------------------
-  // 玻璃按钮（primary/secondary/danger/glass 四变体共用管线）
+  // 玻璃按钮：五态矩阵（Spec §4.4）
   // -------------------------------------------------------------------------
   Widget _buildGlassButton(BuildContext context) {
     final palette = context.palette;
-    final appColors = context.appColors;
-    final enabled = widget.onPressed != null && !widget.loading;
+    final dark = context.tokens.isDark;
 
-    // L2 吸附层规格（§5.2：玻璃按钮取 dock 层填充与描边）；
-    // 渲染复用 GlassPanel（D1 单一玻璃出口，BackdropFilter 不在按钮内自建）
-    final dockSpec = resolveGlassSpec(
-      tier: GlassTier.dock,
-      brightness: context.tokens.brightness,
-      palette: palette,
-      quality: context.tokens.glassQuality,
-    );
+    final isTinted = widget.variant != AppButtonVariant.secondary;
+    final tint = widget.variant == AppButtonVariant.danger
+        ? (dark ? GlassThemeColors.dangerDark : GlassThemeColors.dangerLight)
+        : palette.primary;
 
-    final (Color baseFill, Color fg) = switch (widget.variant) {
-      // 中性玻璃基（L2 填充）；primary/danger 在其上做品牌/语义着色
-      AppButtonVariant.primary ||
-      AppButtonVariant.glass ||
-      AppButtonVariant.secondary =>
-        (dockSpec.fill, palette.textPrimary),
-      AppButtonVariant.danger => (dockSpec.fill, appColors.expense),
-      _ => (dockSpec.fill, palette.textPrimary),
-    };
-    // primary 变体的品牌着色：主操作以 primary α0.90 叠加于中性玻璃之上，
-    // 前景 onPrimary（§5.2 主操作着色）
-    var fill = widget.variant == AppButtonVariant.primary
-        ? Color.alphaBlend(palette.primary.withValues(alpha: 0.90), dockSpec.fill)
-        : baseFill;
-    if (widget.variant == AppButtonVariant.danger) {
-      fill =
-          Color.alphaBlend(appColors.expense.withValues(alpha: 0.90), dockSpec.fill);
+    // ── 状态解析（次级按钮五态矩阵 / 着色玻璃恒 σ20 仅调 fill）──
+    double sigma;
+    double highlightAlpha;
+    Color fill;
+
+    if (!_enabled) {
+      sigma = isTinted ? GlassButtonTokens.blurDefault : GlassButtonTokens.blurDisabled; // 禁用 σ8（主按钮恒 20）
+      highlightAlpha = 0; // 禁用去内高光
+      fill = isTinted
+          ? tint.withValues(alpha: GlassButtonTokens.primaryDisabledFill)
+          : Colors.white
+              .withValues(alpha: dark ? GlassButtonTokens.fillDisabledDark : GlassButtonTokens.fillDisabledLight);
+    } else if (isTinted) {
+      // 主操作/危险着色玻璃：σ20 不变，fill 仅随 hover/pressed 微调
+      var alpha = dark ? GlassButtonTokens.primaryFillDark : GlassButtonTokens.primaryFillLight;
+      if (_pressed) {
+        alpha = (alpha - GlassButtonTokens.primaryPressedDrop).clamp(0.0, 1.0);
+      } else if (_hover) {
+        alpha = (alpha + GlassButtonTokens.primaryHoverBoost).clamp(0.0, 1.0);
+      }
+      sigma = GlassButtonTokens.blurDefault;
+      highlightAlpha =
+          resolveGlassSpec(level: GlassLevel.g2, brightness: palette.brightness)
+              .borderInnerHighlight
+              .a;
+      fill = tint.withValues(alpha: alpha);
+    } else if (_pressed) {
+      sigma = GlassButtonTokens.blurPressed;
+      highlightAlpha =
+          resolveGlassSpec(level: GlassLevel.g2, brightness: palette.brightness)
+              .borderInnerHighlight
+              .a;
+      fill = Colors.white
+          .withValues(alpha: dark ? GlassButtonTokens.fillPressedDark : GlassButtonTokens.fillPressedLight);
+    } else if (_hover) {
+      sigma = GlassButtonTokens.blurHover;
+      highlightAlpha = resolveGlassSpec(
+                  level: GlassLevel.g2, brightness: palette.brightness)
+              .borderInnerHighlight
+              .a +
+          GlassButtonTokens.hoverHighlightBoost; // 内高光 α +0.05
+      fill = Colors.white
+          .withValues(alpha: dark ? GlassButtonTokens.fillHoverDark : GlassButtonTokens.fillHoverLight);
+    } else {
+      sigma = GlassButtonTokens.blurDefault;
+      highlightAlpha =
+          resolveGlassSpec(level: GlassLevel.g2, brightness: palette.brightness)
+              .borderInnerHighlight
+              .a;
+      fill = Colors.white
+          .withValues(alpha: dark ? GlassButtonTokens.fillDefaultDark : GlassButtonTokens.fillDefaultLight);
     }
-    final foregroundColor = switch (widget.variant) {
-      AppButtonVariant.primary => palette.onPrimary,
-      AppButtonVariant.danger =>
-        ThemeData.estimateBrightnessForColor(fill) == Brightness.dark
-            ? Colors.white
-            : palette.textPrimary,
-      _ => fg,
-    };
 
-    final radius = BorderRadius.circular(AppRadius.md);
+    // 文字色：着色玻璃白字实色（禁用 α0.50）；次级 textPrimary / textDisabled
+    final foreground = isTinted
+        ? palette.onPrimary.withValues(
+            alpha: !_enabled ? GlassButtonTokens.primaryDisabledTextAlpha : 1.0)
+        : (_enabled ? palette.textPrimary : palette.textDisabled);
 
-    final surface = GlassPanel(
-      tier: GlassTier.dock,
+    final radius = BorderRadius.circular(
+        widget.capsule ? AppRadius.pill : AppRadius.md);
+    final height = widget.compact
+        ? GlassButtonTokens.heightCompact
+        : GlassButtonTokens.heightStandard;
+
+    final surface = ClipRRect(
       borderRadius: radius,
-      onTap: enabled ? widget.onPressed : null,
-      colorOverride: fill,
-      child: SizedBox(
-        height: 48,
-        child: Center(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+        child: AnimatedContainer(
+          duration: GlassMotion.micro,
+          curve: GlassMotion.curve,
+          height: height,
+          padding: const EdgeInsets.symmetric(
+              horizontal: GlassButtonTokens.horizontalPadding),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: radius,
+            border: Border.all(
+              color: resolveGlassSpec(
+                      level: GlassLevel.g2, brightness: palette.brightness)
+                  .borderOuter,
+              width: 0.5,
+            ),
+          ),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: highlightAlpha),
+              width: 0.5,
+            ),
+            // Pressed 顶部内阴影近似（inset 0/1/3 #000 α0.08）
+            gradient: _pressed
+                ? LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: const Alignment(0, 0.10),
+                    colors: [
+                      Colors.black
+                          .withValues(alpha: GlassButtonTokens.pressedInnerShadowAlpha),
+                      Colors.transparent,
+                    ],
+                  )
+                : null,
+          ),
+          alignment: Alignment.center,
           child: AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 120),
-          style: (context.text.labelLarge ?? const TextStyle())
-              .copyWith(color: foregroundColor),
-          child: widget.loading
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: foregroundColor,
+            duration: GlassMotion.micro,
+            style: (context.text.labelLarge ?? const TextStyle())
+                .copyWith(color: foreground),
+            child: widget.loading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: foreground,
+                    ),
+                  )
+                : IconTheme.merge(
+                    data: IconThemeData(color: foreground, size: 18),
+                    child: widget.child,
                   ),
-                )
-              : IconTheme.merge(
-                  data: IconThemeData(color: foregroundColor, size: 18),
-                  child: widget.child,
-                ),
           ),
         ),
       ),
     );
 
-    // focus 外环 + 光晕（primary 2px + primary α0.18 blur8，150ms；
-    // 常驻 2px 内边距保证聚焦态零布局位移）
+    // Focus：2px 外环 primary α0.50（键盘导航可见；常驻 3px 余量防位移）
     Widget button = Padding(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(3),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
+        duration: GlassMotion.state,
+        curve: GlassMotion.curve,
+        foregroundDecoration: BoxDecoration(
           borderRadius: radius,
           border: Border.all(
-            color: _focused ? palette.primary : Colors.transparent,
-            width: 2,
+            color: _focused && _enabled
+                ? palette.primary.withValues(alpha: GlassButtonTokens.focusRingAlpha)
+                : Colors.transparent,
+            width: GlassButtonTokens.focusRingWidth,
           ),
         ),
-        foregroundDecoration: BoxDecoration(borderRadius: radius),
         child: surface,
       ),
     );
-    if (_focused) {
-      button = AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.md + 2),
-          boxShadow: [
-            BoxShadow(
-              color: palette.primary.withValues(alpha: 0.18),
-              blurRadius: 8,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: button,
-      );
-    }
 
     button = Semantics(
       button: true,
-      enabled: enabled,
+      enabled: _enabled,
       child: MouseRegion(
-        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        cursor: _enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        onEnter: (_) {
+          if (_enabled && !_hover) setState(() => _hover = true);
+        },
+        onExit: (_) {
+          if (_hover) setState(() => _hover = false);
+        },
         child: Focus(
           onFocusChange: (v) => setState(() => _focused = v),
-          child: Opacity(
-            opacity: enabled ? 1.0 : 0.45,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _enabled ? widget.onPressed : null,
+            onTapDown: (_) {
+              if (_enabled) setState(() => _pressed = true);
+            },
+            onTapUp: (_) {
+              if (_pressed) setState(() => _pressed = false);
+            },
+            onTapCancel: () {
+              if (_pressed) setState(() => _pressed = false);
+            },
             child: button,
           ),
         ),
       ),
     );
 
-    // 按压 96% 缩放（150ms easeOutCubic，沿用 v2 Listener 手势管线）
-    return Listener(
-      onPointerDown: enabled ? (_) => _setPressed(true) : null,
-      onPointerUp: enabled ? (_) => _setPressed(false) : null,
-      onPointerCancel: enabled ? (_) => _setPressed(false) : null,
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOutCubic,
-        child: SizedBox(
-          width: widget.block ? double.infinity : null,
-          child: button,
-        ),
+    // Pressed scale 0.98（150ms，Spec §6 微交互）
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1,
+      duration: GlassMotion.micro,
+      curve: GlassMotion.curve,
+      child: SizedBox(
+        width: widget.block ? double.infinity : null,
+        child: button,
       ),
     );
   }

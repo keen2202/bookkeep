@@ -55,7 +55,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(BottomSheet),
-        matching: find.widgetWithText(FilterChip, '早餐'),
+        matching: find.text('早餐'),
       ),
     );
     await tester.pumpAndSettle();
@@ -169,9 +169,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('选择分类'));
     await tester.pumpAndSettle();
+    // FGDS：分类 chip 改为自定义玻璃 chip（无 FilterChip），按文本命中
     Finder breakfastChip() => find.descendant(
           of: find.byType(BottomSheet),
-          matching: find.widgetWithText(FilterChip, '早餐'),
+          matching: find.text('早餐'),
         );
     expect(breakfastChip(), findsOneWidget);
 

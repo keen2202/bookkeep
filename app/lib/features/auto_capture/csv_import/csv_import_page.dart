@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/services/capture_candidate.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/glass_nav.dart';
 import '../../books/books_providers.dart' show transactionRepositoryProvider;
 import '../capture_confirm_page.dart';
 import '../import_service.dart';
@@ -60,8 +61,8 @@ class _CsvImportPageState extends ConsumerState<CsvImportPage> {
   @override
   Widget build(BuildContext context) {
     final parsed = _parsed;
-    return Scaffold(
-      appBar: AppBar(title: const Text('CSV 导入')),
+    return GlassScaffold(
+      title: const Text('CSV 导入'),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

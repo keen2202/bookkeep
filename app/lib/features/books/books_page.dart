@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/constants/constants.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/glass_nav.dart';
 import '../sync/token_store.dart';
 import 'books_api.dart';
 import 'books_providers.dart';
@@ -28,8 +29,8 @@ class BooksPage extends ConsumerWidget {
     final books = ref.watch(booksViewModelProvider);
     final currentId = ref.watch(currentBookIdProvider);
     final current = ref.watch(currentBookProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('账本')),
+    return GlassScaffold(
+      title: const Text('账本'),
       body: books.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),

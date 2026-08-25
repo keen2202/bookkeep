@@ -98,7 +98,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(BottomSheet),
-        matching: find.widgetWithText(FilterChip, '早餐'),
+        matching: find.text('早餐'),
       ),
     );
     await tester.pumpAndSettle();

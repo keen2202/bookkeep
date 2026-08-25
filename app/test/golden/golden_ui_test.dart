@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show Value;
@@ -18,7 +17,7 @@ import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/settings/appearance_page.dart';
 import 'package:bookkeep_app/features/settings/component_gallery_page.dart';
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
-import 'package:bookkeep_app/shared/theme/background/ambient_gradient.dart';
+import 'package:bookkeep_app/shared/theme/glass_tokens.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 import 'package:bookkeep_app/shared/widgets/app_amount_text.dart';
 import 'package:bookkeep_app/shared/widgets/app_card.dart';
@@ -98,16 +97,15 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    // 玻璃拟态（Glassmorphism v2→v3）：Golden 与生产一致——页面之下先铺
-    // AmbientGradient 环境光层（生产由 AppBackground 提供，Scaffold 已透明）；
-    // v3 环境光为 ConsumerWidget（动效 provider 接线），统一包 ProviderScope。
-    // 全部 Golden 以 standard 档渲染（Spec §10 覆盖策略声明）。
-    // v3：AmbientGradient 为 ConsumerWidget——仅为其提供独立作用域
-    // （零 override，不与业务页内层 override 作用域交叉，riverpod 作用域语义安全）
+    // FGDS（BK-FG-002）：Golden 与生产一致——页面之下铺 §2.2 白名单
+    // 纯净底色（生产由 AppBackground 提供）
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(preset),
-        home: AmbientGradient(child: home),
+        home: ColoredBox(
+          color: preset.isDark ? GlassBackground.baseDark : GlassBackground.baseLight,
+          child: home,
+        ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 300));
@@ -222,51 +220,18 @@ void main() {
     });
   }
 
-  // ── Glassmorphism v3 扩面（BK-GLS-017，Spec §10 覆盖策略）──
+  // ── FGDS 扩面（Spec §10 覆盖策略延续）──
 
-  group('v3 样板间全展区 ×{T1,T6}（standard 档渲染声明）', () {
+  group('FGDS 样板间全展区 ×{T1,T6}', () {
     for (final id in ['t1', 't6']) {
       final preset = findPresetById(id)!;
-      testWidgets('$id 组件样板间（含玻璃层级/状态矩阵/环境光/色带探针）', (tester) async {
+      testWidgets('$id 组件样板间（含玻璃层级 G1–G5/图标容器/选中态/表格）', (tester) async {
         await pumpGolden(tester, preset, const ComponentGalleryPage());
         await expectGolden(tester, '${id}_gallery');
       });
     }
   });
 
-  group('v3 样板间(T1) × 自定义背景图 fixture', () {
-    testWidgets('bg_probe 多色渐变探针图 + 智能遮罩 + 样板间内容', (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-      final t1 = findPresetById('t1')!;
-      // 复刻生产 AppBackground 图像路径分层：背景图 → 智能遮罩 → 内容层；
-      // 图源为入库 fixture test/fixtures/bg_probe.png（生成器见
-      // generate_bg_fixture_test.dart）
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildTheme(t1),
-          home: AmbientGradient(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image(
-                  image: FileImage(File('test/fixtures/bg_probe.png')),
-                  fit: BoxFit.cover,
-                ),
-                ColoredBox(
-                  color: t1.palette.background.withValues(alpha: 0.30),
-                ),
-                const Scaffold(body: ComponentGalleryPage()),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 100));
-      await expectGolden(tester, 't1_gallery_bgpicture');
-    });
-  });
 }
 
 /// 0.5% 容差 golden 比较器（Spec §9），SDK 官方示例模式

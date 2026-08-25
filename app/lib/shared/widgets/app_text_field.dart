@@ -2,17 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/glass_tokens.dart';
 import '../theme/tokens.dart';
 
-/// 统一输入框（设计文档 §3.4 / Spec §6 + Glassmorphism v3 §5.1，GLS-006）：
-/// 填充改玻璃（浅色白 α0.12 / 深色白 α0.06，由主题 inputDecorationTheme
-/// 提供 0x1FFFFFFF / 0x0FFFFFFF）、圆角 sm、聚焦描边 primary 2px、错误态
-/// expense 描边 + 12sp 错误文案。
-///
-/// v3 focus 光晕：外层 AnimatedContainer 提供 primary α0.18 blur12 光晕 +
-/// primary 2px 描边（180ms easeOut）；hover 描边白 0.35（120ms）；error 光晕
-/// 随 expense 色。视觉规格来自主题 InputDecorationTheme，本组件做光晕包装
-/// 与参数收敛。
+/// FG-INP 统一输入框（Spec §4.8；BK-FG-023）：
+/// - 材质：G2 基材、fill 降至 α0.45（浅）/0.10（深），与卡片区分
+///   （主题 inputDecorationTheme 单源提供）；
+/// - 圆角 12 / 高度 44；
+/// - 聚焦：内高光 α +0.05（顶部渐变近似）+ 2px 外环 primary α0.50；
+/// - 错误：外环 danger α0.60，下方错误文字 danger 色；
+/// - 禁用：fill α0.24/0.05、文字 text.disabled。
 class AppTextField extends StatefulWidget {
   const AppTextField({
     super.key,
@@ -53,7 +52,7 @@ class AppTextField extends StatefulWidget {
   final bool autofocus;
   final bool readOnly;
 
-  /// 禁用态（false 时降低不透明度且不可交互）
+  /// 禁用态（false 时按 §4.8 禁用参数渲染且不可交互）
   final bool enabled;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onTap;
@@ -65,7 +64,6 @@ class AppTextField extends StatefulWidget {
 
 class _AppTextFieldState extends State<AppTextField> {
   FocusNode? _internalFocus;
-  bool _hover = false;
 
   FocusNode get _effectiveFocus =>
       widget.focusNode ?? (_internalFocus ??= FocusNode());
@@ -78,69 +76,58 @@ class _AppTextFieldState extends State<AppTextField> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    final appColors = context.appColors;
     return ListenableBuilder(
       listenable: _effectiveFocus,
       builder: (context, _) {
-        final focused = _effectiveFocus.hasFocus;
-        final hasError = widget.error != null && widget.error!.isNotEmpty;
-        // focus 光晕：primary α0.18 blur12（180ms）；error 态随 expense 色
-        final glowColor = hasError ? appColors.expense : palette.primary;
-        return MouseRegion(
-          cursor: WidgetStateMouseCursor.clickable.resolve({}),
-          onEnter: (_) => setState(() => _hover = true),
-          onExit: (_) => setState(() => _hover = false),
-          child: AnimatedContainer(
-            duration: Duration(milliseconds: focused || hasError ? 180 : 120),
-            curve: Curves.easeOut,
-            decoration: BoxDecoration(
-              borderRadius: AppRadius.smAll,
-              border: Border.all(
-                color: _hover && !focused && !hasError
-                    ? Colors.white.withValues(alpha: 0.35)
-                    : Colors.transparent,
-                width: 1,
-              ),
-              boxShadow: focused || hasError
-                  ? [
-                      BoxShadow(
-                        color: glowColor.withValues(alpha: 0.18),
-                        blurRadius: 12,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : const [],
-            ),
-            child: TextField(
-              controller: widget.controller,
-              focusNode: _effectiveFocus,
-              enabled: widget.enabled,
-              keyboardType: widget.keyboardType,
-              inputFormatters: widget.inputFormatters,
-              maxLength: widget.maxLength,
-              maxLines: widget.maxLines,
-              autofocus: widget.autofocus,
-              readOnly: widget.readOnly,
-              onChanged: widget.onChanged,
-              onTap: widget.onTap,
-              decoration: InputDecoration(
-                labelText: widget.label,
-                hintText: widget.hint,
-                errorText: widget.error,
-                prefixIcon: widget.prefix,
-                suffixIcon: widget.suffix,
-                counterText: widget.maxLength == null ? null : '',
-                // hover 描边白 0.35（120ms，v3 §5.2 输入框行）
-                enabledBorder: _hover
-                    ? OutlineInputBorder(
-                        borderRadius: AppRadius.smAll,
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.35),
-                        ),
-                      )
-                    : null,
-              ),
+        final focused = _effectiveFocus.hasFocus && widget.enabled;
+        // 聚焦内高光增强：顶部白色渐变（基准 +0.05，Spec §4.8 聚焦行）
+        final highlightAlpha = focused
+            ? resolveGlassSpec(
+                    level: GlassLevel.g2, brightness: context.tokens.brightness)
+                .topHighlightAlpha +
+                GlassInputTokens.focusHighlightBoost
+            : null;
+        return DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.mdAll,
+            gradient: focused
+                ? LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: const Alignment(0, GlassInputTokens.focusHighlightBoost * 4),
+                    colors: [
+                      Colors.white.withValues(alpha: highlightAlpha!),
+                      Colors.transparent,
+                    ],
+                  )
+                : null,
+          ),
+          child: TextField(
+            controller: widget.controller,
+            focusNode: _effectiveFocus,
+            enabled: widget.enabled,
+            keyboardType: widget.keyboardType,
+            inputFormatters: widget.inputFormatters,
+            maxLength: widget.maxLength,
+            maxLines: widget.maxLines,
+            autofocus: widget.autofocus,
+            readOnly: widget.readOnly,
+            onChanged: widget.onChanged,
+            onTap: widget.onTap,
+            decoration: InputDecoration(
+              labelText: widget.label,
+              hintText: widget.hint,
+              errorText: widget.error,
+              prefixIcon: widget.prefix,
+              suffixIcon: widget.suffix,
+              counterText: widget.maxLength == null ? null : '',
+              // 禁用态降档填充（Spec §4.8：fill α 0.24 浅 / 0.05 深）
+              fillColor: !widget.enabled
+                  ? Colors.white.withValues(
+                      alpha: context.tokens.isDark
+                          ? GlassInputTokens.disabledFillDark
+                          : GlassInputTokens.disabledFillLight)
+                  : null,
             ),
           ),
         );

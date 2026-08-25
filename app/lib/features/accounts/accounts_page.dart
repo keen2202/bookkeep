@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/glass_nav.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
@@ -18,8 +19,8 @@ class AccountsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final viewModel = ref.watch(accountsViewModelProvider);
     final viewer = ref.watch(currentRoleProvider) == 'viewer';
-    return Scaffold(
-      appBar: AppBar(title: const Text('账户')),
+    return GlassScaffold(
+      title: const Text('账户'),
       body: viewModel.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),

@@ -1,10 +1,10 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
-import 'package:bookkeep_app/shared/theme/glass/glass_layers.dart';
-import 'package:bookkeep_app/shared/theme/glass/glass_panel.dart';
-import 'package:bookkeep_app/shared/theme/glass/glass_quality.dart';
+import 'package:bookkeep_app/shared/theme/glass_tokens.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 import 'package:bookkeep_app/shared/widgets/app_button.dart';
 
@@ -16,92 +16,103 @@ Widget _host(Widget child) => MaterialApp(
     );
 
 void main() {
-  testWidgets('glass 变体：L2 填充 + 描边 + 顶部高光（GLS-006）', (tester) async {
-    await tester.pumpWidget(_host(const AppButton.glass(
+  testWidgets('secondary 默认态：G2 fill α0.60 + blur σ20（BackdropFilter 存在）',
+      (tester) async {
+    await tester.pumpWidget(_host(const AppButton.secondary(
       onPressed: doNothing,
-      child: Text('玻璃按钮'),
+      child: Text('次按钮'),
     )));
-    // 面板渲染复用 GlassPanel（D1 单一玻璃出口）
-    expect(find.byType(GlassPanel), findsOneWidget);
-    expect(find.text('玻璃按钮'), findsOneWidget);
-    final palette = findPresetById('t1')!.palette;
-    final dockSpec = resolveGlassSpec(
-      tier: GlassTier.dock,
-      brightness: Brightness.light,
-      palette: palette,
-      quality: GlassQuality.standard,
-    );
-    // GlassPanel 内部 AnimatedContainer 承载 L2 fill
-    expect(
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    final container = tester.widgetList<AnimatedContainer>(
       find.byWidgetPredicate((w) =>
           w is AnimatedContainer &&
           w.decoration is BoxDecoration &&
-          (w.decoration! as BoxDecoration).color == dockSpec.fill),
-      findsOneWidget,
-      reason: 'glass 变体取 dock 层标准档填充',
-    );
+          (w.decoration! as BoxDecoration).color != null),
+    ).first;
+    final fill = (container.decoration! as BoxDecoration).color!;
+    expect(fill, Colors.white.withValues(alpha: GlassButtonTokens.fillDefaultLight));
+    expect(container.duration, GlassMotion.micro);
   });
 
-  testWidgets('primary 变体：品牌色玻璃（primary α0.90 叠加），前景 onPrimary',
+  testWidgets('primary 变体：主题色着色玻璃 α0.75 + 白色实色文字（非实色按钮）',
       (tester) async {
     await tester.pumpWidget(_host(const AppButton.primary(
       onPressed: doNothing,
       child: Text('主操作'),
     )));
     final t1 = findPresetById('t1')!.palette;
-    final dockFill = resolveGlassSpec(
-      tier: GlassTier.dock,
-      brightness: Brightness.light,
-      palette: t1,
-      quality: GlassQuality.standard,
-    ).fill;
-    final expected = Color.alphaBlend(t1.primary.withValues(alpha: 0.90), dockFill);
+    final expectedFill =
+        t1.primary.withValues(alpha: GlassButtonTokens.primaryFillLight);
     expect(
       find.byWidgetPredicate((w) =>
           w is AnimatedContainer &&
           w.decoration is BoxDecoration &&
-          (w.decoration! as BoxDecoration).color == expected),
+          (w.decoration! as BoxDecoration).color == expectedFill),
       findsOneWidget,
+      reason: '主按钮为 primary α0.75 着色玻璃（AC-07 非实色）',
     );
+    // 文字白色实色（样式由按钮内 AnimatedDefaultTextStyle 下发）
+    final paragraph =
+        tester.renderObject<RenderParagraph>(find.text('主操作'));
+    expect(paragraph.text.style!.color, t1.onPrimary);
   });
 
-  testWidgets('hover：描边 α+0.08 / 高光 +0.05（120ms）；press：scrim 加深（150ms）',
+  testWidgets('hover：blur σ24 + fill α0.68 + 内高光 +0.05（150ms 过渡）',
       (tester) async {
-    await tester.pumpWidget(_host(const AppButton.primary(
+    await tester.pumpWidget(_host(const AppButton.secondary(
       onPressed: doNothing,
-      child: Text('三态'),
+      child: Text('悬停'),
     )));
-    Color? fillOf() {
-      final panels = tester.widgetList<AnimatedContainer>(
-        find.byWidgetPredicate((w) =>
-            w is AnimatedContainer && w.decoration is BoxDecoration),
-      );
-      for (final c in panels) {
-        final d = c.decoration! as BoxDecoration;
-        if (d.color != null) return d.color;
-      }
-      return null;
-    }
+    // 模拟鼠标悬停
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await tester.pump();
+    await gesture.moveTo(tester.getCenter(find.text('悬停')));
+    await tester.pumpAndSettle();
+
+    // σ 由 ImageFilter.blur 承载：断言 BackdropFilter 节点仍在且容器填充变 hover 值
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    final container = tester.widgetList<AnimatedContainer>(
+      find.byWidgetPredicate((w) =>
+          w is AnimatedContainer &&
+          w.decoration is BoxDecoration &&
+          (w.decoration! as BoxDecoration).color != null),
+    ).first;
+    expect((container.decoration! as BoxDecoration).color,
+        Colors.white.withValues(alpha: GlassButtonTokens.fillHoverLight));
+    // 内高光 +0.05：前景描边 alpha = G2 基准 + 0.05
+    final fg = (container.foregroundDecoration! as BoxDecoration).border!;
+    expect(fg.top.color.a,
+        closeTo(GlassLevel.g2.highlightInnerAlphaLight + GlassButtonTokens.hoverHighlightBoost, 0.005));
+    expect(container.duration, GlassMotion.micro);
+  });
+
+  testWidgets('pressed：fill α0.48 + scale 0.98；松开归位', (tester) async {
+    await tester.pumpWidget(_host(const AppButton.secondary(
+      onPressed: doNothing,
+      child: Text('按压'),
+    )));
+    Color? fillOf() => tester
+        .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+        .map((c) =>
+            c.decoration is BoxDecoration ? (c.decoration! as BoxDecoration).color : null)
+        .firstWhere((c) => c != null, orElse: () => null);
 
     final before = fillOf();
-    expect(before, isNotNull);
-    // 按压
-    final gesture = await tester.startGesture(tester.getCenter(find.text('三态')));
+    final gesture =
+        await tester.startGesture(tester.getCenter(find.text('按压')));
     await tester.pumpAndSettle();
-    final pressed = fillOf();
-    expect(pressed, isNot(before), reason: '按压填充 scrim 加深');
-    // 松开归位（150ms 过渡）
+    expect(fillOf(),
+        Colors.white.withValues(alpha: GlassButtonTokens.fillPressedLight));
+    final scale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+    expect(scale.scale, 0.98);
     await gesture.up();
     await tester.pumpAndSettle();
     expect(fillOf(), before);
-    // scale 缩放断言：Listener→AnimatedScale 管线存在
-    expect(find.byType(AnimatedScale), findsOneWidget);
-    final scale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
-    expect(scale.duration, const Duration(milliseconds: 150));
-    expect(scale.scale, 1.0);
   });
 
-  testWidgets('focus ring：primary 2px 外环 + α0.18 blur8 光晕（150ms）',
+  testWidgets('focus：2px 外环 primary α0.50（键盘导航可见，无光晕阴影）',
       (tester) async {
     await tester.pumpWidget(_host(const AppButton.primary(
       onPressed: doNothing,
@@ -110,30 +121,21 @@ void main() {
     final primary =
         Theme.of(tester.element(find.text('聚焦'))).colorScheme.primary;
 
-    // 经按钮内部 Focus 节点（取其子孙 context）申请焦点，触发 onFocusChange
     final node = Focus.of(tester.element(find.text('聚焦')));
     node.requestFocus();
     await tester.pumpAndSettle();
 
-    // 外环：常驻 2px padding 的 AnimatedContainer 边框变 primary
-    final ring = tester.widgetList<Container>(find.byType(Container)).where(
-      (c) =>
-          c.decoration is BoxDecoration &&
-          (c.decoration! as BoxDecoration).border != null &&
-          (c.decoration! as BoxDecoration).border!.top.color == primary &&
-          (c.decoration! as BoxDecoration).border!.top.width == 2,
-    );
-    expect(ring, isNotEmpty, reason: 'focus 态出现 primary 2px 外环');
-    // 光晕：primary α0.18 blur8 spread2 阴影
-    final glow = tester.widgetList<AnimatedContainer>(
+    final ringDecos = tester.widgetList<AnimatedContainer>(
       find.byType(AnimatedContainer),
-    ).any((c) => c.decoration is BoxDecoration && ((c.decoration! as BoxDecoration).boxShadow?.isNotEmpty ?? false));
-    expect(glow, isTrue, reason: 'focus 态携带外发光阴影');
-    // 过渡时长 150ms
-    final durations = tester.widgetList<AnimatedContainer>(
-      find.byType(AnimatedContainer),
-    ).map((c) => c.duration);
-    expect(durations, contains(const Duration(milliseconds: 150)));
+    ).where((c) =>
+        c.foregroundDecoration is BoxDecoration &&
+        (c.foregroundDecoration! as BoxDecoration).border != null &&
+        ((c.foregroundDecoration! as BoxDecoration).border!.top.color.a > 0));
+    expect(ringDecos, isNotEmpty, reason: '聚焦态存在前景环');
+    final ringDeco = ringDecos.first.foregroundDecoration! as BoxDecoration;
+    expect(ringDeco.border!.top.width, GlassButtonTokens.focusRingWidth);
+    expect(ringDeco.border!.top.color,
+        primary.withValues(alpha: GlassButtonTokens.focusRingAlpha));
   });
 
   testWidgets('loading：内置 spinner 且点击不触发（防重入）', (tester) async {
@@ -144,22 +146,33 @@ void main() {
       child: const Text('加载中'),
     )));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('加载中'), findsNothing, reason: 'loading 时替换 label');
     await tester.tap(find.byType(AppButton), warnIfMissed: false);
     expect(taps, 0, reason: 'loading 态禁止重复点击');
   });
 
-  testWidgets('disabled：onPressed=null 不响应且降透明度', (tester) async {
+  testWidgets('disabled：fill 降至 0.32、去内高光、不响应', (tester) async {
+    var taps = 0;
+    await tester.pumpWidget(_host(AppButton.secondary(
+      onPressed: () => taps++,
+      child: const Text('禁用'),
+    )));
+    // 重新以 onPressed=null 构建
     await tester.pumpWidget(_host(const AppButton.secondary(
       onPressed: null,
       child: Text('禁用'),
     )));
+    final container = tester.widgetList<AnimatedContainer>(
+      find.byWidgetPredicate((w) =>
+          w is AnimatedContainer &&
+          w.decoration is BoxDecoration &&
+          (w.decoration! as BoxDecoration).color != null),
+    ).first;
+    expect((container.decoration! as BoxDecoration).color,
+        Colors.white.withValues(alpha: GlassButtonTokens.fillDisabledLight));
+    final fg = (container.foregroundDecoration! as BoxDecoration).border!;
+    expect(fg.top.color.a, 0, reason: '禁用去内高光');
     await tester.tap(find.text('禁用'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-    final opacity = tester.widget<Opacity>(
-      find.ancestor(of: find.text('禁用'), matching: find.byType(Opacity)),
-    );
-    expect(opacity.opacity, lessThan(1.0));
+    expect(taps, 0, reason: '禁用不可交互');
   });
 }
 

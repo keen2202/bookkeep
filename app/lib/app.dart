@@ -9,7 +9,6 @@ import 'core/ledger_version.dart';
 import 'data/local/database_provider.dart';
 import 'data/repositories/settings_repository.dart';
 import 'features/accounts/accounts_page.dart';
-import 'features/auth_lock/lock_controller.dart';
 import 'features/auth_lock/lock_gate.dart';
 import 'features/auth_lock/lock_settings.dart';
 import 'features/auto_capture/csv_import/csv_import_page.dart' show AutoCaptureSettingsEntry;
@@ -28,13 +27,10 @@ import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/appearance_page.dart';
 import 'shared/theme/app_icons.dart';
-import 'shared/theme/glass/glass_quality.dart' show glassPrefsProvider;
-import 'shared/theme/glass/ambient_motion.dart';
-import 'shared/theme/glass/glass_panel.dart';
-import 'shared/theme/glass_icon.dart';
-import 'shared/theme/background/app_background.dart';
 import 'shared/theme/theme_controller.dart';
 import 'shared/theme/theme_transition.dart';
+import 'shared/widgets/glass_nav.dart';
+import 'shared/theme/background/app_background.dart';
 
 /// 中文本地化配置（主入口与秒开模式的 MaterialApp 共用）
 const bookkeepLocalizationsDelegates = [
@@ -45,9 +41,8 @@ const bookkeepLocalizationsDelegates = [
 
 const bookkeepSupportedLocales = [Locale('zh', 'CN')];
 
-/// 全局 shell builder（审核 F7/A2）：主题 250ms 过场 + 全局背景 + 隐私锁门禁。
-/// 主入口与秒开入口共用同一拼装链，保证两入口背景/过场观感一致
-/// （AppBackground 无背景时零开销，秒开纳入不产生额外成本，Spec §4.7 D1）。
+/// 全局 shell builder（审核 F7/A2）：主题 200ms 过场（FGDS §9）+ 全局
+/// 纯净背景（Spec §2.2）+ 隐私锁门禁。主入口与秒开入口共用同一拼装链。
 Widget appShellBuilder(BuildContext context, Widget? child) => ThemeTransition(
       child: AppBackground(
         child: lockGateBuilder(context, child),
@@ -69,10 +64,8 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   int _tab = 0;
 
-  /// 环境光路由观察者（app 生命周期单实例；push/pop → 光斑脉冲，GLS-012）
-  static final AmbientRouteObserver _ambientRouteObserver = AmbientRouteObserver(
-    onPulse: (direction) => AmbientMotion.instance.pulse(direction: direction),
-  );
+  /// 主页滚动联动（FG-NAV 分隔线渐显）：滚动 >0 渐显 / 顶部隐藏
+  bool _scrolled = false;
 
   @override
   void initState() {
@@ -131,32 +124,23 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    // 个性化主题：预制主题直出 / 自定义种子色（设置页即时生效，全树热重建）；
-    // v3：玻璃画质档变化同样触发主题整体重建（σ 分支/填充补偿随档生效）
+    // 个性化主题：预制主题直出 / 自定义种子色（设置页即时生效，全树热重建）
     final themeSettings = ref.watch(themeControllerProvider);
-    final glassQuality = ref.watch(
-        glassPrefsProvider.select((p) => p.quality));
-    final themes = materialThemesFor(themeSettings, quality: glassQuality);
+    final themes = materialThemesFor(themeSettings);
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: 'bookkeep',
       locale: const Locale('zh', 'CN'),
       localizationsDelegates: bookkeepLocalizationsDelegates,
       supportedLocales: bookkeepSupportedLocales,
-      // UI 重构（Spec §4）：预制主题完整直出；custom 退回 fromSeed 旧路径
+      // 预制主题完整直出；custom 退回 fromSeed 派生主色路径
       theme: themes.theme,
       darkTheme: themes.darkTheme,
       themeMode: themes.mode,
-      // v3（GLS-012）：环境光路由观察者——push/pop 触发光斑位移脉冲
-      navigatorObservers: [_ambientRouteObserver],
-      // 主题切换 250ms 过场（BK-UI-004）+ 全局背景（BK-UI-014，位于
-      // Navigator 之上，二级页/弹层共享同一背景）+ 隐私锁门禁；
+      // 主题切换 200ms 过场（FGDS §9/Spec §6 状态切换档）+ 全局纯净背景
+      // （位于 Navigator 之上，二级页/弹层共享同一背景）+ 隐私锁门禁；
       // 与秒开入口共用 appShellBuilder（审核 F7/A2）
-      // v3（GLS-013）：锁定态作用域注入（AmbientGradient 据此静止）
-      builder: (context, child) => AmbientLockScope(
-            locked: ref.watch(lockControllerProvider.select((s) => s.locked)),
-            child: appShellBuilder(context, child),
-          ),
+      builder: (context, child) => appShellBuilder(context, child),
       // Builder 提供 Navigator 内 context（state.context 在 MaterialApp 之上，无法导航）
       home: Builder(
         builder: (navContext) {
@@ -165,51 +149,61 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
           ref.watch(serverBooksProvider);
           final viewer = ref.watch(currentRoleProvider) == 'viewer';
           return Scaffold(
-            // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range/_hideAmounts）
-            body: IndexedStack(
-              index: _tab,
-              children: const [
-                BillsPage(),
-                CategoriesPage(),
-                RecurringPage(),
-                ReportsPage(),
-                CalendarPage(),
-              ],
+            body: NotificationListener<UserScrollNotification>(
+              onNotification: (n) {
+                final scrolled = n.metrics.pixels > 0;
+                if (scrolled != _scrolled) {
+                  setState(() => _scrolled = scrolled);
+                }
+                return false;
+              },
+              // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range/_hideAmounts）
+              child: IndexedStack(
+                index: _tab,
+                children: const [
+                  BillsPage(),
+                  CategoriesPage(),
+                  RecurringPage(),
+                  ReportsPage(),
+                  CalendarPage(),
+                ],
+              ),
             ),
             floatingActionButton: viewer
                 ? null
-                : FloatingActionButton(
-                    onPressed: () => _openQuickEntry(navContext),
+                : GlassFab(
+                    icon: Icons.add,
                     tooltip: '记一笔',
-                    child: const GlassIcon(icon: Icons.add, size: 22),
+                    onTap: () => _openQuickEntry(navContext),
                   ),
-            bottomNavigationBar: NavigationBar(
+            bottomNavigationBar: GlassBottomBar(
               selectedIndex: _tab,
-              onDestinationSelected: (i) {
-                // v3（GLS-012）：Tab 切换触发环境光呼吸（×0.5→1.0，500ms）
-                AmbientMotion.instance.breathe();
-                setState(() => _tab = i);
-              },
-              destinations: [
+              showDivider: _scrolled,
+              onTap: (i) => setState(() => _tab = i),
+              items: [
                 for (final m in AppModule.values)
-                  NavigationDestination(
-                    icon: GlassIcon(icon: moduleIcon(m, themeSettings.iconPack), size: 20),
+                  GlassNavItem(
+                    icon: moduleIcon(m, themeSettings.iconPack),
                     label: m.label,
                   ),
               ],
             ),
-            // 审查 U-1：单 AppBar，按 Tab 配置标题与动作（页面动作经顶层函数组装）
-            appBar: AppBar(
-              title: Text(_tabTitles[_tab]),
-              actions: [
-                ..._tabActions(navContext),
-                const BookSwitcher(),
-                GlassIconButton(
-                  icon: Icons.settings_outlined,
-                  tooltip: '设置',
-                  onPressed: () => _showSettings(navContext),
-                ),
-              ],
+            // FG-NAV（BK-FG-021）：G3 吸顶玻璃栏；滚动后分隔线渐显
+            appBar: PreferredSize(
+              preferredSize: const Size.fromHeight(kToolbarHeight),
+              child: GlassAppBar(
+                title: Text(_tabTitles[_tab]),
+                showDivider: _scrolled,
+                actions: [
+                  ..._tabActions(navContext),
+                  const BookSwitcher(),
+                  GlassAppBarAction(
+                    icon: Icons.settings_outlined,
+                    tooltip: '设置',
+                    onPressed: () => _showSettings(navContext),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -256,7 +250,7 @@ class _SettingsSheet extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.palette_outlined),
                 title: const Text('外观'),
-                subtitle: const Text('主题方案 / 图标风格 / 个性背景'),
+                subtitle: const Text('主题方案 / 图标风格'),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AppearancePage()),
                 ),

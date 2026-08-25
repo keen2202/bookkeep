@@ -3,13 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/theme/app_icons.dart';
 import '../../shared/theme/app_theme.dart';
-import '../../shared/theme/contrast_guard.dart';
-import '../../shared/theme/glass/glass_quality.dart' as gq;
-import '../../shared/theme/glass_icon.dart';
-import '../../shared/theme/background/app_background.dart';
-import '../../shared/theme/background/background_controller.dart';
-import '../../shared/theme/background/background_settings.dart';
-import '../../shared/theme/background/luminance.dart';
+import '../../shared/theme/glass_prefs.dart';
+import '../../shared/theme/glass_tokens.dart';
+import '../../shared/widgets/glass_icon.dart';
 import '../../shared/theme/color_picker_dialog.dart';
 import '../../shared/theme/theme_controller.dart';
 import '../../shared/theme/theme_presets.dart';
@@ -18,22 +14,24 @@ import '../../shared/theme/tokens.dart';
 import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/app_sheet.dart';
-import '../../shared/widgets/app_snack.dart';
+import '../../shared/widgets/glass_nav.dart';
 
-/// "外观"设置页（BK-UI-015，Spec §7；Glassmorphism v3 GLS-014 扩容）：
-/// 主题方案（8 套预制网格 + 自定义入口）/ 图标风格 / 个性背景（开关/换图/
-/// 遮罩模式滑杆 + 实时预览 + 对比度评级/模糊开关）/ 玻璃质感（画质三档）/
-/// 环境光（动效开关 / 光斑强度三档 + ContrastGuard 钳制徽标 / 导航脉冲）。
+/// "外观"设置页（FGDS v1.0 收敛版）：
+/// 主题方案（8 套预制网格 + 自定义入口）/ 图标风格 / 玻璃质感（磨砂
+/// 降级开关，fill α+0.10 补偿）。
+///
+/// 旧「个性背景」（背景图/遮罩/模糊）与「环境光」（光斑动效/强度/钳制）
+/// 已随旧系统拆除——纯净背景为 Spec §2.2 硬约束、禁止背景图与光斑
+/// （设计文档 §3，AC-02）。
 class AppearancePage extends ConsumerWidget {
   const AppearancePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeSettings = ref.watch(themeControllerProvider);
-    final background = ref.watch(backgroundControllerProvider).valueOrNull;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('外观')),
+    return GlassScaffold(
+      title: const Text('外观'),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
@@ -43,17 +41,9 @@ class AppearancePage extends ConsumerWidget {
           _SectionTitle('图标风格'),
           _IconPackSection(current: themeSettings),
           const SizedBox(height: AppSpacing.lg),
-          _SectionTitle('个性背景'),
-          _BackgroundSection(
-            settings: background ?? BackgroundSettings.defaults,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          // Glassmorphism v3（GLS-014）：两组新设置
+          // FGDS：玻璃质感唯一可调项——低性能磨砂降级（BK-FG-003）
           const _SectionTitle('玻璃质感'),
-          const _GlassQualitySection(),
-          const SizedBox(height: AppSpacing.lg),
-          const _SectionTitle('环境光'),
-          const _AmbientLightSection(),
+          const _GlassBlurSection(),
         ],
       ),
     );
@@ -105,7 +95,7 @@ class _ThemePresetGrid extends ConsumerWidget {
     );
   }
 
-  /// 自定义种子色流程（保留旧能力，Spec D3）：种子色色板 + 取色器 + 外观模式
+  /// 自定义种子色流程（保留旧能力）：种子色色板 + 取色器 + 外观模式
   Future<void> _openCustomSheet(BuildContext context, WidgetRef ref) async {
     final currentSettings = ref.read(themeControllerProvider);
     final controller = ref.read(themeControllerProvider.notifier);
@@ -141,8 +131,8 @@ class _PresetCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          borderRadius: AppRadius.mdAll,
-          // 选中态：primary 2px 描边 + 右上角对勾
+          borderRadius: AppRadius.cardAll,
+          // 选中态：primary 外环（FG-SEL 描边语义的简化预览形态）
           border: selected
               ? Border.all(color: context.palette.primary, width: 2)
               : null,
@@ -150,29 +140,32 @@ class _PresetCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 色板缩略预览（Glassmorphism v2）：环境光渐变底 + 磨砂玻璃
-            // 卡片示意 + 主色/收支语义色示意
+            // 色板缩略预览：纯净底色（Spec §2.2 白名单底色）+ G2 玻璃面板示意
             Container(
               height: 40,
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: p.ambient.isEmpty ? [p.background] : p.ambient,
-                ),
+                color: p.background,
                 borderRadius: AppRadius.smAll,
-                border: Border.all(color: p.border),
+                border: Border.all(color: p.border, width: 0.5),
               ),
               child: Row(
                 children: [
+                  // G2 白玻璃示意（fill 取层级表浅/深值）
                   Container(
                     width: 32,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: p.glassFill,
+                      color: Colors.white.withValues(
+                        alpha: p.isDark
+                            ? GlassLevel.g2.fillAlphaDark
+                            : GlassLevel.g2.fillAlphaLight,
+                      ),
                       borderRadius: const BorderRadius.all(Radius.circular(4)),
-                      border: Border.all(color: p.glassBorder),
+                      border: Border.all(
+                        color: p.isDark ? Colors.white.withValues(alpha: 0.30) : Colors.black.withValues(alpha: 0.06),
+                        width: 0.5,
+                      ),
                     ),
                     padding: const EdgeInsets.all(4),
                     child: Row(
@@ -240,10 +233,10 @@ class _CustomCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: AppRadius.mdAll,
+          borderRadius: AppRadius.cardAll,
           border: Border.all(
             color: selected ? palette.primary : palette.border,
-            width: selected ? 2 : 1,
+            width: selected ? 2 : 0.5,
           ),
         ),
         child: Column(
@@ -316,7 +309,6 @@ class _CustomThemeSheetState extends State<_CustomThemeSheet> {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        // 审核 F4：自定义颜色入口收敛至 AppButton.secondary（icon 并入 child Row）
         AppButton.secondary(
           onPressed: () async {
             final picked = await ColorPickerDialog.show(context, initial: _seed);
@@ -374,7 +366,7 @@ class _SeedDot extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 图标风格（现有能力迁移保留，Spec D7）
+// 图标风格（现有能力迁移保留）
 // ---------------------------------------------------------------------------
 class _IconPackSection extends ConsumerWidget {
   const _IconPackSection({required this.current});
@@ -396,7 +388,7 @@ class _IconPackSection extends ConsumerWidget {
           onSelectionChanged: (s) => controller.setIconPack(s.first),
         ),
         const SizedBox(height: AppSpacing.sm),
-        // 模块图标预览（账单/分类/周期记账/报表/日历）
+        // 模块图标预览（账单/分类/周期记账/报表/日历）：36 档 FG-ICON 容器
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -404,7 +396,7 @@ class _IconPackSection extends ConsumerWidget {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GlassIcon(icon: moduleIcon(module, current.iconPack), size: 20),
+                  GlassIcon(icon: moduleIcon(module, current.iconPack)),
                   const SizedBox(height: AppSpacing.xs),
                   Text(module.label, style: context.text.labelSmall),
                 ],
@@ -417,440 +409,26 @@ class _IconPackSection extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 个性背景（Spec §7）：预览 / 开关 / 换图与恢复 / 遮罩滑杆 + 评级 / 模糊
+// 玻璃质感（BK-FG-003）：唯一可调项——磨砂降级开关（fill α +0.10 补偿）
 // ---------------------------------------------------------------------------
-class _BackgroundSection extends ConsumerWidget {
-  const _BackgroundSection({required this.settings});
-
-  final BackgroundSettings settings;
+class _GlassBlurSection extends ConsumerWidget {
+  const _GlassBlurSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final controller = ref.read(backgroundControllerProvider.notifier);
-    final imageL = ref.watch(backgroundLuminanceProvider).valueOrNull;
-    final dark = context.tokens.isDark;
-    final visuals = backgroundVisuals(
-      settings: settings,
-      imageL: imageL,
-      palette: context.palette,
-      dark: dark,
-    );
-    final imagePath = settings.imagePath;
-    final hasImage = settings.enabled && imagePath != null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 实时预览（遮罩后有效底色 + 透明度读数；未选图态为可点击占位，
-        // 点击等同「选择背景图片」，审核 F1）
-        _BackgroundPreview(
-          settings: settings,
-          imageL: imageL,
-          alpha: visuals.alpha,
-          onPick: () => _pickAndApply(context, ref),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('使用背景图片'),
-          subtitle: Text(
-            imagePath == null ? '请先选择一张相册图片' : '图片仅存本地，不同步不备份',
-            style: context.text.bodySmall,
-          ),
-          value: settings.enabled,
-          onChanged: imagePath == null
-              ? null
-              : (v) => controller.setEnabled(v),
-        ),
-        // 审核 F1/R2 三态主操作区：
-        // ① 未选图（imagePath == null）：主按钮「选择背景图片」兜底首次选图
-        //    入口（旧实现"更换图片"不渲染 + 开关禁用，功能死锁）；
-        // ② 已选图：更换图片 + 恢复默认（现状不变）；开关可用
-        if (imagePath == null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          AppButton.primary(
-            block: true,
-            onPressed: () => _pickAndApply(context, ref),
-            child: const Text('选择背景图片'),
-          ),
-        ] else ...[
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton.secondary(
-                  child: const Text('更换图片'),
-                  onPressed: () => _pickAndApply(context, ref),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: AppButton.text(
-                  child: const Text('恢复默认'),
-                  onPressed: () => controller.clear(),
-                ),
-              ),
-            ],
-          ),
-        ],
-        if (hasImage) ...[
-          const SizedBox(height: AppSpacing.md),
-          Text('遮罩', style: context.text.titleSmall),
-          const SizedBox(height: AppSpacing.sm),
-          SegmentedButton<OverlayMode>(
-            segments: [
-              for (final mode in OverlayMode.values)
-                ButtonSegment(value: mode, label: Text(mode.label)),
-            ],
-            selected: {settings.overlayMode},
-            onSelectionChanged: (s) =>
-                controller.setOverlayMode(s.first),
-          ),
-          if (settings.overlayMode == OverlayMode.manual) ...[
-            const SizedBox(height: AppSpacing.sm),
-            _ManualAlphaSlider(settings: settings),
-            const SizedBox(height: AppSpacing.xs),
-            _ContrastRating(visuals: visuals),
-          ] else ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text('智能模式：按图片亮度自动调节，保证文字对比度',
-                style: context.text.bodySmall),
-          ],
-          const SizedBox(height: AppSpacing.sm),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('背景模糊'),
-            subtitle: Text('柔化背景细节，增强文字可读性（8px）',
-                style: context.text.bodySmall),
-            value: settings.blurEnabled,
-            onChanged: (v) => controller.setBlur(v),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Future<void> _pickAndApply(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(backgroundControllerProvider.notifier);
-    final result = await controller.pickAndApply();
-    if (!context.mounted) return;
-    if (result.isSuccess) {
-      AppSnack.success(context, '背景图片已应用');
-    } else {
-      AppSnack.error(context, result.message);
-    }
-  }
-}
-
-/// 遮罩后底色实时预览；未选图态渲染占位（surfaceVariant 底 + 图标 + 文案），
-/// 点击等同「选择背景图片」（审核 F1）。渲染侧经 [backgroundImageFileProvider]
-/// 消费绝对路径文件（审核 F2/R1，消除相对路径读取）。
-class _BackgroundPreview extends ConsumerWidget {
-  const _BackgroundPreview({
-    required this.settings,
-    required this.imageL,
-    required this.alpha,
-    required this.onPick,
-  });
-
-  final BackgroundSettings settings;
-  final double? imageL;
-  final double alpha;
-
-  /// 未选图态点击（等同「选择背景图片」主按钮）
-  final VoidCallback onPick;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = context.palette;
-    final imageFile = ref.watch(backgroundImageFileProvider).valueOrNull;
-    final imageRevision = ref.watch(backgroundRevisionProvider);
-    final hasImage = imageFile != null;
-    final effColor = hasImage
-        ? Color.lerp(
-            // 图（近似中灰占位）+ 主题底色按 α 混合（真实图在预览区直接渲染）
-            Colors.white,
-            palette.background,
-            alpha,
-          )!
-        : palette.surfaceVariant;
-
-    return ClipRRect(
-      borderRadius: AppRadius.mdAll,
-      child: GestureDetector(
-        onTap: hasImage ? null : onPick,
-        child: Container(
-          height: 96,
-          decoration: BoxDecoration(
-            color: effColor,
-            borderRadius: AppRadius.mdAll,
-            border: Border.all(color: palette.border),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (hasImage)
-                Image(
-                  image: ResizeImage(
-                    RevisionFileImage(imageFile, revision: imageRevision),
-                    width: 400,
-                  ),
-                  key: ValueKey('bg-preview-$imageRevision'),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                ),
-              if (hasImage)
-                ColoredBox(
-                  color: palette.background.withValues(alpha: alpha),
-                ),
-              if (!hasImage)
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.image_outlined,
-                        size: 28,
-                        color: palette.textSecondary,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text('未设置背景', style: context.text.bodySmall),
-                    ],
-                  ),
-                ),
-              // 预览示意卡片（玻璃磨砂质感 + 文字可读性示意）
-              if (hasImage)
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    child: Container(
-                      width: 120,
-                      padding: const EdgeInsets.all(AppSpacing.xs),
-                      decoration: BoxDecoration(
-                        color: palette.glassFill,
-                        borderRadius: AppRadius.smAll,
-                        border: Border.all(color: palette.glassBorder),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 4,
-                            color: palette.textPrimary,
-                          ),
-                          const SizedBox(height: 3),
-                          Container(
-                            width: 24,
-                            height: 3,
-                            color: palette.textSecondary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              // 遮罩透明度读数
-              if (hasImage)
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: palette.surface.withValues(alpha: 0.85),
-                        borderRadius: AppRadius.pillAll,
-                      ),
-                      child: Text(
-                        '遮罩 ${(alpha * 100).round()}%',
-                        style: context.text.labelSmall,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+    final prefs = ref.watch(glassPrefsProvider);
+    final controller = ref.read(glassPrefsProvider.notifier);
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('真实磨砂'),
+      subtitle: Text(
+        prefs.blurEnabled
+            ? '容器级组件实时模糊背景（同屏 ≤20 处）；关闭后以填充加粗补偿'
+            : '已关闭：玻璃改为半透明填充（α +${(kBlurDegradeFillCompensation * 100).round()}% 补偿），低端机更流畅',
+        style: context.text.bodySmall,
       ),
-    );
-  }
-}
-
-/// 手动模式滑杆（0–92%，实时生效并持久化，Spec §2.3/§5.3）
-class _ManualAlphaSlider extends ConsumerWidget {
-  const _ManualAlphaSlider({required this.settings});
-
-  final BackgroundSettings settings;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Slider(
-      value: settings.manualAlpha.clamp(0.0, kOverlayAlphaCap),
-      min: 0,
-      max: kOverlayAlphaCap,
-      divisions: 23, // 4% 步进
-      label: '${(settings.manualAlpha * 100).round()}%',
-      onChanged: (v) => ref
-          .read(backgroundControllerProvider.notifier)
-          .setOverlayMode(OverlayMode.manual, manualAlpha: v),
-    );
-  }
-}
-
-/// 对比度评级（手动模式提示，Spec §5.3：优 ≥4.5 / 良 ≥3.0 / 差 <3.0）
-class _ContrastRating extends StatelessWidget {
-  const _ContrastRating({required this.visuals});
-
-  final BackgroundVisuals visuals;
-
-  @override
-  Widget build(BuildContext context) {
-    final textL = relativeLuminance(context.palette.textPrimary);
-    final ratio = contrastRatioFromLuminance(textL, visuals.effLum);
-    final (label, color) = ratio >= 4.5
-        ? ('优', context.appColors.income)
-        : ratio >= 3.0
-            ? ('良', context.appColors.warning)
-            : ('差', context.appColors.expense);
-    return Row(
-      children: [
-        Text('文字对比度：', style: context.text.bodySmall),
-        Text('$label（${ratio.toStringAsFixed(1)}:1）',
-            style: context.text.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            )),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 玻璃质感（Glassmorphism v3，GLS-014）：画质三档，即时生效并持久化
-// ---------------------------------------------------------------------------
-class _GlassQualitySection extends ConsumerWidget {
-  const _GlassQualitySection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final prefs = ref.watch(gq.glassPrefsProvider);
-    final controller = ref.read(gq.glassPrefsProvider.notifier);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SegmentedButton<gq.GlassQuality>(
-          segments: [
-            for (final q in gq.GlassQuality.values)
-              ButtonSegment(value: q, label: Text(q.label)),
-          ],
-          selected: {prefs.quality},
-          onSelectionChanged: (s) => controller.setQuality(s.first),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          // Spec §7 说明文案
-          prefs.quality == gq.GlassQuality.saver
-              ? '省电模式将关闭环境光动效并降低弹层模糊'
-              : prefs.quality.description,
-          style: context.text.bodySmall?.copyWith(
-            color: context.palette.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 环境光（GLS-014）：动效开关 / 光斑强度三档 + 钳制徽标 / 页面切换位移
-// ---------------------------------------------------------------------------
-class _AmbientLightSection extends ConsumerWidget {
-  const _AmbientLightSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final prefs = ref.watch(gq.glassPrefsProvider);
-    final controller = ref.read(gq.glassPrefsProvider.notifier);
-    final palette = context.palette;
-    // ContrastGuard 钳制徽标（Spec §4.5）：clamp 生效时向用户说明
-    final effectiveIntensity = ContrastGuard.effectiveIntensity(
-      palette: palette,
-      requested: prefs.intensity,
-    );
-    final clamped = effectiveIntensity != prefs.intensity;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('动态漂移'),
-          subtitle: Text('环境光斑沿椭圆轨道缓慢游移（36s/圈）',
-              style: context.text.bodySmall),
-          value: prefs.motionEnabled,
-          onChanged: (v) => controller.setMotionEnabled(v),
-        ),
-        Text('光斑强度', style: context.text.titleSmall),
-        const SizedBox(height: AppSpacing.sm),
-        SegmentedButton<gq.AmbientIntensity>(
-          segments: [
-            for (final i in gq.AmbientIntensity.values)
-              ButtonSegment(value: i, label: Text(i.label)),
-          ],
-          selected: {prefs.intensity},
-          onSelectionChanged: (s) => controller.setIntensity(s.first),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Row(
-          children: [
-            if (clamped) ...[
-              // 「已自动限制强度以保持对比度」徽标（Spec §7）
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: context.appColors.warning.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: context.appColors.warning.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Text(
-                  '已自动限制强度以保持对比度',
-                  style: context.text.labelSmall?.copyWith(
-                    color: context.appColors.warning,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-            ],
-            Expanded(
-              child: Text(
-                '个性化让位于可读性时自动钳制（WCAG AA）',
-                style: context.text.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('页面切换位移'),
-          subtitle: Text('push/pop 时全体光斑沿导航方向位移 +3%',
-              style: context.text.bodySmall),
-          value: prefs.navPulse,
-          onChanged: (v) => controller.setNavPulse(v),
-        ),
-      ],
+      value: prefs.blurEnabled,
+      onChanged: (v) => controller.setBlurEnabled(v),
     );
   }
 }

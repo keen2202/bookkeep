@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
 import '../reports/charts/report_charts.dart' show chartAreaGradient, glassGridData;
-import '../../shared/theme/glass/glass_layers.dart';
-import '../../shared/theme/glass/glass_panel.dart';
+import '../../shared/theme/glass_tokens.dart';
+import '../../shared/widgets/glass_panel.dart';
 import '../auth_lock/lock_controller.dart';
 import 'calendar_page.dart' show calendarDailyTotalsProvider;
 
@@ -175,12 +175,11 @@ class CashflowChart extends ConsumerWidget {
   }
 
   Widget _shell(BuildContext context, String title, Widget child) {
-    // Glassmorphism v3（GLS-007）：容器统一 GlassPanel(panel, innerSheen)
+    // FGDS：图表容器统一 GlassPanel（G2，Spec §4.5）
     return Padding(
       padding: const EdgeInsets.all(8),
       child: GlassPanel(
-        tier: GlassTier.panel,
-        innerSheen: true,
+        level: GlassLevel.g2,
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

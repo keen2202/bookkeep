@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/glass_tokens.dart';
 import '../theme/tokens.dart';
+import 'glass_panel.dart';
 
-/// 统一底部弹层（设计文档 §3.4）：顶部圆角 lg、拖拽柄 32×4、背板 scrim 54%
-/// （背板色由 BottomSheetThemeData.modalBarrierColor 提供），下滑关闭。
-/// showModalBottomSheet 的全项目收敛出口（Spec §6）。
+/// FG-OVL 统一底部弹层（Spec §4.7；BK-FG-022）：G4 玻璃面板（σ36、fill
+/// 0.80/0.24）、顶部圆角 20、底部贴边、背板遮罩 α0.32；入场位移沿用
+/// showModalBottomSheet 默认 250ms 动画（Spec §6 浮层进出）。
+/// showModalBottomSheet 的全项目收敛出口。
 class AppSheet extends StatelessWidget {
   const AppSheet({
     super.key,
@@ -25,46 +28,53 @@ class AppSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        // 键盘弹起时整体上移
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 拖拽柄 32×4
-            Padding(
-              padding: const EdgeInsets.only(
-                  top: AppSpacing.sm, bottom: AppSpacing.xs),
-              child: Container(
-                width: 32,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.textDisabled,
-                  borderRadius: AppRadius.pillAll,
+    return GlassPanel(
+      level: GlassLevel.g4,
+      borderRadius: AppRadius.sheetTop,
+      padding: EdgeInsets.zero,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          // 键盘弹起时整体上移
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 拖拽柄 32×4
+              Padding(
+                padding: const EdgeInsets.only(
+                    top: AppSpacing.sm, bottom: AppSpacing.xs),
+                child: Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: palette.textTertiary,
+                    borderRadius: AppRadius.pillAll,
+                  ),
                 ),
               ),
-            ),
-            if (title != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                child: Text(title!, style: context.text.titleLarge),
+              if (title != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: Text(title!, style: context.text.titleLarge),
+                ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: padding,
+                  child: child,
+                ),
               ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: padding,
-                child: child,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// 弹出统一底部弹层（isScrollControlled，内容自适应高度）
+/// 弹出统一底部弹层（isScrollControlled，内容自适应高度）；
+/// 遮罩为 Spec §2.3 glass.scrim α0.32。
 Future<T?> showAppSheet<T>(
   BuildContext context, {
   String? title,
@@ -75,6 +85,9 @@ Future<T?> showAppSheet<T>(
     context: context,
     isScrollControlled: true,
     useRootNavigator: useRootNavigator,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    barrierColor: GlassBackground.scrimOf(Colors.black),
     builder: (_) => AppSheet(title: title, child: child),
   );
 }

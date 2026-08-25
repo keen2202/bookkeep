@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// 主题切换过场（Spec §4.5 / BK-UI-004）：MaterialApp.builder 内包一层，
-/// ThemeData 变化时以 250ms 色彩插值过渡（ThemeDataTween 覆盖 ColorScheme、
-/// TextTheme 及 AppColors/AppTokens 等 ThemeExtension 的 lerp）。
+/// 主题切换过场（FGDS v1.0，Spec §6 状态切换档 / 设计文档 §9）：
+/// MaterialApp.builder 内包一层，ThemeData 变化时以 200ms 色彩插值过渡
+/// （ThemeDataTween 覆盖 ColorScheme、TextTheme 及 AppColors/AppTokens 等
+/// ThemeExtension 的 lerp），禁止闪变。
 class ThemeTransition extends StatefulWidget {
   const ThemeTransition({super.key, required this.child});
 
   final Widget child;
 
-  /// 过场时长（设计文档 §3.4：主题切换 250ms）
-  static const duration = Duration(milliseconds: 250);
+  /// 过场时长（Spec §6：状态切换 200ms）
+  static const duration = Duration(milliseconds: 200);
 
   @override
   State<ThemeTransition> createState() => _ThemeTransitionState();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/glass_nav.dart';
 import '../sync/sync_api.dart';
 import 'books_api.dart';
 import 'books_page.dart' show accessToken, booksApi;
@@ -126,8 +127,8 @@ class _MemberManagerSheetState extends State<MemberManagerSheet> {
   @override
   Widget build(BuildContext context) {
     final members = _members;
-    return Scaffold(
-      appBar: AppBar(title: const Text('成员管理')),
+    return GlassScaffold(
+      title: const Text('成员管理'),
       body: _busy
           ? const Center(child: CircularProgressIndicator())
           : _error != null

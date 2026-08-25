@@ -10,6 +10,7 @@ import 'package:bookkeep_app/features/auth_lock/lock_gate.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/shared/theme/background/app_background.dart';
 import 'package:bookkeep_app/shared/theme/theme_transition.dart';
+import 'package:bookkeep_app/shared/widgets/glass_nav.dart';
 
 import 'categories_page_test.dart' show testSeed;
 
@@ -28,9 +29,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.byType(BookkeepApp), findsOneWidget);
-    // 默认主页为账单详情页：AppBar 标题为「账单」
+    // 默认主页为账单详情页：G3 吸顶玻璃栏标题为「账单」（FG-NAV）
     expect(
-      find.descendant(of: find.byType(AppBar), matching: find.text('账单')),
+      find.descendant(of: find.byType(GlassAppBar), matching: find.text('账单')),
       findsOneWidget,
     );
     expect(find.text('分类'), findsWidgets);

@@ -24,7 +24,7 @@ import 'features/auth_lock/lock_controller.dart';
 import 'features/books/books_providers.dart';
 import 'features/recurring/recurring_service.dart';
 import 'features/sync/sync_providers.dart';
-import 'shared/theme/glass/glass_quality.dart';
+import 'shared/theme/glass_prefs.dart';
 import 'shared/theme/theme_controller.dart';
 
 Future<void> main() async {

@@ -6,6 +6,7 @@ import '../../core/constants/constants.dart';
 import '../../core/ledger_version.dart';
 import '../../data/local/database.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/glass_nav.dart';
 import 'currency_providers.dart';
 
 /// 汇率管理（审查 F-8）：手动录入/修改汇率；未设置汇率显式标注，
@@ -16,8 +17,8 @@ class CurrencyManagePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currencies = ref.watch(currenciesViewModelProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('汇率管理')),
+    return GlassScaffold(
+      title: const Text('汇率管理'),
       body: currencies.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),

@@ -1,8 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 
-import '../../shared/theme/background/background_settings.dart';
-import '../../shared/theme/glass/glass_quality.dart';
+import '../../shared/theme/glass_prefs.dart';
 import '../../shared/theme/theme_settings.dart';
 import '../local/database.dart';
 
@@ -18,19 +17,12 @@ class SettingsRepository {
   // UI 重构（Spec §2.2/D5）：预制主题键；旧用户无此键时按旧 seed_color 落 'custom'
   static const _themePresetIdKey = 'theme_preset_id';
 
-  // UI 重构（Spec §2.3/D5）：背景系统键（图片仅存本地，不同步不备份）
-  static const _bgEnabledKey = 'bg_enabled';
-  static const _bgImagePathKey = 'bg_image_path';
-  static const _bgOverlayModeKey = 'bg_overlay_mode';
-  static const _bgOverlayAlphaKey = 'bg_overlay_alpha';
-  static const _bgBlurKey = 'bg_blur';
+  // 旧背景图系统五键（bg_*）随纯净背景约束一并废弃（Spec §2.2，AC-02）：
+  // 历史键读取时忽略、不再写入。
 
-  // 玻璃拟态 v3（GLS-014）：玻璃质感与环境光 5 个新键（Spec §4.3/§2.3）
-  static const _glassQualityKey = 'glass_quality';
-  static const _ambientMotionEnabledKey = 'ambient_motion_enabled';
-  static const _ambientIntensityKey = 'ambient_intensity';
-  static const _ambientNavPulseKey = 'ambient_nav_pulse';
-  static const _ambientImagePulseKey = 'ambient_image_pulse';
+  // FGDS v1.0（BK-FG-003）：玻璃降级开关键；旧 v3 的 glass_quality /
+  // ambient_* 四键已废弃——读取时忽略、不再写入（Spec §8 清除清单，AC-08）
+  static const _glassBlurEnabledKey = 'glass_blur_enabled';
 
   Future<bool> secondsOpenMode() async {
     final rows =
@@ -96,81 +88,24 @@ class SettingsRepository {
     });
   }
 
-  /// 背景设置（Spec §2.3）：全键缺失回退默认（无背景图）
-  Future<BackgroundSettings> backgroundSettings() async {
-    final rows = await (db.select(db.appMeta)
-          ..where((t) => t.key.isIn({
-                _bgEnabledKey,
-                _bgImagePathKey,
-                _bgOverlayModeKey,
-                _bgOverlayAlphaKey,
-                _bgBlurKey,
-              })))
-        .get();
-    final map = {for (final r in rows) r.key: r.value};
-    final rawPath = map[_bgImagePathKey];
-    return BackgroundSettings(
-      enabled: map[_bgEnabledKey] == 'true',
-      // 空串（clear 后写入的占位）与缺失键统一归一为 null
-      imagePath: (rawPath == null || rawPath.isEmpty) ? null : rawPath,
-      overlayMode: map[_bgOverlayModeKey] == 'manual'
-          ? OverlayMode.manual
-          : OverlayMode.auto,
-      manualAlpha: double.tryParse(map[_bgOverlayAlphaKey] ?? '') ??
-          BackgroundSettings.defaults.manualAlpha,
-      blurEnabled: map[_bgBlurKey] != 'false',
-    );
-  }
-
-  Future<void> setBackgroundSettings(BackgroundSettings settings) async {
-    await db.batch((batch) {
-      void put(String key, String value) {
-        batch.insert(db.appMeta, AppMetaCompanion.insert(key: key, value: value),
-            onConflict: DoUpdate((_) => AppMetaCompanion(value: Value(value))));
-      }
-
-      put(_bgEnabledKey, '${settings.enabled}');
-      put(_bgImagePathKey, settings.imagePath ?? '');
-      put(_bgOverlayModeKey, settings.overlayMode.name);
-      put(_bgOverlayAlphaKey, '${settings.manualAlpha}');
-      put(_bgBlurKey, '${settings.blurEnabled}');
-    });
-  }
-
-  /// 玻璃质感 + 环境光设置（Glassmorphism v3，GLS-014）：
-  /// 全键缺失回退默认（standard / 开动效 / standard 强度 / 脉冲开 / 图像脉冲关）
+  /// 玻璃偏好（FGDS v1.0）：键缺失回退默认（启用磨砂）
   Future<GlassPrefs> glassPrefs() async {
     final rows = await (db.select(db.appMeta)
-          ..where((t) => t.key.isIn({
-                _glassQualityKey,
-                _ambientMotionEnabledKey,
-                _ambientIntensityKey,
-                _ambientNavPulseKey,
-                _ambientImagePulseKey,
-              })))
+          ..where((t) => t.key.equals(_glassBlurEnabledKey)))
         .get();
     final map = {for (final r in rows) r.key: r.value};
-    return GlassPrefs(
-      quality: GlassQuality.parse(map[_glassQualityKey]),
-      motionEnabled: map[_ambientMotionEnabledKey] != 'false',
-      intensity: AmbientIntensity.parse(map[_ambientIntensityKey]),
-      navPulse: map[_ambientNavPulseKey] != 'false',
-      imagePulse: map[_ambientImagePulseKey] == 'true',
-    );
+    return GlassPrefs(blurEnabled: map[_glassBlurEnabledKey] != 'false');
   }
 
   Future<void> setGlassPrefs(GlassPrefs prefs) async {
     await db.batch((batch) {
-      void put(String key, String value) {
-        batch.insert(db.appMeta, AppMetaCompanion.insert(key: key, value: value),
-            onConflict: DoUpdate((_) => AppMetaCompanion(value: Value(value))));
-      }
-
-      put(_glassQualityKey, prefs.quality.name);
-      put(_ambientMotionEnabledKey, '${prefs.motionEnabled}');
-      put(_ambientIntensityKey, prefs.intensity.name);
-      put(_ambientNavPulseKey, '${prefs.navPulse}');
-      put(_ambientImagePulseKey, '${prefs.imagePulse}');
+      batch.insert(
+        db.appMeta,
+        AppMetaCompanion.insert(
+            key: _glassBlurEnabledKey, value: '${prefs.blurEnabled}'),
+        onConflict: DoUpdate((_) =>
+            AppMetaCompanion(value: Value('${prefs.blurEnabled}'))),
+      );
     });
   }
 

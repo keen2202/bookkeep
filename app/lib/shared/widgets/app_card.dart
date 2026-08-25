@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../theme/glass/glass_layers.dart';
-import '../theme/glass/glass_panel.dart';
+import '../theme/glass_tokens.dart';
 import '../theme/tokens.dart';
+import 'glass_panel.dart';
 
-/// 统一卡片（设计文档 §3.4 / Spec §6；Glassmorphism v3 GLS-002）：
-/// [GlassPanel]（L1 panel 层）薄封装，签名与 v2 完全兼容——存量调用点
-/// 零改动。视觉规格由层级函数解析：半透明磨砂填充 + 1px 高光发丝描边 +
-/// 顶部高光渐变 + 悬浮阴影；σ 按画质档解析（standard/saver 档 fill-only，
-/// 零 saveLayer）。可点卡片 hover/press 三态过渡 + 水波纹。
+/// FG-CARD 统一卡片（Spec §4.5 / 设计文档 §5.5；BK-FG-012）：
+/// [GlassPanel] G2 薄封装——半透明填充 + 双层发丝描边 + 顶部内高光渐变 +
+/// 环境投影 0/4/16/α0.06，σ20 真实磨砂（降级开关生效时 fill +0.10 补偿）。
+///
+/// - 内边距 16（紧凑 12）；卡片间距由调用方按同组 12 / 跨组 20 排布；
+/// - 嵌套最多一层：内层分组容器请用 [GlassPanel.nested]（下一档填充值、
+///   不新增 BackdropFilter、圆角 12）；
+/// - 整卡可点时按压反馈走 FG-BTN pressed 规则（fill 0.48/0.09 + scale 0.98，
+///   由 [GlassPanel] 内建）。
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -16,32 +20,33 @@ class AppCard extends StatelessWidget {
     this.onTap,
     this.padded = true,
     this.margin,
-    this.color,
+    this.compactPadding = false,
   });
 
   final Widget child;
 
-  /// 传入即可点（水波纹 + 按压背景 4% 变化）
+  /// 传入即可点（FG-CARD 点击反馈）
   final VoidCallback? onTap;
 
-  /// 内边距（默认 md=16；false 时零填充，由 child 自管）
+  /// 内边距开关（false 时零填充，由 child 自管）
   final bool padded;
 
-  final EdgeInsetsGeometry? margin;
+  /// 紧凑内边距 12（Spec §4.5）
+  final bool compactPadding;
 
-  /// 覆盖底色（默认 L1 层级解析玻璃填充；传不透明色可关闭通透感）
-  final Color? color;
+  final EdgeInsetsGeometry? margin;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: margin,
       child: GlassPanel(
-        tier: GlassTier.panel,
-        borderRadius: AppRadius.mdAll,
+        level: GlassLevel.g2,
+        borderRadius: AppRadius.cardAll,
         onTap: onTap,
-        colorOverride: color,
-        padding: padded ? AppSpacing.cardPadding : null,
+        padding: padded
+            ? (compactPadding ? AppSpacing.cardPaddingCompact : AppSpacing.cardPadding)
+            : null,
         child: child,
       ),
     );

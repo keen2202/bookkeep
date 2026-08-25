@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../shared/theme/app_theme.dart';
-import '../../shared/theme/glass/glass_layers.dart';
+import '../../shared/theme/glass_tokens.dart';
 
 /// 自绘 PIN 数字键盘（Spec §3.6 / BK-T-008）；输入满 [length] 位自动提交。
 /// Glassmorphism v3（GLS-010 散点收敛）：键帽收敛到 L1 层级 Token
@@ -100,13 +99,9 @@ class _Key extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // GLS-010：键帽玻璃规格（L1 填充 + 1px 白系描边，fill-only）
-    final spec = resolveGlassSpec(
-      tier: GlassTier.panel,
-      brightness: theme.brightness,
-      palette: context.palette,
-      quality: context.tokens.glassQuality,
-    );
+    // FGDS（BK-FG-030）：键帽为行级批量元素——仅 G2 填充值 + 双层发丝描边，
+    // 零 BackdropFilter（设计文档 §4.3 行级禁真模糊）
+    final g2 = resolveGlassSpec(level: GlassLevel.g2, brightness: theme.brightness);
     return Semantics(
       // 审查 U-12：读屏可识别按键；触控即反馈（HapticFeedback）
       button: true,
@@ -123,10 +118,13 @@ class _Key extends StatelessWidget {
           margin: const EdgeInsets.all(3),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: spec.fill,
+            color: g2.fill,
             shape: BoxShape.circle,
-            // 描边宽度恒 1（Border.all 默认值，Spec §2.1）
-            border: Border.all(color: spec.borderColor),
+            border: Border.all(color: g2.borderOuter, width: 0.5),
+          ),
+          foregroundDecoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: g2.borderInnerHighlight, width: 0.5),
           ),
           child: icon != null
               ? Icon(icon, color: theme.colorScheme.onSurfaceVariant)

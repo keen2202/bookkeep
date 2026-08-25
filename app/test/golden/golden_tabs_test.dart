@@ -16,7 +16,7 @@ import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/recurring/recurring_page.dart';
 import 'package:bookkeep_app/features/reports/reports_page.dart';
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
-import 'package:bookkeep_app/shared/theme/background/ambient_gradient.dart';
+import 'package:bookkeep_app/shared/theme/glass_tokens.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 
 import '../helpers/fixtures.dart' show testBookId;
@@ -88,18 +88,18 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    // 玻璃拟态（Glassmorphism v2→v3）：与 golden_ui_test 相同——页面之下先铺
-    // AmbientGradient 环境光层；v3 统一 standard 档渲染 + ProviderScope
-    // v3：AmbientGradient 仅消费无副作用默认值（画质档/动效控制器/锁定桥），
-    // 无需外层 ProviderScope；业务页自带内层 override 作用域（与基线一致）
+    // FGDS（BK-FG-002）：与生产一致——页面之下铺 §2.2 白名单纯净底色
+    //（生产由 AppBackground 提供）；golden 断言静态帧
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(preset),
-        home: AmbientGradient(child: home),
+        home: ColoredBox(
+          color: preset.isDark ? GlassBackground.baseDark : GlassBackground.baseLight,
+          child: home,
+        ),
       ),
     );
     // 报表图表动画/异步数据加载完成后稳定渲染
-    // v3 环境光动效常驻 Ticker（漂移）：golden 断言静态帧，不 settle 无限动画
     await tester.pump(const Duration(milliseconds: 300));
   }
 

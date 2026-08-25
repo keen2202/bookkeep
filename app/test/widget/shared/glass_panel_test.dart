@@ -1,10 +1,10 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bookkeep_app/shared/theme/app_theme.dart';
-import 'package:bookkeep_app/shared/theme/glass/glass_panel.dart';
+import 'package:bookkeep_app/shared/theme/glass_tokens.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
+import 'package:bookkeep_app/shared/widgets/glass_panel.dart';
 
 Widget _host(Widget child, {Brightness brightness = Brightness.light}) =>
     MaterialApp(
@@ -15,64 +15,62 @@ Widget _host(Widget child, {Brightness brightness = Brightness.light}) =>
     );
 
 void main() {
-  testWidgets('σ=0（standard 档 L1）：无 ClipRRect/BackdropFilter 节点（GLS-002 Checklist）',
+  testWidgets('默认（blurEnabled）：G2 面板渲染 ClipRRect + BackdropFilter 节点',
       (tester) async {
     await tester.pumpWidget(_host(const GlassPanel(child: SizedBox(width: 100, height: 60))));
-    expect(find.byType(BackdropFilter), findsNothing,
-        reason: 'standard 档 L1 主路径 fill-only，零 saveLayer');
-    expect(find.byKey(const ValueKey('glass-clip')), findsNothing);
-    expect(find.byKey(const ValueKey('glass-blur')), findsNothing);
-  });
-
-  testWidgets('high 档（blurOverride σ>0）：ClipRRect + BackdropFilter 双保险节点存在',
-      (tester) async {
-    await tester.pumpWidget(_host(const GlassPanel(
-      blurOverride: 10,
-      child: SizedBox(width: 100, height: 60),
-    )));
-    // 节点结构断言（Spec §3.2：二者缺一不可）
-    final clipFinder = find.byKey(const ValueKey('glass-clip'));
-    expect(clipFinder, findsOneWidget, reason: '外层 ClipRRect 承担圆角');
     final blurFinder = find.byKey(const ValueKey('glass-blur'));
     expect(blurFinder, findsOneWidget);
-    // BackdropFilter 的祖先必须是 ClipRRect（采样边界裁剪双保险）
+    // BackdropFilter 的祖先必须是 ClipRRect（采样边界裁剪）
     expect(
       find.ancestor(of: blurFinder, matching: find.byType(ClipRRect)),
       findsAtLeastNWidgets(1),
     );
   });
 
-  testWidgets('hover 态：描边 α+0.08、高光 α_top+0.05（120ms 过渡）', (tester) async {
-    await tester.pumpWidget(_host(GlassPanel(
-      onTap: () {},
-      padding: const EdgeInsets.all(8),
-      child: const SizedBox(width: 120, height: 60),
+  testWidgets('降级作用域（GlassPrefsScope.blurEnabled=false）：零模糊节点 + fill α+0.10 补偿',
+      (tester) async {
+    await tester.pumpWidget(_host(GlassPrefsScope(
+      blurEnabled: false,
+      child: const GlassPanel(child: SizedBox(width: 100, height: 60)),
     )));
-    BoxBorder borderOf() {
-      final surface = tester.widget<AnimatedContainer>(
-        find.byKey(const ValueKey('glass-surface')),
-      );
-      return (surface.decoration! as BoxDecoration).border!;
-    }
-
-    final before = borderOf().top.color;
-    // 模拟鼠标悬停
-    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await gesture.addPointer(location: Offset.zero);
-    addTearDown(gesture.removePointer);
-    await tester.pump();
-    await gesture.moveTo(tester.getCenter(find.byType(GlassPanel)));
-    await tester.pumpAndSettle();
-    final after = borderOf().top.color;
-    expect(after.a, closeTo(before.a + 0.08, 0.005), reason: 'hover 描边 α+0.08');
-    // 120ms 过渡时长断言
+    expect(find.byType(BackdropFilter), findsNothing,
+        reason: '禁用磨砂后跳过 BackdropFilter 节点');
     final surface = tester.widget<AnimatedContainer>(
       find.byKey(const ValueKey('glass-surface')),
     );
-    expect(surface.duration, const Duration(milliseconds: 120));
+    final fill = (surface.decoration! as BoxDecoration).color!;
+    expect(fill.a,
+        closeTo(GlassLevel.g2.fillAlphaLight + kBlurDegradeFillCompensation, 0.0001),
+        reason: 'fill α +0.10 补偿（Spec §3 派生规则）');
   });
 
-  testWidgets('按压态：填充叠加 scrim（150ms）', (tester) async {
+  testWidgets('双层描边：外层深色勾边 + 前景白色高光（各 0.5px）', (tester) async {
+    await tester.pumpWidget(_host(const GlassPanel(child: SizedBox(width: 100, height: 60))));
+    final surface = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('glass-surface')),
+    );
+    final decoration = surface.decoration! as BoxDecoration;
+    final fg = surface.foregroundDecoration! as BoxDecoration;
+    final spec = resolveGlassSpec(level: GlassLevel.g2, brightness: Brightness.light);
+    expect(decoration.border!.top.width, 0.5);
+    expect(decoration.border!.top.color, spec.borderOuter);
+    expect(fg.border!.top.color, spec.borderInnerHighlight);
+    expect(fg.border!.top.width, 0.5);
+  });
+
+  testWidgets('顶部内高光：前景渐变覆盖高度 40%（Spec §3 内高光覆盖行）', (tester) async {
+    await tester.pumpWidget(_host(const GlassPanel(child: SizedBox(width: 100, height: 60))));
+    final surface = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('glass-surface')),
+    );
+    final fg = surface.foregroundDecoration! as BoxDecoration;
+    final gradient = fg.gradient! as LinearGradient;
+    expect(gradient.colors.first, Colors.white.withValues(alpha: 0.20));
+    expect(gradient.colors.last, Colors.transparent);
+    expect((gradient.end as Alignment).y, closeTo(0.40, 0.0001));
+  });
+
+  testWidgets('按压态：fill→0.48 + scale 0.98 + 150ms 过渡（FG-CARD 点击反馈）', (tester) async {
     await tester.pumpWidget(_host(GlassPanel(
       onTap: () {},
       padding: const EdgeInsets.all(8),
@@ -83,14 +81,16 @@ void main() {
         ).decoration! as BoxDecoration)
         .color!;
     final before = fillOf();
-    await tester.press(find.byKey(const ValueKey('inner')));
+    final gesture = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('inner'))));
     await tester.pumpAndSettle();
     final after = fillOf();
-    expect(after, isNot(before), reason: '按压叠加 scrim 后填充变深');
-    final surface = tester.widget<AnimatedContainer>(
-      find.byKey(const ValueKey('glass-surface')),
-    );
-    expect(surface.duration, const Duration(milliseconds: 150));
+    expect(after.a, closeTo(0.48, 0.005), reason: 'pressed fill 0.48（浅）');
+    expect(after, isNot(before));
+    final scale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+    expect(scale.scale, 0.98);
+    expect(scale.duration, GlassMotion.micro);
+    await gesture.up();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('onTap 触发回调', (tester) async {
@@ -104,30 +104,19 @@ void main() {
     expect(taps, 1);
   });
 
-  testWidgets('深色主题：填充为 surface 基（非纯白），描边实值 0.16', (tester) async {
-    await tester.pumpWidget(_host(
-      const GlassPanel(child: SizedBox(width: 100, height: 60)),
-      brightness: Brightness.dark,
-    ));
-    final surface = tester.widget<AnimatedContainer>(
+  testWidgets('嵌套构造：GlassPanel.nested 零新增模糊节点且取下一档填充', (tester) async {
+    await tester.pumpWidget(_host(Column(children: [
+      GlassPanel(level: GlassLevel.g2, child: const SizedBox(width: 80, height: 40)),
+      GlassPanel.nested(host: GlassLevel.g2, child: const SizedBox(width: 80, height: 40)),
+    ])));
+    // 宿主面板 1 个模糊节点；嵌套层不叠加
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    final surfaces = tester.widgetList<AnimatedContainer>(
       find.byKey(const ValueKey('glass-surface')),
     );
-    final decoration = surface.decoration! as BoxDecoration;
-    final t5 = findPresetById('t5')!.palette;
-    expect(decoration.color!.a, closeTo(0.70, 0.0001),
-        reason: 'standard 档深色 L1 = 0.66 + 0.04 补偿');
-    expect(decoration.color!.b, closeTo(t5.surface.b, 0.001),
-        reason: '带主题色温非纯黑');
-    expect(decoration.border!.top.color.a, closeTo(0.16, 0.0001));
-  });
-
-  testWidgets('innerSheen：图表容器前景装饰携带底部反光参数', (tester) async {
-    // innerSheen 由 _GlassForegroundDecoration 承载；此处验证开关透传后
-    // 面板仍正常渲染且与普通面板渲染互不干扰（视觉 golden 走样板间）
-    await tester.pumpWidget(_host(const Column(children: [
-      GlassPanel(innerSheen: true, child: SizedBox(width: 80, height: 40)),
-      GlassPanel(child: SizedBox(width: 80, height: 40)),
-    ])));
-    expect(find.byType(GlassPanel), findsNWidgets(2));
+    final nestedFill =
+        surfaces.last.decoration! as BoxDecoration;
+    expect(nestedFill.color!.a, closeTo(GlassLevel.g3.fillAlphaLight, 0.0001),
+        reason: '内层用 G3 填充值（Spec §4.5 嵌套行）');
   });
 }

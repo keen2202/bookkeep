@@ -9,6 +9,7 @@ import '../../core/security/backup_cipher.dart';
 import '../../data/local/database_provider.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/glass_nav.dart';
 import '../books/books_providers.dart' show booksViewModelProvider, currentBookIdProvider;
 import 'backup_service.dart';
 import 'export_service.dart';
@@ -136,8 +137,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('备份与导出')),
+    return GlassScaffold(
+      title: const Text('备份与导出'),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
