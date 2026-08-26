@@ -239,7 +239,7 @@ void main() {
         granularity: BucketGranularity.month,
         rates: {'USD': 7500000},
       );
-      expect(buckets.single.amountMinor, 71000);
+      expect(buckets.single.expenseMinor, 71000);
     });
 
     test('审查 F-8：转账按账户币种写汇率快照', () async {

@@ -29,9 +29,14 @@ class CategorySlice {
 enum BucketGranularity { week, month }
 
 class PeriodBucket {
-  const PeriodBucket({required this.label, required this.amountMinor});
+  const PeriodBucket({
+    required this.label,
+    required this.expenseMinor,
+    required this.incomeMinor,
+  });
   final String label;
-  final int amountMinor;
+  final int expenseMinor;
+  final int incomeMinor;
 }
 
 // ================= 报表时间范围（纯函数，独立可测） =================
@@ -76,39 +81,58 @@ extension ReportRangeWindow on ReportRange {
           .add(const Duration(days: 1)),
     );
 
-/// 周期对比窗口：当前周期 + 前 5 年同期。
-/// 「年」= 当年全年 + 前 5 年全年；「月/周/日」= 当期 + 各年前同月/同周/同日。
+/// 周期对比窗口（需求：日=最近7天、周=最近5周、月=最近5月、年=最近5年）：
+/// 每个维度取「含当前周期在内」的最近 N 个连续周期，按时间升序返回。
+/// [anchor] 为当前周期的锚点（各维度 window().start，即当天/本周一/本月1号/当年1月1日）。
 List<({String label, DateTime start, DateTime end})> comparisonWindows(
   ReportRange range,
   DateTime anchor,
 ) {
-  final y = anchor.year;
-  final years = [for (var i = y - 5; i <= y; i++) i];
+  final today = DateTime(anchor.year, anchor.month, anchor.day);
+  // 本周一（周为首日锚点）
+  final monday = today.subtract(Duration(days: today.weekday - 1));
   return switch (range) {
     ReportRange.day => [
-        for (final year in years)
-          (
-            label: '$year-${_two(anchor.month)}-${_two(anchor.day)}',
-            start: DateTime(year, anchor.month, anchor.day),
-            end: DateTime(year, anchor.month, anchor.day + 1),
-          ),
+        for (var i = 6; i >= 0; i--) _dayWindow(today.subtract(Duration(days: i))),
       ],
-    ReportRange.week => _comparisonWeekWindows(years, anchor),
+    ReportRange.week => [
+        for (var i = 4; i >= 0; i--) _weekWindow(monday.subtract(Duration(days: 7 * i))),
+      ],
     ReportRange.month => [
-        for (final year in years)
-          (
-            label: '$year-${_two(anchor.month)}',
-            start: DateTime(year, anchor.month),
-            end: DateTime(year, anchor.month + 1),
-          ),
+        for (var i = 4; i >= 0; i--) _monthWindow(DateTime(anchor.year, anchor.month - i)),
       ],
     ReportRange.year => [
-        for (final year in years)
-          (label: '$year', start: DateTime(year), end: DateTime(year + 1)),
+        for (var i = 4; i >= 0; i--)
+          (
+            label: '${anchor.year - i}',
+            start: DateTime(anchor.year - i),
+            end: DateTime(anchor.year - i + 1),
+          ),
       ],
     ReportRange.custom => const [],
   };
 }
+
+/// 单日窗口（本地零点起 24h），标签 MM-DD
+({String label, DateTime start, DateTime end}) _dayWindow(DateTime day) => (
+      label: '${_two(day.month)}-${_two(day.day)}',
+      start: DateTime(day.year, day.month, day.day),
+      end: DateTime(day.year, day.month, day.day + 1),
+    );
+
+/// 单周窗口（周一起 7 天），标签「MM-DD 周」（周一日期）
+({String label, DateTime start, DateTime end}) _weekWindow(DateTime monday) => (
+      label: '${_two(monday.month)}-${_two(monday.day)} 周',
+      start: DateTime(monday.year, monday.month, monday.day),
+      end: DateTime(monday.year, monday.month, monday.day + 7),
+    );
+
+/// 单月窗口，标签 YYYY-MM
+({String label, DateTime start, DateTime end}) _monthWindow(DateTime month) => (
+      label: '${month.year}-${_two(month.month)}',
+      start: month,
+      end: DateTime(month.year, month.month + 1),
+    );
 
 /// ISO 8601 周号（周一为一周首日，第 1 周含当年首个周四）
 int isoWeekNumber(DateTime date) {
@@ -121,24 +145,6 @@ DateTime? mondayOfIsoWeek(int year, int week) {
   final monday = _firstThursday(year).add(Duration(days: (week - 1) * 7 - 3));
   if (isoWeekNumber(monday) != week) return null;
   return monday;
-}
-
-List<({String label, DateTime start, DateTime end})> _comparisonWeekWindows(
-  List<int> years,
-  DateTime anchor,
-) {
-  final week = isoWeekNumber(anchor);
-  final result = <({String label, DateTime start, DateTime end})>[];
-  for (final year in years) {
-    final monday = mondayOfIsoWeek(year, week);
-    if (monday == null) continue; // 该年无此 ISO 周（如 53 周）
-    result.add((
-      label: '$year-W${_two(week)}',
-      start: monday,
-      end: monday.add(const Duration(days: 7)),
-    ));
-  }
-  return result;
 }
 
 DateTime _firstThursday(int year) {
@@ -253,9 +259,9 @@ class ReportsRepository {
     return slices;
   }
 
-  /// 单窗口周期分桶（自定义时间范围用）：周/月粒度。
+  /// 单窗口周期分桶（自定义时间范围用）：周/月粒度，支出/收入双列。
   /// 周桶按 ISO 周（%G-W%V，与 [mondayOfIsoWeek] 同源，修复跨年周归属错位）；
-  /// 本地时区口径与 [dailyTotals] 一致。
+  /// 本地时区口径与 [dailyTotals] 一致；多币种按 (币种, 汇率快照) 折算（审查 F-8）。
   Future<List<PeriodBucket>> periodBuckets({
     required DateTime start,
     required DateTime end,
@@ -269,31 +275,40 @@ class ReportsRepository {
     final rows = await db.customSelect(
       "SELECT strftime(?, occurred_at, 'unixepoch', 'localtime') AS bucket, "
       'currency, rate_snapshot, '
-      'COALESCE(SUM(-amount_minor), 0) AS amount '
+      'COALESCE(SUM(CASE WHEN type = ? THEN -amount_minor END), 0) AS expense, '
+      'COALESCE(SUM(CASE WHEN type = ? THEN amount_minor END), 0) AS income '
       'FROM transactions '
-      'WHERE type = ? AND deleted_at IS NULL AND book_id = ? '
+      'WHERE deleted_at IS NULL AND type IN (?, ?) AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
       'GROUP BY bucket, currency, rate_snapshot',
       variables: [
         Variable.withString(format),
         Variable.withString('expense'),
+        Variable.withString('income'),
+        Variable.withString('expense'),
+        Variable.withString('income'),
         Variable.withString(currentBookId),
         Variable.withDateTime(start),
         Variable.withDateTime(end),
       ],
     ).get();
-    final byBucket = <String, int>{};
+    final byBucket = <String, ({int expense, int income})>{};
     for (final row in rows) {
       final bucket = row.read<String>('bucket');
       final currency = row.read<String>('currency');
       final snapshot = row.read<int?>('rate_snapshot');
-      final amount = _convertWith(row.read<int>('amount'), currency, snapshot, rates);
-      byBucket.update(bucket, (v) => v + amount, ifAbsent: () => amount);
+      final expense = _convertWith(row.read<int>('expense'), currency, snapshot, rates);
+      final income = _convertWith(row.read<int>('income'), currency, snapshot, rates);
+      byBucket.update(
+        bucket,
+        (v) => (expense: v.expense + expense, income: v.income + income),
+        ifAbsent: () => (expense: expense, income: income),
+      );
     }
     final buckets = byBucket.keys.toList()..sort();
     final results = <PeriodBucket>[];
     for (final bucket in buckets) {
-      final amount = byBucket[bucket]!;
+      final amounts = byBucket[bucket]!;
       if (granularity == BucketGranularity.week) {
         final parts = bucket.split('-W');
         final year = int.parse(parts[0]);
@@ -303,17 +318,22 @@ class ReportsRepository {
           label: monday == null
               ? bucket
               : '${_two(monday.month)}-${_two(monday.day)} 周',
-          amountMinor: amount,
+          expenseMinor: amounts.expense,
+          incomeMinor: amounts.income,
         ));
       } else {
-        results.add(PeriodBucket(label: bucket, amountMinor: amount));
+        results.add(PeriodBucket(
+          label: bucket,
+          expenseMinor: amounts.expense,
+          incomeMinor: amounts.income,
+        ));
       }
     }
     return results;
   }
 
-  /// 周期对比跨年聚合：给定带标签窗口（见 [comparisonWindows]），
-  /// 全跨度一次按日查询（避免 N+1），Dart 侧按窗口切片。
+  /// 周期对比聚合（见 [comparisonWindows]）：全跨度一次按日查询（避免 N+1），
+  /// Dart 侧按窗口切片汇总支出/收入双列。
   Future<List<PeriodBucket>> comparisonBuckets({
     required List<({String label, DateTime start, DateTime end})> windows,
     Map<String, int> rates = const {},
@@ -322,42 +342,63 @@ class ReportsRepository {
     final currentBookId = bookId;
     final rows = await db.customSelect(
       "SELECT date(occurred_at, 'unixepoch', 'localtime') AS day, currency, rate_snapshot, "
-      'COALESCE(SUM(-amount_minor), 0) AS amount '
+      'COALESCE(SUM(CASE WHEN type = ? THEN -amount_minor END), 0) AS expense, '
+      'COALESCE(SUM(CASE WHEN type = ? THEN amount_minor END), 0) AS income '
       'FROM transactions '
-      'WHERE type = ? AND deleted_at IS NULL AND book_id = ? '
+      'WHERE deleted_at IS NULL AND type IN (?, ?) AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
       'GROUP BY day, currency, rate_snapshot',
       variables: [
         Variable.withString('expense'),
+        Variable.withString('income'),
+        Variable.withString('expense'),
+        Variable.withString('income'),
         Variable.withString(currentBookId),
         Variable.withDateTime(windows.first.start),
         Variable.withDateTime(windows.last.end),
       ],
     ).get();
-    final byDay = <String, int>{};
+    final byDay = <String, ({int expense, int income})>{};
     for (final row in rows) {
       final day = row.read<String>('day');
       final currency = row.read<String>('currency');
       final snapshot = row.read<int?>('rate_snapshot');
-      final amount = _convertWith(row.read<int>('amount'), currency, snapshot, rates);
-      byDay.update(day, (v) => v + amount, ifAbsent: () => amount);
+      final expense = _convertWith(row.read<int>('expense'), currency, snapshot, rates);
+      final income = _convertWith(row.read<int>('income'), currency, snapshot, rates);
+      byDay.update(
+        day,
+        (t) => (expense: t.expense + expense, income: t.income + income),
+        ifAbsent: () => (expense: expense, income: income),
+      );
     }
-    return [
-      for (final w in windows)
-        PeriodBucket(label: w.label, amountMinor: _sumDays(byDay, w.start, w.end)),
-    ];
+    final results = <PeriodBucket>[];
+    for (final w in windows) {
+      final sums = _sumDays(byDay, w.start, w.end);
+      results.add(PeriodBucket(
+        label: w.label,
+        expenseMinor: sums.expense,
+        incomeMinor: sums.income,
+      ));
+    }
+    return results;
   }
 
-  int _sumDays(Map<String, int> byDay, DateTime start, DateTime end) {
+  ({int expense, int income}) _sumDays(
+    Map<String, ({int expense, int income})> byDay,
+    DateTime start,
+    DateTime end,
+  ) {
     final startKey = _localDayKey(start);
     final endKey = _localDayKey(end);
-    var total = 0;
+    var expense = 0;
+    var income = 0;
     for (final entry in byDay.entries) {
       if (entry.key.compareTo(startKey) >= 0 && entry.key.compareTo(endKey) < 0) {
-        total += entry.value;
+        expense += entry.value.expense;
+        income += entry.value.income;
       }
     }
-    return total;
+    return (expense: expense, income: income);
   }
 
   /// 按记账时汇率快照折算主币种（审查 F-8）：快照优先；

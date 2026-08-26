@@ -90,4 +90,41 @@ void main() {
     expect(find.text('编辑预算'), findsOneWidget);
     expect(find.text('删除预算'), findsOneWidget);
   });
+
+  testWidgets('sheet background is fully opaque to cover content beneath', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    // 经 BudgetManageSheet.show 打开（与记账页入口一致），
+    // 断言弹层底色完全不透明——覆盖下方数字键盘（需求 7）
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+        categorySeedProvider.overrideWith((ref) async => testSeed),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: FilledButton(
+                onPressed: () => BudgetManageSheet.show(context),
+                child: const Text('打开预算管理'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('打开预算管理'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('预算管理'), findsOneWidget);
+    // BottomSheet 内部自建 Material 承载底色
+    final material = tester.widget<Material>(
+      find.descendant(of: find.byType(BottomSheet), matching: find.byType(Material)).first,
+    );
+    expect(material.color, isNotNull);
+    expect((material.color!.a * 255.0).round(), 255);
+  });
 }

@@ -109,10 +109,10 @@ void main() {
     await pumpUntilFound(tester, find.text('餐饮 / 早餐'));
 
     // 组头：当天支出 ¥25.50 · 收入 ¥100.00（转账不计入）；
-    // W3 迁移后'支出 '标签与金额（AppAmountText 等宽数字）拆分为独立 Text
-    expect(find.text('支出 '), findsOneWidget);
+    // 日汇总行与明细区分：黑色标题样式 + 「支出：/收入：」与标题同字号
+    expect(find.text('支出：'), findsOneWidget);
     expect(find.text('¥25.50'), findsOneWidget);
-    expect(find.text('收入 '), findsOneWidget);
+    expect(find.text('收入：'), findsOneWidget);
     expect(find.text('¥100.00'), findsOneWidget);
     // 分类行（父/子拼接）+ 时间
     expect(find.text('餐饮 / 早餐'), findsOneWidget);
@@ -142,7 +142,7 @@ void main() {
     await tester.pumpWidget(harness(db, masked: true));
     await pumpUntilFound(tester, find.text('餐饮 / 早餐'));
 
-    expect(find.text('支出 '), findsOneWidget);
+    expect(find.text('支出：'), findsOneWidget);
     expect(find.text('¥***'), findsWidgets);
     expect(find.textContaining('25.50'), findsNothing);
   });

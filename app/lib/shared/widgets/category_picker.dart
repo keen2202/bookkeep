@@ -120,7 +120,12 @@ class _ParentTile extends StatelessWidget {
         contentPadding: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
         leading: Icon(categoryIcon(parent.icon), color: Color(parent.color)),
-        title: Text(parent.name),
+        // 一级分类加粗主文字色，与下方缩进的二级 chip 形成层级对比
+        title: Text(
+          parent.name,
+          style: context.text.titleSmall
+              ?.copyWith(color: context.palette.textPrimary),
+        ),
         trailing: hasChildren
             ? Icon(expanded ? Icons.expand_more : Icons.expand_less, size: 18)
             : null,

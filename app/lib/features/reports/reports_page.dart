@@ -29,15 +29,6 @@ final reportRatesProvider = FutureProvider<Map<String, int>>((ref) async {
   return rates;
 });
 
-final dailyTotalsProvider =
-    FutureProvider.family<List<DailyTotal>, ReportWindow>((ref, window) async {
-  ref.watch(ledgerVersionProvider); // 账本写操作后自动重建（审查 F-1）
-  final rates = await ref.watch(reportRatesProvider.future);
-  return ref
-      .watch(reportsRepositoryProvider)
-      .dailyTotals(start: window.start, end: window.end, rates: rates);
-});
-
 final categoryBreakdownProvider =
     FutureProvider.family<List<CategorySlice>, ReportWindow>((ref, window) async {
   ref.watch(ledgerVersionProvider);
@@ -53,7 +44,8 @@ final periodBucketsProvider =
   ref.watch(ledgerVersionProvider);
   final rates = await ref.watch(reportRatesProvider.future);
   final repo = ref.watch(reportsRepositoryProvider);
-  // 标准维度：周期对比 = 当前周期 + 前 5 年同期（跨年柱状对比）
+  // 标准维度：周期对比 = 最近连续周期（日=最近7天 / 周=最近5周 /
+  // 月=最近5月 / 年=最近5年），每桶支出/收入双柱对比
   if (key.range != ReportRange.custom) {
     return repo.comparisonBuckets(
       windows: comparisonWindows(key.range, key.window.start),
@@ -72,7 +64,8 @@ final periodBucketsProvider =
   );
 });
 
-/// 报表页（Spec §3.5 / BK-P0-005）：饼图（分类占比）/ 柱状（周期对比）/ 折线（趋势）
+/// 报表页（Spec §3.5 / BK-P0-005）：饼图（分类占比）/ 柱状（周期对比，
+/// 支出/收入双柱）
 class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
 
@@ -121,7 +114,6 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   @override
   Widget build(BuildContext context) {
     final window = _window;
-    final daily = ref.watch(dailyTotalsProvider(window));
     final slices = ref.watch(categoryBreakdownProvider(window));
     final buckets = ref.watch(periodBucketsProvider((window: window, range: _range)));
     // 隐私锁锁定/后台态强制脱敏（Spec §3.6），叠加用户手动隐藏金额开关
@@ -191,20 +183,13 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                   () => ref.invalidate(categoryBreakdownProvider(window)),
                 ),
               ),
+              // 需求：取消「收支趋势」折线图；周期对比承载收支双柱
               _Section(
                 title: '周期对比',
                 child: _chartOrRetry(
                   buckets,
                   (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts),
                   () => ref.invalidate(periodBucketsProvider((window: window, range: _range))),
-                ),
-              ),
-              _Section(
-                title: '收支趋势',
-                child: _chartOrRetry(
-                  daily,
-                  (d) => TrendLineChart(totals: d, hideAmounts: hideAmounts),
-                  () => ref.invalidate(dailyTotalsProvider(window)),
                 ),
               ),
             ],

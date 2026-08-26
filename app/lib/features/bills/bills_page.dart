@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../shared/theme/app_theme.dart';
@@ -95,26 +96,36 @@ class _DayHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 日汇总与明细区分（需求）：组头为「日汇总行」——日期与收支合计统一
+    // 主文字色（黑色）加粗，金额数字与标题同字号；下方明细行保持常规
+    // 列表样式（正文灰度层级），一眼可辨汇总与逐笔记录
+    final headerStyle = theme.textTheme.titleSmall
+        ?.copyWith(color: context.palette.textPrimary, fontWeight: FontWeight.w600);
+    String money(int minor) => masked ? maskedMoney() : formatMoney(minor);
+    final showExpense = day.expenseMinor > 0;
+    final showIncome = day.incomeMinor > 0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
       child: Row(
         children: [
           Text('${day.day.month}月${day.day.day}日 ${_weekdayNames[day.day.weekday - 1]}',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(color: context.palette.textSecondary)),
+              style: headerStyle),
           const Spacer(),
-          if (day.expenseMinor > 0)
-            Text('支出 ', style: theme.textTheme.bodySmall),
-          if (day.expenseMinor > 0)
-            AppAmountText.minor(day.expenseMinor,
-                signed: false, masked: masked, tone: AppAmountTone.expense),
-          if (day.expenseMinor > 0 && day.incomeMinor > 0)
-            Text(' · ', style: theme.textTheme.bodySmall),
-          if (day.incomeMinor > 0)
-            Text('收入 ', style: theme.textTheme.bodySmall),
-          if (day.incomeMinor > 0)
-            AppAmountText.minor(day.incomeMinor, signed: false, masked: masked),
+          if (showExpense) ...[
+            Text('支出：', style: headerStyle),
+            Text(money(day.expenseMinor),
+                style:
+                    headerStyle?.copyWith(color: context.appColors.expense)),
+          ],
+          if (showExpense && showIncome)
+            Text(' · ', style: headerStyle),
+          if (showIncome) ...[
+            Text('收入：', style: headerStyle),
+            Text(money(day.incomeMinor),
+                style:
+                    headerStyle?.copyWith(color: context.appColors.income)),
+          ],
         ],
       ),
     );

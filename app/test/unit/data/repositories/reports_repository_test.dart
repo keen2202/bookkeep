@@ -129,17 +129,20 @@ void main() {
     await insertTx(categoryId: foodId, amountMinor: -1000, occurredAt: DateTime(2026, 8, 3));
     await insertTx(categoryId: foodId, amountMinor: -2000, occurredAt: DateTime(2026, 8, 10));
     await insertTx(categoryId: foodId, amountMinor: -4000, occurredAt: DateTime(2026, 8, 17));
+    await insertTx(categoryId: foodId, amountMinor: 500, occurredAt: DateTime(2026, 8, 11), type: TransactionType.income);
 
     final weeks = await repo.periodBuckets(
         start: DateTime(2026, 8, 1), end: DateTime(2026, 9, 1), granularity: BucketGranularity.week);
 
     expect(weeks, hasLength(3));
-    expect(weeks.map((w) => w.amountMinor).toList(), [1000, 2000, 4000]);
+    expect(weeks.map((w) => w.expenseMinor).toList(), [1000, 2000, 4000]);
+    expect(weeks[1].incomeMinor, 500);
     expect(weeks.first.label, '08-03 周');
   });
 
-  test('comparison buckets slice labeled windows (cross-year)', () async {
+  test('comparison buckets slice recent-year windows with expense/income', () async {
     await insertTx(categoryId: foodId, amountMinor: -1000, occurredAt: DateTime(2026, 1, 5));
+    await insertTx(categoryId: foodId, amountMinor: 6000, occurredAt: DateTime(2026, 2, 5), type: TransactionType.income);
     await insertTx(categoryId: foodId, amountMinor: -3000, occurredAt: DateTime(2024, 12, 31));
     await insertTx(categoryId: foodId, amountMinor: -2000, occurredAt: DateTime(2024, 6, 15));
     await insertTx(categoryId: foodId, amountMinor: -4000, occurredAt: DateTime(2025, 3, 1));
@@ -148,28 +151,33 @@ void main() {
     final windows = comparisonWindows(ReportRange.year, DateTime(2026, 8, 9));
     final buckets = await repo.comparisonBuckets(windows: windows);
 
-    final byLabel = {for (final b in buckets) b.label: b.amountMinor};
-    expect(buckets, hasLength(6));
-    expect(byLabel['2026'], 1000);
-    expect(byLabel['2025'], 4000);
-    expect(byLabel['2024'], 5000);
-    expect(byLabel['2023'], 0);
-    expect(byLabel['2022'], 0);
-    expect(byLabel['2021'], 0);
+    final byLabel = {for (final b in buckets) b.label: b};
+    expect(buckets, hasLength(5));
+    expect(byLabel['2026']!.expenseMinor, 1000);
+    expect(byLabel['2026']!.incomeMinor, 6000);
+    expect(byLabel['2025']!.expenseMinor, 4000);
+    expect(byLabel['2024']!.expenseMinor, 5000);
+    expect(byLabel['2023']!.expenseMinor, 0);
+    expect(byLabel['2022']!.expenseMinor, 0);
   });
 
-  test('comparison buckets slice month windows (same month across years)', () async {
-    await insertTx(categoryId: foodId, amountMinor: -1000, occurredAt: DateTime(2024, 8, 15));
+  test('comparison buckets slice consecutive month windows', () async {
     await insertTx(categoryId: foodId, amountMinor: -2000, occurredAt: DateTime(2026, 8, 3));
     await insertTx(categoryId: foodId, amountMinor: -3000, occurredAt: DateTime(2026, 7, 31));
+    await insertTx(categoryId: foodId, amountMinor: 1500, occurredAt: DateTime(2026, 5, 10), type: TransactionType.income);
+    await insertTx(categoryId: foodId, amountMinor: -4000, occurredAt: DateTime(2026, 2, 20)); // 窗口外
 
     final windows = comparisonWindows(ReportRange.month, DateTime(2026, 8, 9));
     final buckets = await repo.comparisonBuckets(windows: windows);
 
-    final byLabel = {for (final b in buckets) b.label: b.amountMinor};
-    expect(byLabel['2026-08'], 2000);
-    expect(byLabel['2024-08'], 1000);
-    expect(byLabel['2026-07'], isNull); // 窗口外
+    final byLabel = {for (final b in buckets) b.label: b};
+    expect(windows.map((w) => w.label).toList(),
+        ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08']);
+    expect(byLabel['2026-08']!.expenseMinor, 2000);
+    expect(byLabel['2026-07']!.expenseMinor, 3000);
+    expect(byLabel['2026-05']!.incomeMinor, 1500);
+    // 窗口外的 2 月不在最近 5 个月中
+    expect(byLabel.containsKey('2026-02'), isFalse);
   });
 
   test('report totals equal transaction totals for any range', () async {
@@ -230,35 +238,41 @@ void main() {
           (start: DateTime(2026, 1, 1), end: DateTime(2027, 1, 1)));
     });
 
-    test('comparison windows: year range spans current + 5 prior years', () {
+    test('comparison windows: year range spans last 5 years (incl. current)', () {
       final windows = comparisonWindows(ReportRange.year, DateTime(2026, 8, 9));
-      expect(windows, hasLength(6));
-      expect(windows.first.label, '2021');
-      expect(windows.last.label, '2026');
+      expect(windows, hasLength(5));
+      expect(windows.map((w) => w.label).toList(),
+          ['2022', '2023', '2024', '2025', '2026']);
       expect(windows.last.start, DateTime(2026));
       expect(windows.last.end, DateTime(2027));
     });
 
-    test('comparison windows: month range uses same month across years', () {
+    test('comparison windows: month range spans last 5 months', () {
       final windows = comparisonWindows(ReportRange.month, DateTime(2026, 8, 9));
       expect(windows.map((w) => w.label).toList(),
-          ['2021-08', '2022-08', '2023-08', '2024-08', '2025-08', '2026-08']);
+          ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08']);
       expect(windows.last.start, DateTime(2026, 8));
       expect(windows.last.end, DateTime(2026, 9));
+      // 跨年：1 月锚点 → 去年 9 月起
+      final crossYear = comparisonWindows(ReportRange.month, DateTime(2026, 1, 9));
+      expect(crossYear.first.label, '2025-09');
+      expect(crossYear.last.label, '2026-01');
     });
 
-    test('comparison windows: day range uses same day across years', () {
+    test('comparison windows: day range spans last 7 days', () {
       final windows = comparisonWindows(ReportRange.day, DateTime(2026, 8, 9));
+      expect(windows, hasLength(7));
       expect(windows.first,
-          (label: '2021-08-09', start: DateTime(2021, 8, 9), end: DateTime(2021, 8, 10)));
+          (label: '08-03', start: DateTime(2026, 8, 3), end: DateTime(2026, 8, 4)));
       expect(windows.last,
-          (label: '2026-08-09', start: DateTime(2026, 8, 9), end: DateTime(2026, 8, 10)));
+          (label: '08-09', start: DateTime(2026, 8, 9), end: DateTime(2026, 8, 10)));
     });
 
-    test('comparison windows: week range uses ISO week across years', () {
+    test('comparison windows: week range spans last 5 weeks (Mon-based)', () {
       final windows = comparisonWindows(ReportRange.week, DateTime(2026, 8, 9));
+      // 2026-08-09 为周日，本周一为 08-03
       expect(windows.map((w) => w.label).toList(),
-          ['2021-W32', '2022-W32', '2023-W32', '2024-W32', '2025-W32', '2026-W32']);
+          ['07-06 周', '07-13 周', '07-20 周', '07-27 周', '08-03 周']);
       for (final w in windows) {
         expect(w.start.weekday, DateTime.monday);
         expect(w.end.difference(w.start), const Duration(days: 7));

@@ -84,9 +84,9 @@ void main() {
     expect(find.byType(PieChart), findsOneWidget);
     expect(find.byType(BarChart), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('收支趋势'), 200,
-        scrollable: find.byType(Scrollable).first);
-    expect(find.text('收支趋势'), findsOneWidget);
+    // 需求：取消「收支趋势」折线图
+    expect(find.text('收支趋势'), findsNothing);
+    expect(find.byType(LineChart), findsNothing);
 
     // 切换区间
     await tester.tap(find.text('年'));

@@ -19,6 +19,9 @@ class BudgetManageSheet extends ConsumerWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // 需求：主题默认的 G4 玻璃填充过透（记账页数字键盘会从下方透出），
+      // 预算管理弹层改用不透明 surface 底色，完整覆盖下层内容
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (_) => const BudgetManageSheet(),
     );
   }

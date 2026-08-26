@@ -125,7 +125,7 @@ void main() {
     expect(txs.single.type, TransactionType.expense);
   });
 
-  testWidgets('快速记账页提供退出入口', (tester) async {
+  testWidgets('快速记账页不再显示右上角退出按钮', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     await seedDb(db);
@@ -133,8 +133,38 @@ void main() {
     await tester.pumpWidget(harness(db));
     await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
 
-    expect(find.text('退出'), findsOneWidget);
-    expect(find.byIcon(Icons.close), findsOneWidget);
+    // 需求：取消记账页右上角「退出」按钮，返回走系统返回手势/导航返回键
+    expect(find.text('退出'), findsNothing);
+    expect(find.byIcon(Icons.close), findsNothing);
+  });
+
+  testWidgets('新增记账提供备注栏，填写后随保存入库', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+
+    // 需求：记账页（新增模式）展示备注栏
+    expect(find.text('备注'), findsOneWidget);
+
+    await tester.tap(find.text('2'));
+    await tester.pump();
+    await tester.tap(find.text('8'));
+    await tester.pump();
+    await pickAccount(tester);
+    await pickBreakfast(tester);
+    await tester.enterText(find.byType(TextField), '和同事拼单');
+    await tester.pump();
+
+    await tester.tap(find.text('确定'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final txs = await db.select(db.transactions).get();
+    expect(txs, hasLength(1));
+    expect(txs.single.amountMinor, -2800);
+    expect(txs.single.note, '和同事拼单');
   });
 
   testWidgets('invalid amount shows an error and does not save', (tester) async {
@@ -268,8 +298,12 @@ void main() {
 
     await tester.tap(find.text('09:30'));
     await tester.pumpAndSettle();
-    // 输入模式时间选择器：时/分两个 TextField
-    final fields = find.byType(TextField);
+    // 输入模式时间选择器：时/分两个 TextField（限定对话框范围，
+    // 记账页备注栏本身也是一个 TextField）
+    final fields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextField),
+    );
     expect(fields, findsNWidgets(2));
     await tester.enterText(fields.at(0), '9');
     await tester.enterText(fields.at(1), '05');

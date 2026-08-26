@@ -254,6 +254,8 @@ class QuickEntryController extends ChangeNotifier {
         type: type,
         amountMinor: signed,
         occurredAt: occurredAt,
+        // 需求：新增记账备注栏——备注随保存入库
+        note: trimmedNote.isEmpty ? null : trimmedNote,
       );
       await transactionRepository.rememberDefaults(
         type: type,

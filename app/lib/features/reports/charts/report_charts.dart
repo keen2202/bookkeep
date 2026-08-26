@@ -5,6 +5,7 @@ import '../../../core/utils/money_format.dart';
 import '../../../data/repositories/reports_repository.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/theme/chart_colors.dart';
+import '../../../shared/theme/tokens.dart';
 
 /// 图表通用网格线（Glassmorphism v3，Spec §5.4 / GLS-007）：
 /// `palette.divider` α0.5，刻度清晰度不受画质档影响。
@@ -144,7 +145,9 @@ class CategoryPieChart extends StatelessWidget {
   }
 }
 
-/// 周期对比柱状图（Spec §3.5；审查 U-11：touch 开启 + tooltip 金额格式化 + 可读刻度）
+/// 周期对比柱状图（Spec §3.5；需求：日/周/月/年各桶以「支出红 / 收入绿」
+/// 双柱并列呈现，实心加深语义色替代 α 渐变淡柱，x 轴每个周期下可直接
+/// 对比当期收支；审查 U-11：touch tooltip 金额格式化 + 可读刻度）。
 class PeriodBarChart extends StatelessWidget {
   const PeriodBarChart({super.key, required this.buckets, required this.hideAmounts});
 
@@ -156,224 +159,125 @@ class PeriodBarChart extends StatelessWidget {
     if (buckets.isEmpty) {
       return const Center(child: Text('暂无数据'));
     }
-    final series = chartSeriesColors(context);
+    // 需求「加深柱状图颜色」：弃用 chartAreaGradient（顶色 α0.12 起），
+    // 改为收支语义实心色（支出红 / 收入绿，浅深主题锁定值）
+    final expenseColor = context.appColors.expense;
+    final incomeColor = context.appColors.income;
     final axisStyle = context.text.bodySmall;
-    final maxAmount = buckets.fold<int>(0, (a, b) => a > b.amountMinor ? a : b.amountMinor);
+    final maxAmount = buckets.fold<int>(
+      0,
+      (a, b) => a > b.expenseMinor ? a : (b.expenseMinor > b.incomeMinor ? b.expenseMinor : b.incomeMinor),
+    );
     // x/y 轴比例均衡：显式「好看」刻度步长（约 4 档），避免 fl_chart 默认间隔
     // 在极端量级下产生过密刻度或柱高与刻度错位的观感
     final yInterval = niceAxisStep((maxAmount == 0 ? 1 : maxAmount) * 1.2 / 4);
     final axisLabels = compactPeriodAxisLabels([
       for (final b in buckets) b.label,
     ]);
-    return SizedBox(
-      height: 220,
-      child: BarChart(
-        BarChartData(
-          // 跨年对比允许某年无数据（0 柱）；maxY 兜底避免 0 刻度
-          maxY: (maxAmount == 0 ? 1 : maxAmount).toDouble() * 1.2,
-          // v3 网格线：divider α0.5（GLS-007，刻度不受档位影响）
-          gridData: glassGridData(context),
-          barTouchData: BarTouchData(
-            enabled: !hideAmounts,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipItem: (group, groupIndex, rod, rodIndex) =>
-                  BarTooltipItem(formatMoney(rod.toY.round()), const TextStyle()),
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 收支对比图例：双柱语义一眼可辨
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _legendDot(expenseColor),
+              const SizedBox(width: AppSpacing.xs),
+              Text('支出', style: axisStyle),
+              const SizedBox(width: AppSpacing.lg),
+              _legendDot(incomeColor),
+              const SizedBox(width: AppSpacing.xs),
+              Text('收入', style: axisStyle),
+            ],
           ),
-          titlesData: FlTitlesData(
-            leftTitles: hideAmounts
-                ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
-                : AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 52,
-                      interval: yInterval,
-                      getTitlesWidget: (value, meta) {
-                        if (value <= 0) return const SizedBox.shrink();
-                        return SideTitleWidget(
-                          meta: meta,
-                          space: 4,
-                          child: Text(compactTickLabel(value.round()), style: axisStyle),
-                        );
-                      },
-                    ),
-                  ),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 32,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= buckets.length) return const SizedBox.shrink();
-                  return SideTitleWidget(
-                    meta: meta,
-                    space: 4,
-                    child: Text(axisLabels[index], style: axisStyle),
-                  );
-                },
-              ),
-            ),
-          ),
-          barGroups: [
-            for (var i = 0; i < buckets.length; i++)
-              BarChartGroupData(x: i, barRods: [
-                BarChartRodData(
-                  toY: buckets[i].amountMinor.toDouble(),
-                  // 「光透过图表」：柱身自上而下语义色 → α0.12 渐变（GLS-007）
-                  gradient: chartAreaGradient(series[i % series.length]),
-                  width: 16,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ]),
-          ],
         ),
-      ),
-    );
-  }
-}
-
-/// 收支趋势折线图（Spec §3.5；审查 U-11：tooltip 金额格式化 + 可读刻度）。
-/// 修正：单日（「日」维度）折线无法绘制时直接展示收支汇总；
-/// 采样步长取整；x 轴带日期标签；tooltip 显示日期。
-class TrendLineChart extends StatelessWidget {
-  const TrendLineChart({
-    super.key,
-    required this.totals,
-    required this.hideAmounts,
-    this.maxPoints = 60,
-  });
-
-  final List<DailyTotal> totals;
-  final bool hideAmounts;
-  final int maxPoints;
-
-  @override
-  Widget build(BuildContext context) {
-    if (totals.isEmpty) {
-      return const Center(child: Text('暂无数据'));
-    }
-    // 收支语义色（UI 重构 BK-UI-007：序列色语义化，浅深主题锁定）
-    final expenseColor = context.appColors.expense;
-    final incomeColor = context.appColors.income;
-    final axisStyle = context.text.bodySmall;
-    final sampled = totals.length > maxPoints
-        ? [
-            for (var i = 0; i < totals.length; i += (totals.length / maxPoints).ceil())
-              totals[i],
-          ]
-        : totals;
-    // 单日（如「日」维度）：折线至少需 2 点，单日直接展示收支汇总（与记录一致）
-    if (sampled.length < 2) {
-      final t = sampled.single;
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('${t.date}  支出 ${hideAmounts ? '***' : formatMoney(t.expenseMinor)}'),
-          Text('${t.date}  收入 ${hideAmounts ? '***' : formatMoney(t.incomeMinor)}'),
-        ],
-      );
-    }
-    final expense = <FlSpot>[
-      for (var i = 0; i < sampled.length; i++)
-        FlSpot(i.toDouble(), sampled[i].expenseMinor.toDouble()),
-    ];
-    final income = <FlSpot>[
-      for (var i = 0; i < sampled.length; i++)
-        FlSpot(i.toDouble(), sampled[i].incomeMinor.toDouble()),
-    ];
-    final maxY = [
-      for (final s in expense) s.y,
-      for (final s in income) s.y,
-    ].fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
-    final labelStep = (sampled.length / 6).ceil().clamp(1, 99);
-    final yInterval = niceAxisStep(maxY / 4);
-
-    return SizedBox(
-      height: 220,
-      child: LineChart(
-        LineChartData(
-          maxY: maxY,
-          minY: 0,
-          lineTouchData: LineTouchData(
-            enabled: !hideAmounts,
-            touchTooltipData: LineTouchTooltipData(
-              getTooltipItems: (spots) => [
-                for (final s in spots)
-                  LineTooltipItem(
-                    '${sampled[s.spotIndex].date}\n${formatMoney(s.y.round())}',
-                    TextStyle(
-                      color: s.barIndex == 0 ? expenseColor : incomeColor,
-                      fontWeight: FontWeight.bold,
-                    ),
+        SizedBox(
+          height: 220,
+          child: BarChart(
+            BarChartData(
+              // 允许某周期无数据（0 柱）；maxY 兜底避免 0 刻度
+              maxY: (maxAmount == 0 ? 1 : maxAmount).toDouble() * 1.2,
+              // v3 网格线：divider α0.5（GLS-007，刻度不受档位影响）
+              gridData: glassGridData(context),
+              barTouchData: BarTouchData(
+                enabled: !hideAmounts,
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
+                    '${rodIndex == 0 ? '支出' : '收入'} ${formatMoney(rod.toY.round())}',
+                    TextStyle(color: rodIndex == 0 ? expenseColor : incomeColor),
+                  ),
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: hideAmounts
+                    ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
+                    : AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 52,
+                          interval: yInterval,
+                          getTitlesWidget: (value, meta) {
+                            if (value <= 0) return const SizedBox.shrink();
+                            return SideTitleWidget(
+                              meta: meta,
+                              space: 4,
+                              child: Text(compactTickLabel(value.round()), style: axisStyle),
+                            );
+                          },
+                        ),
+                      ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 32,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index < 0 || index >= buckets.length) return const SizedBox.shrink();
+                      return SideTitleWidget(
+                        meta: meta,
+                        space: 4,
+                        child: Text(axisLabels[index], style: axisStyle),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              barGroups: [
+                for (var i = 0; i < buckets.length; i++)
+                  BarChartGroupData(
+                    x: i,
+                    barsSpace: AppSpacing.xs,
+                    barRods: [
+                      BarChartRodData(
+                        toY: buckets[i].expenseMinor.toDouble(),
+                        color: expenseColor,
+                        width: 12,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
+                      ),
+                      BarChartRodData(
+                        toY: buckets[i].incomeMinor.toDouble(),
+                        color: incomeColor,
+                        width: 12,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
+                      ),
+                    ],
                   ),
               ],
             ),
           ),
-          gridData: glassGridData(context),
-          titlesData: FlTitlesData(
-            leftTitles: hideAmounts
-                ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
-                : AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 52,
-                      interval: yInterval,
-                      getTitlesWidget: (value, meta) {
-                        if (value <= 0) return const SizedBox.shrink();
-                        return Text(compactTickLabel(value.round()), style: axisStyle);
-                      },
-                    ),
-                  ),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 24,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= sampled.length) return const SizedBox.shrink();
-                  if (index % labelStep != 0 && index != sampled.length - 1) {
-                    return const SizedBox.shrink();
-                  }
-                  final parts = sampled[index].date.split('-');
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text('${parts[1]}-${parts[2]}', style: axisStyle),
-                  );
-                },
-              ),
-            ),
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: expense,
-              color: expenseColor,
-              barWidth: 2,
-              isCurved: true,
-              dotData: const FlDotData(show: false),
-              // 「光透过图表」：线下语义色 α0.12→0 渐变填充（GLS-007）
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: chartAreaGradient(expenseColor),
-              ),
-            ),
-            LineChartBarData(
-              spots: income,
-              color: incomeColor,
-              barWidth: 2,
-              isCurved: true,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: chartAreaGradient(incomeColor),
-              ),
-            ),
-          ],
         ),
-      ),
+      ],
     );
   }
+
+  Widget _legendDot(Color color) => Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+      );
 }

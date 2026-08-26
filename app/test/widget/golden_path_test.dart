@@ -119,8 +119,8 @@ void main() {
     expect(ops.last.lamport, greaterThan(0));
 
     // ── ③ 账单页（默认主页）：当天支出合计 + 分类行；记账页预算卡联动 ──
-    // （W3 迁移后'支出 '标签与金额拆分为独立 Text）
-    expect(find.text('支出 '), findsOneWidget);
+    // （日汇总行与明细区分：黑色标题样式 + 「支出：」与标题同字号）
+    expect(find.text('支出：'), findsOneWidget);
     expect(find.text('¥25.50'), findsOneWidget);
     expect(find.text('餐饮 / 早餐'), findsOneWidget);
     await tester.tap(find.byTooltip('记一笔'));
@@ -132,14 +132,12 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
-    // ── ④ 报表页：三图渲染（当月区间）──
+    // ── ④ 报表页：饼图 + 周期对比双柱图（当月区间；收支趋势已按需求取消）──
     await tester.tap(find.text('报表'));
     await tester.pumpAndSettle();
     expect(find.byType(PieChart), findsOneWidget);
     expect(find.byType(BarChart), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('收支趋势'), 200,
-        scrollable: find.byType(Scrollable).first);
-    expect(find.text('收支趋势'), findsOneWidget);
+    expect(find.text('收支趋势'), findsNothing);
 
     // ── ⑤ 设置 → 开启隐私锁 → 立即锁定 → 锁屏覆盖 → PIN 解锁 ──
     await tester.tap(find.byIcon(Icons.settings_outlined));

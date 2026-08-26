@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/errors/repository_exceptions.dart';
 import '../../core/ledger_version.dart';import '../../data/local/database.dart';
 import '../../domain/models/category_seed.dart';
+import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
 import '../books/books_providers.dart'
     show categoryRepositoryProvider, currentRoleProvider;
@@ -88,18 +89,10 @@ class _CategoryListState extends ConsumerState<_CategoryList> {
         ),
         if (!_collapsed.contains(parent.id))
           for (final child in categories.where((c) => c.parentId == parent.id))
-            ListTile(
-              leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
-              title: Text(child.name),
-              // 编辑/删除入口（含系统分类，软删除保留历史流水分类名快照）：
-              // 点击整行或右侧菜单均可打开操作弹层；viewer 只读隐藏
-              onTap: widget.viewer ? null : () => _showActions(context, ref, child),
-              trailing: widget.viewer
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.more_vert),
-                      onPressed: () => _showActions(context, ref, child),
-                    ),
+            _ChildTile(
+              child: child,
+              viewer: widget.viewer,
+              onActions: () => _showActions(context, ref, child),
             ),
       ],
     ];
@@ -177,6 +170,8 @@ class _CategoryListState extends ConsumerState<_CategoryList> {
   }
 }
 
+/// 一级分类组头（需求：与二级分类直观区分）：
+/// 分类自身色调淡底 + 圆角通栏条，标题加粗着色，右侧折叠/操作入口
 class _ParentHeader extends StatelessWidget {
   const _ParentHeader({
     required this.parent,
@@ -194,26 +189,74 @@ class _ParentHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+      child: Container(
+        // 一级分类淡色底条：以分类主色的低透明度铺底，与白底的二级行分层
+        decoration: BoxDecoration(
+          color: Color(parent.color).withValues(alpha: 0.12),
+          borderRadius: AppRadius.smAll,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: ListTile(
+            dense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
+            leading: Icon(categoryIcon(parent.icon), color: Color(parent.color)),
+            title: Text(
+              parent.name,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Color(parent.color), fontWeight: FontWeight.bold),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasChildren)
+                  Icon(collapsed ? Icons.expand_less : Icons.expand_more),
+                if (onMore != null)
+                  IconButton(icon: const Icon(Icons.more_vert), onPressed: onMore),
+              ],
+            ),
+            onTap: hasChildren ? onToggle : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 二级分类行：相对一级组头整体右移缩进 + 常规字重，层级从属一目了然
+class _ChildTile extends StatelessWidget {
+  const _ChildTile({
+    required this.child,
+    required this.viewer,
+    required this.onActions,
+  });
+
+  final Category child;
+  final bool viewer;
+  final VoidCallback onActions;
+
+  @override
+  Widget build(BuildContext context) {
     return ListTile(
-      dense: true,
-      leading: Icon(categoryIcon(parent.icon), color: Color(parent.color)),
-      title: Text(
-        parent.name,
-        style: Theme.of(context)
-            .textTheme
-            .titleSmall
-            ?.copyWith(color: Color(parent.color), fontWeight: FontWeight.bold),
+      // 缩进量 = 组头外边距(md) + 组头内边距(sm) + 一级缩进(lg)，
+      // 使子项图标明显退入父级之下
+      contentPadding: const EdgeInsetsDirectional.only(
+        start: AppSpacing.md + AppSpacing.sm + AppSpacing.lg,
+        end: AppSpacing.md,
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hasChildren)
-            Icon(collapsed ? Icons.expand_less : Icons.expand_more),
-          if (onMore != null)
-            IconButton(icon: const Icon(Icons.more_vert), onPressed: onMore),
-        ],
-      ),
-      onTap: hasChildren ? onToggle : null,
+      leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
+      title: Text(child.name),
+      // 编辑/删除入口（含系统分类，软删除保留历史流水分类名快照）：
+      // 点击整行或右侧菜单均可打开操作弹层；viewer 只读隐藏
+      onTap: viewer ? null : onActions,
+      trailing: viewer
+          ? null
+          : IconButton(icon: const Icon(Icons.more_vert), onPressed: onActions),
     );
   }
 }

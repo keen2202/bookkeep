@@ -10,7 +10,7 @@ void main() {
   testWidgets('period bar chart compacts cross-year X labels', (tester) async {
     final buckets = [
       for (final y in [2021, 2022, 2023, 2024, 2025, 2026])
-        PeriodBucket(label: '$y-08-09', amountMinor: 1000),
+        PeriodBucket(label: '$y-08-09', expenseMinor: 1000, incomeMinor: 500),
     ];
 
     await tester.pumpWidget(harness(
@@ -31,7 +31,11 @@ void main() {
   testWidgets('period bar chart compacts month buckets to month only', (tester) async {
     final buckets = [
       for (var m = 1; m <= 6; m++)
-        PeriodBucket(label: '2026-${m.toString().padLeft(2, '0')}', amountMinor: 1000),
+        PeriodBucket(
+          label: '2026-${m.toString().padLeft(2, '0')}',
+          expenseMinor: 1000,
+          incomeMinor: 500,
+        ),
     ];
 
     await tester.pumpWidget(harness(
@@ -46,5 +50,25 @@ void main() {
       expect(find.text(m), findsOneWidget);
     }
     expect(find.text('2026-01'), findsNothing);
+  });
+
+  testWidgets('period bar chart shows expense/income legend for direct comparison',
+      (tester) async {
+    final buckets = [
+      PeriodBucket(label: '08-03', expenseMinor: 1000, incomeMinor: 500),
+      PeriodBucket(label: '08-04', expenseMinor: 2000, incomeMinor: 0),
+    ];
+
+    await tester.pumpWidget(harness(
+      SizedBox(
+        width: 320,
+        child: PeriodBarChart(buckets: buckets, hideAmounts: false),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 需求：x 轴每个周期下以「支出/收入」双柱 + 图例直观对比收支
+    expect(find.text('支出'), findsOneWidget);
+    expect(find.text('收入'), findsOneWidget);
   });
 }

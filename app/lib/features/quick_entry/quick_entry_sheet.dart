@@ -10,7 +10,6 @@ import '../../data/local/tables/categories_table.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/usecases/create_transaction.dart';
 import '../../shared/theme/app_theme.dart';
-import '../../shared/widgets/glass_icon.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/app_snack.dart';
@@ -120,17 +119,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     super.dispose();
   }
 
-  /// 退出快速记账：不强制完成记账，直接返回主界面。
-  /// 若当前为根路由（异常/测试环境）则执行 maybePop 兜底，不阻断退出。
-  void _exit() {
-    final navigator = Navigator.of(context);
-    if (navigator.canPop()) {
-      navigator.pop();
-    } else {
-      navigator.maybePop();
-    }
-  }
-
   Future<void> _save() async {
     // 审查 U-4：保存 busy 锁——连点「确定」不重复入账（controller 内也有 saving 互斥）
     if (_controller.saving) return;
@@ -169,13 +157,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
     return GlassScaffold(
       title: Text(widget.editTarget != null ? '编辑账单' : '记一笔'),
-      actions: [
-        TextButton.icon(
-          onPressed: _exit,
-          icon: const GlassIcon(icon: Icons.close, size: GlassIconSize.s28),
-          label: const Text('退出'),
-        ),
-      ],
+      // 需求：取消右上角「退出」按钮——返回由系统返回手势/导航返回键承担
       body: Column(
         children: [
           SegmentedButton<TransactionType>(
@@ -216,7 +198,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             child: ListView(
               children: [
                 if (widget.editTarget == null) const BudgetSummaryCard(),
-                if (widget.editTarget != null) _buildNoteField(),
+                // 需求：新增记账同样提供备注栏（编辑模式此前已有）
+                _buildNoteField(),
                 _buildSelections(
                   accounts: accounts,
                   accountsLoading: accountsAsync.isLoading,
@@ -239,7 +222,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     );
   }
 
-  /// 备注字段（编辑模式）：账单列表展示备注，编辑需可改
+  /// 备注字段（新增/编辑通用）：账单列表展示备注，记一笔即可填写
   Widget _buildNoteField() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm),
