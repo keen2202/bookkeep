@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shared/theme/app_icons.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/glass_prefs.dart';
 import '../../shared/theme/glass_tokens.dart';
-import '../../shared/widgets/glass_icon.dart';
 import '../../shared/theme/color_picker_dialog.dart';
 import '../../shared/theme/theme_controller.dart';
 import '../../shared/theme/theme_presets.dart';
@@ -17,8 +15,11 @@ import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/glass_nav.dart';
 
 /// "外观"设置页（FGDS v1.0 收敛版）：
-/// 主题方案（8 套预制网格 + 自定义入口）/ 图标风格 / 玻璃质感（磨砂
-/// 降级开关，fill α+0.10 补偿）。
+/// 主题方案（8 套预制网格 + 自定义入口）/ 玻璃质感（磨砂降级开关，
+/// fill α+0.10 补偿）。
+///
+/// 「图标风格选择」已移除（Spec §2.3 / BK-DOC-26）：IconPack 配置面整体
+/// 收敛，模块图标固定 outlined 变体。
 ///
 /// 旧「个性背景」（背景图/遮罩/模糊）与「环境光」（光斑动效/强度/钳制）
 /// 已随旧系统拆除——纯净背景为 Spec §2.2 硬约束、禁止背景图与光斑
@@ -37,9 +38,6 @@ class AppearancePage extends ConsumerWidget {
         children: [
           _SectionTitle('主题方案'),
           _ThemePresetGrid(current: themeSettings),
-          const SizedBox(height: AppSpacing.lg),
-          _SectionTitle('图标风格'),
-          _IconPackSection(current: themeSettings),
           const SizedBox(height: AppSpacing.lg),
           // FGDS：玻璃质感唯一可调项——低性能磨砂降级（BK-FG-003）
           const _SectionTitle('玻璃质感'),
@@ -361,49 +359,6 @@ class _SeedDot extends StatelessWidget {
         ),
         child: selected ? Icon(Icons.check, size: 20, color: checkColor) : null,
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 图标风格（现有能力迁移保留）
-// ---------------------------------------------------------------------------
-class _IconPackSection extends ConsumerWidget {
-  const _IconPackSection({required this.current});
-
-  final ThemeSettings current;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final controller = ref.read(themeControllerProvider.notifier);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SegmentedButton<IconPack>(
-          segments: [
-            for (final pack in IconPack.values)
-              ButtonSegment(value: pack, label: Text(pack.label)),
-          ],
-          selected: {current.iconPack},
-          onSelectionChanged: (s) => controller.setIconPack(s.first),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        // 模块图标预览（账单/分类/周期记账/报表/日历）：36 档 FG-ICON 容器
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            for (final module in AppModule.values)
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GlassIcon(icon: moduleIcon(module, current.iconPack)),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(module.label, style: context.text.labelSmall),
-                ],
-              ),
-          ],
-        ),
-      ],
     );
   }
 }

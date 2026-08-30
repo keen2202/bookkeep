@@ -17,18 +17,19 @@ import 'features/books/book_switcher.dart';
 import 'features/books/books_page.dart' show serverBooksProvider;
 import 'features/books/books_providers.dart' show currentBookIdProvider, currentRoleProvider;
 import 'features/bills/bills_page.dart';
-import 'features/calendar/calendar_page.dart';
 import 'features/categories/categories_page.dart' show CategoriesPage, categoriesPageAction;
 import 'features/currency/currency_manage_page.dart';
 import 'features/quick_entry/quick_entry_sheet.dart';
-import 'features/recurring/recurring_page.dart' show RecurringPage, recurringPageActions;
+import 'features/recurring/recurring_page.dart' show RecurringSettingsPage;
 import 'features/recurring/recurring_providers.dart' show recurringServiceProvider;
 import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/appearance_page.dart';
+import 'features/settings/fab_position.dart';
 import 'shared/theme/app_icons.dart';
 import 'shared/theme/theme_controller.dart';
 import 'shared/theme/theme_transition.dart';
+import 'shared/widgets/draggable_fab.dart';
 import 'shared/widgets/glass_nav.dart';
 import 'shared/theme/background/app_background.dart';
 
@@ -120,7 +121,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   /// 需传入 Navigator 内的 context（state.context 在 MaterialApp 之上，无法定位 Navigator）
   Future<void> _openQuickEntry(BuildContext navContext) => openQuickEntrySheet(navContext);
 
-  static const _tabTitles = ['账单', '分类', '周期记账', '报表', '日历'];
+  static const _tabTitles = ['账单', '分类', '报表'];
 
   @override
   Widget build(BuildContext context) {
@@ -149,33 +150,41 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
           ref.watch(serverBooksProvider);
           final viewer = ref.watch(currentRoleProvider) == 'viewer';
           return Scaffold(
-            body: NotificationListener<UserScrollNotification>(
-              onNotification: (n) {
-                final scrolled = n.metrics.pixels > 0;
-                if (scrolled != _scrolled) {
-                  setState(() => _scrolled = scrolled);
-                }
-                return false;
-              },
-              // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range/_hideAmounts）
-              child: IndexedStack(
-                index: _tab,
-                children: const [
-                  BillsPage(),
-                  CategoriesPage(),
-                  RecurringPage(),
-                  ReportsPage(),
-                  CalendarPage(),
-                ],
-              ),
-            ),
-            floatingActionButton: viewer
-                ? null
-                : GlassFab(
-                    icon: Icons.add,
-                    tooltip: '记一笔',
-                    onTap: () => _openQuickEntry(navContext),
+            body: Stack(
+              children: [
+                NotificationListener<UserScrollNotification>(
+                  onNotification: (n) {
+                    final scrolled = n.metrics.pixels > 0;
+                    if (scrolled != _scrolled) {
+                      setState(() => _scrolled = scrolled);
+                    }
+                    return false;
+                  },
+                  // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range/_hideAmounts）
+                  child: IndexedStack(
+                    index: _tab,
+                    children: const [
+                      BillsPage(),
+                      CategoriesPage(),
+                      ReportsPage(),
+                    ],
                   ),
+                ),
+                // BK-DOC-26 需求4：可拖拽记账按钮——长按拖动自由移动，
+                // 默认底部正中；松手持久化归一化锚点，重启还原；viewer 隐藏
+                if (!viewer)
+                  Positioned.fill(
+                    child: DraggableGlassFab(
+                      icon: Icons.add,
+                      semanticLabel: '记一笔',
+                      anchor: ref.watch(fabAnchorProvider),
+                      onTap: () => _openQuickEntry(navContext),
+                      onPlacementChanged: (a) =>
+                          ref.read(fabAnchorProvider.notifier).save(a),
+                    ),
+                  ),
+              ],
+            ),
             bottomNavigationBar: GlassBottomBar(
               selectedIndex: _tab,
               showDivider: _scrolled,
@@ -183,7 +192,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
               items: [
                 for (final m in AppModule.values)
                   GlassNavItem(
-                    icon: moduleIcon(m, themeSettings.iconPack),
+                    icon: moduleIcon(m),
                     label: m.label,
                   ),
               ],
@@ -215,7 +224,6 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   List<Widget> _tabActions(BuildContext navContext) {
     return switch (_tab) {
       1 => [ ?categoriesPageAction(navContext, ref) ],
-      2 => recurringPageActions(navContext, ref),
       _ => const [],
     };
   }
@@ -250,7 +258,7 @@ class _SettingsSheet extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.palette_outlined),
                 title: const Text('外观'),
-                subtitle: const Text('主题方案 / 图标风格'),
+                subtitle: const Text('主题方案 / 玻璃质感'),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AppearancePage()),
                 ),
@@ -280,6 +288,14 @@ class _SettingsSheet extends ConsumerWidget {
                 subtitle: const Text('新增 / 编辑 / 归档账户'),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AccountsPage()),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.repeat_outlined),
+                title: const Text('周期记账'),
+                subtitle: const Text('创建 / 编辑 / 删除规则，到期自动入账'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RecurringSettingsPage()),
                 ),
               ),
               ListTile(

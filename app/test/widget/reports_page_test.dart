@@ -2,8 +2,10 @@ import 'package:drift/drift.dart' hide isNotNull;
 import 'package:drift/native.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/database_provider.dart';
@@ -184,5 +186,73 @@ void main() {
 
     expect(find.text('${now.year}'), findsOneWidget);
     expect(find.text('$lastYear'), findsOneWidget);
+  });
+
+  // ── BK-DOC-26 需求6：日历并入报表 ──
+
+  testWidgets('calendar view: toggle shows month grid, tapping a day opens detail',
+      (tester) async {
+    await initializeDateFormatting('zh_CN');
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
+          bookId: testBookId,
+          accountType: AccountType.cash,
+          name: '钱包',
+          currency: 'CNY',
+          createdAt: DateTime.utc(2026, 8, 1),
+        ));
+    final now = DateTime.now();
+    await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
+          accountId: accountId,
+          type: TransactionType.expense,
+          amountMinor: -2550,
+          currency: 'CNY',
+          occurredAt: DateTime(now.year, now.month, now.day, 8, 30),
+          updatedAt: now,
+        ));
+
+    // TableCalendar zh_CN 头部需要本地化代理（与 calendar_page_test 同）
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        currentBookIdProvider.overrideWith((ref) => testBookId),
+      ],
+      child: const MaterialApp(
+        locale: Locale('zh', 'CN'),
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(body: ReportsPage()),
+      ),
+    ));
+    await pumpUntilFound(tester, find.text('分类占比'));
+
+    // 图表 → 日历：月历出现，图表区收起
+    await tester.tap(find.text('日历'));
+    await pumpUntilFound(tester, find.text('周一'));
+    expect(find.text('周一'), findsOneWidget);
+    expect(find.text('分类占比'), findsNothing);
+
+    // 点击「今天」日格（唯一加粗白字日号）→ 当天账单明细
+    final today = DateTime.now().day;
+    final todayCell = find.byWidgetPredicate(
+      (w) =>
+          w is Text &&
+          w.data == '$today' &&
+          w.style?.fontWeight == FontWeight.bold &&
+          w.style?.color == Colors.white,
+    );
+    await tester.tap(todayCell);
+    await pumpUntilFound(tester, find.textContaining('净额'));
+    expect(find.textContaining('净额'), findsOneWidget);
+
+    // 切回图表视图正常
+    await tester.tap(find.text('图表'));
+    await pumpUntilFound(tester, find.text('分类占比'));
+    expect(find.text('分类占比'), findsOneWidget);
   });
 }

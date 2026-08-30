@@ -23,7 +23,7 @@ class CaptureConfirmPage extends ConsumerStatefulWidget {
 
   final List<CaptureCandidate> candidates;
 
-  /// 建议分类映射（语音/短信可用规则引擎结果；CSV 为空）
+  /// 建议分类映射（短信可用规则引擎结果；CSV 为空）
   final String? Function(CaptureCandidate)? categoryNameFor;
   final String? source;
 

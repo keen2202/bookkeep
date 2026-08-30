@@ -13,11 +13,13 @@ class SettingsRepository {
   static const _secondsOpenKey = 'seconds_open_mode';
   static const _themeSeedKey = 'theme_seed';
   static const _themeModeKey = 'theme_mode';
-  static const _themeIconPackKey = 'theme_icon_pack';
   // UI 重构（Spec §2.2/D5）：预制主题键；旧用户无此键时按旧 seed_color 落 'custom'
   static const _themePresetIdKey = 'theme_preset_id';
 
   // 旧背景图系统五键（bg_*）随纯净背景约束一并废弃（Spec §2.2，AC-02）：
+  // 历史键读取时忽略、不再写入。
+
+  // 图标风格键（theme_icon_pack）随外观简化废弃（Spec §2.3，BK-DOC-26）：
   // 历史键读取时忽略、不再写入。
 
   // FGDS v1.0（BK-FG-003）：玻璃降级开关键；旧 v3 的 glass_quality /
@@ -46,7 +48,6 @@ class SettingsRepository {
           ..where((t) => t.key.isIn({
                 _themeSeedKey,
                 _themeModeKey,
-                _themeIconPackKey,
                 _themePresetIdKey,
               })))
         .get();
@@ -57,14 +58,12 @@ class SettingsRepository {
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
-    final iconPack = IconPack.values.asNameMap()[map[_themeIconPackKey]];
     final presetId = map[_themePresetIdKey] ??
         (map.containsKey(_themeSeedKey) ? 'custom' : ThemeSettings.defaults.presetId);
     return ThemeSettings(
       presetId: presetId,
       seedColor: seed ?? ThemeSettings.defaults.seedColor,
       mode: mode,
-      iconPack: iconPack ?? ThemeSettings.defaults.iconPack,
     );
   }
 
@@ -77,10 +76,6 @@ class SettingsRepository {
           AppMetaCompanion.insert(key: _themeModeKey, value: settings.mode.name),
           onConflict: DoUpdate(
               (_) => AppMetaCompanion(value: Value(settings.mode.name))));
-      batch.insert(db.appMeta,
-          AppMetaCompanion.insert(key: _themeIconPackKey, value: settings.iconPack.name),
-          onConflict: DoUpdate(
-              (_) => AppMetaCompanion(value: Value(settings.iconPack.name))));
       batch.insert(db.appMeta,
           AppMetaCompanion.insert(key: _themePresetIdKey, value: settings.presetId),
           onConflict: DoUpdate(
@@ -105,6 +100,37 @@ class SettingsRepository {
             key: _glassBlurEnabledKey, value: '${prefs.blurEnabled}'),
         onConflict: DoUpdate((_) =>
             AppMetaCompanion(value: Value('${prefs.blurEnabled}'))),
+      );
+    });
+  }
+
+  // FAB 拖拽位置（BK-DOC-26 需求4）：归一化锚点（按钮中心 / 内容区宽高比）。
+  // 键缺失或数值非法返回 (null, null) → 调用方回落默认底部正中位置。
+  static const _fabAnchorXKey = 'fab_anchor_x';
+  static const _fabAnchorYKey = 'fab_anchor_y';
+
+  Future<(double?, double?)> fabAnchor() async {
+    final rows = await (db.select(db.appMeta)
+          ..where((t) => t.key.isIn({_fabAnchorXKey, _fabAnchorYKey})))
+        .get();
+    final map = {for (final r in rows) r.key: r.value};
+    final ax = double.tryParse(map[_fabAnchorXKey] ?? '');
+    final ay = double.tryParse(map[_fabAnchorYKey] ?? '');
+    if (ax == null || ay == null) return (null, null);
+    return (ax, ay);
+  }
+
+  Future<void> setFabAnchor(double ax, double ay) async {
+    await db.batch((batch) {
+      batch.insert(
+        db.appMeta,
+        AppMetaCompanion.insert(key: _fabAnchorXKey, value: '$ax'),
+        onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('$ax'))),
+      );
+      batch.insert(
+        db.appMeta,
+        AppMetaCompanion.insert(key: _fabAnchorYKey, value: '$ay'),
+        onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('$ay'))),
       );
     });
   }

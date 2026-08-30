@@ -14,6 +14,7 @@ import 'package:bookkeep_app/features/accounts/accounts_page.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/books/books_page.dart' show showBookActions;
 import 'package:bookkeep_app/features/books/books_providers.dart';
+import 'package:bookkeep_app/shared/widgets/draggable_fab.dart';
 
 import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
@@ -56,7 +57,7 @@ void main() {
 
     await tester.pumpWidget(shellHarness(db, role: 'viewer'));
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byTooltip('记一笔'), findsNothing);
+    expect(find.byType(DraggableGlassFab), findsNothing);
   });
 
   testWidgets('owner 显示主界面「记一笔」FAB', (tester) async {
@@ -65,7 +66,7 @@ void main() {
 
     await tester.pumpWidget(shellHarness(db));
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byTooltip('记一笔'), findsOneWidget);
+    expect(find.byType(DraggableGlassFab), findsOneWidget);
   });
 
   testWidgets('viewer 隐藏账户页「新建账户」FAB 且长按无编辑菜单', (tester) async {
@@ -118,13 +119,24 @@ void main() {
     expect(find.text('点击右下角 + 记一笔'), findsOneWidget);
   });
 
+  /// 周期记账已下沉为设置项（BK-DOC-26 §2.5）：设置弹层 → 周期记账
+  /// （设置项较多时先滚动到可见）
+  Future<void> openRecurringSettings(WidgetTester tester) async {
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('周期记账'), 120,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('周期记账'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('viewer 隐藏周期记账页「新建规则/立即补跑」动作', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db, role: 'viewer'));
-    await switchTab(tester, '周期记账');
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 600));
+    await openRecurringSettings(tester);
     expect(find.byTooltip('新建规则'), findsNothing);
     expect(find.byTooltip('立即补跑'), findsNothing);
   });
@@ -134,8 +146,8 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db));
-    await switchTab(tester, '周期记账');
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 600));
+    await openRecurringSettings(tester);
     expect(find.byTooltip('新建规则'), findsOneWidget);
     expect(find.byTooltip('立即补跑'), findsOneWidget);
   });

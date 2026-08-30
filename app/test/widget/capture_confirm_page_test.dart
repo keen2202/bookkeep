@@ -46,7 +46,7 @@ void main() {
                   context,
                   candidates: cands,
                   categoryNameFor: (c) => c.categoryName,
-                  source: 'voice',
+                  source: 'sms',
                 ),
                 child: const Text('打开确认页'),
               ),

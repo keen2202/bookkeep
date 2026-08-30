@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/money_format.dart';
 import '../theme/app_theme.dart';
+import '../theme/tokens.dart';
 
 /// 金额语气（收支自动着色，设计文档 §3.4 图表/金额规范）
 enum AppAmountTone { income, expense, neutral }
@@ -15,6 +16,7 @@ class AppAmountText extends StatelessWidget {
     this.tone = AppAmountTone.neutral,
     this.large = false,
     this.color,
+    this.style,
     this.textAlign,
     this.maxLines,
   });
@@ -30,6 +32,7 @@ class AppAmountText extends StatelessWidget {
     bool large = false,
     AppAmountTone? tone,
     Color? color,
+    TextStyle? style,
     TextAlign? textAlign,
   }) {
     final derived = tone ??
@@ -47,6 +50,7 @@ class AppAmountText extends StatelessWidget {
       tone: derived,
       large: large,
       color: color,
+      style: style,
       textAlign: textAlign,
     );
   }
@@ -59,6 +63,10 @@ class AppAmountText extends StatelessWidget {
 
   /// 显式颜色优先于语气着色
   final Color? color;
+
+  /// 字阶覆盖（BK-DOC-26 需求1：如账单行金额对齐页面标题 titleLarge）；
+  /// 语义着色与等宽数字仍然生效
+  final TextStyle? style;
 
   final TextAlign? textAlign;
   final int? maxLines;
@@ -73,12 +81,16 @@ class AppAmountText extends StatelessWidget {
           AppAmountTone.expense => appColors.expense,
           AppAmountTone.neutral => tokens.palette.textPrimary,
         };
-    final base = large ? tokens.displayAmountStyle : tokens.amountStyle;
+    final base = style ?? (large ? tokens.displayAmountStyle : tokens.amountStyle);
     return Text(
       text,
       textAlign: textAlign,
       maxLines: maxLines,
-      style: base.copyWith(color: effectiveColor),
+      // 覆盖字阶时保持等宽数字（金额列纵向对齐不回归）
+      style: base.copyWith(
+        color: effectiveColor,
+        fontFeatures: AppText.tabularFigures,
+      ),
     );
   }
 }

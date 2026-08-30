@@ -75,6 +75,55 @@ class RecurringService {
     return total;
   }
 
+  /// 编辑规则（BK-DOC-26 需求5）：写回频率/锚点/收支类型/金额/账户，
+  /// 并以「严格晚于当前时刻的第一个到期日」重算 nextDue——不回溯补跑，
+  /// 避免锚点变更意外生成历史流水。
+  Future<void> updateRecurringRule(
+    int id, {
+    required RecurringFrequency frequency,
+    required AnchorType anchorType,
+    required int anchorDay,
+    required String type,
+    required int amountMinor,
+    required int accountId,
+    int? categoryId,
+    DateTime? now,
+  }) async {
+    final current = now ?? DateTime.now();
+    final rule = await (db.select(db.recurringRules)
+          ..where((t) => t.id.equals(id)))
+        .getSingle();
+    final spec = RecurringRuleSpec(
+      frequency: frequency,
+      interval: rule.interval,
+      anchorType: anchorType,
+      anchorDay: anchorDay,
+      startDate: rule.startDate,
+      endDate: rule.endDate,
+    );
+    final nextDue = const RecurringEngine().firstDueAfter(spec, current) ?? current;
+    await (db.update(db.recurringRules)..where((t) => t.id.equals(id))).write(
+      RecurringRulesCompanion(
+        frequency: Value(frequency.name),
+        anchorType: Value(anchorType.name),
+        anchorDay: Value(anchorDay),
+        type: Value(type),
+        amountMinor: Value(amountMinor),
+        accountId: Value(accountId),
+        // 编辑界面不管理分类：未显式指定时保留原值
+        categoryId: Value(categoryId ?? rule.categoryId),
+        nextDue: Value(nextDue),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  /// 删除规则（BK-DOC-26 需求5）：仅移除规则本身；已自动生成的历史
+  /// 流水保留（Spec §2.5 AC5-4）。
+  Future<void> deleteRecurringRule(int id) async {
+    await (db.delete(db.recurringRules)..where((t) => t.id.equals(id))).go();
+  }
+
   /// 等额分期计划：建计划 + 排期（末笔补差，合计 = 总额）
   Future<int> createInstallmentPlan({
     required String name,

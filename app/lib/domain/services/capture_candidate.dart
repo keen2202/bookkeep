@@ -1,7 +1,7 @@
 import '../../data/local/tables/transactions_table.dart';
 
 /// 自动记账候选（Spec §4.2 / BK-T-011）：解析/识别结果必须经确认页才可入账
-/// （禁止静默写入）。来源：CSV 导入 / 通知短信解析 / 语音识别。
+/// （禁止静默写入）。来源：CSV 导入 / 通知短信解析。
 class CaptureCandidate {
   const CaptureCandidate({
     required this.amountMinor,

@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bookkeep_app/features/auto_capture/sms_parser.dart';
-import 'package:bookkeep_app/features/auto_capture/voice_entry_sheet.dart';
 
 void main() {
   group('短信解析（Spec §4.2 金额抽取正则）', () {
@@ -53,37 +52,6 @@ void main() {
         expect(c!.amountMinor, isNot(0));
         expect(c.counterparty, isNotEmpty);
       }
-    });
-  });
-
-  group('语音规则引擎（LLM 抽象默认关闭）', () {
-    const engine = VoiceRuleEngine();
-
-    test('提取金额/方向/分类提示', () {
-      final c = engine.extract('昨天午餐打车花了25元');
-      expect(c, isNotNull);
-      expect(c!.amountMinor, -2500);
-      expect(c.type.name, 'expense');
-      expect(c.categoryName, '交通'); // 打车 → 交通
-    });
-
-    test('时间锚点：昨天', () {
-      final now = DateTime.now();
-      final c = engine.extract('昨天吃饭支出50元')!;
-      final yesterday = now.subtract(const Duration(days: 1));
-      expect(c.occurredAt.year, yesterday.year);
-      expect(c.occurredAt.month, yesterday.month);
-      expect(c.occurredAt.day, yesterday.day);
-    });
-
-    test('时间锚点：HH:mm', () {
-      final c = engine.extract('今天 14:30 去超市买东西花了88元')!;
-      expect(c.occurredAt.hour, 14);
-      expect(c.occurredAt.minute, 30);
-    });
-
-    test('方向不明的文本返回 null', () {
-      expect(engine.extract('今天天气不错'), isNull);
     });
   });
 }

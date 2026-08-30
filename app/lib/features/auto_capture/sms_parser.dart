@@ -2,7 +2,7 @@ import '../../data/local/tables/transactions_table.dart';
 import '../../domain/services/capture_candidate.dart';
 
 /// 短信/通知文本抽取（Spec §4.2 / BK-T-011）：正则抽取金额/商户/收支方向。
-/// 纯规则引擎（LLM 接口抽象层见 voice_entry_sheet.dart，默认关闭）。
+/// 纯规则引擎；语音记账入口已移除（BK-DOC-26 需求2）。
 class SmsCaptureParser {
   // 金额：优先货币符号后的金额（避免误匹配尾号等前置数字），支持千分位
   static final _currencyAmountRe =

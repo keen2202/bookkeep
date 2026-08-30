@@ -15,6 +15,7 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/data/repositories/lock_repository.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
+import 'package:bookkeep_app/shared/widgets/draggable_fab.dart';
 
 import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
@@ -37,6 +38,13 @@ void main() {
     await tester.tap(find.text(key));
     await tester.pump(const Duration(milliseconds: 30));
   }
+
+  /// 主界面「记一笔」按钮（BK-DOC-26 需求4 起为可拖拽 DraggableGlassFab，
+  /// 组件本身铺满内容区，真实按钮经加号图标定位）
+  Finder fabButton() => find.descendant(
+        of: find.byType(DraggableGlassFab),
+        matching: find.byIcon(Icons.add),
+      );
 
   /// 经数字键盘输入 6 位 PIN 并等待 PBKDF2 校验/落库完成
   Future<void> enterPin(WidgetTester tester, String pin) async {
@@ -81,7 +89,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     // ── ① 记账：FAB → 快速记账 25.5 元 ──
-    await tester.tap(find.byTooltip('记一笔'));
+    await tester.tap(fabButton());
     await tester.pumpAndSettle();
     await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
     for (final key in ['2', '5', '.', '5']) {
@@ -123,7 +131,7 @@ void main() {
     expect(find.text('支出：'), findsOneWidget);
     expect(find.text('¥25.50'), findsOneWidget);
     expect(find.text('餐饮 / 早餐'), findsOneWidget);
-    await tester.tap(find.byTooltip('记一笔'));
+    await tester.tap(fabButton());
     await tester.pumpAndSettle();
     await pumpUntilFound(tester, find.text('本月预算'));
     expect(find.text('已花 ¥25.50 / 总额 ¥100.00'), findsOneWidget);

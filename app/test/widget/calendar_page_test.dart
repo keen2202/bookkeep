@@ -130,7 +130,7 @@ void main() {
     );
   });
 
-  testWidgets('tapping a date opens quick entry prefilled with that day', (tester) async {
+  testWidgets('tapping a date opens the day bill detail sheet', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -138,15 +138,13 @@ void main() {
     await pumpUntil(tester, find.text('周一'));
     await tapTodayCell(tester);
 
-    expect(find.text('记一笔'), findsOneWidget);
-    final now = DateTime.now();
-    final expected = '${now.year}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
-    expect(find.text(expected), findsOneWidget);
+    // BK-DOC-26 需求6：点日查看当天账单明细（净额 + 笔数）
+    await pumpUntil(tester, find.textContaining('净额'));
+    expect(find.textContaining('净额'), findsOneWidget);
   });
 
-  testWidgets('viewer tapping a date does not open quick entry', (tester) async {
+  testWidgets('viewer tapping a date can still view the day detail (read-only)',
+      (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -154,7 +152,9 @@ void main() {
     await pumpUntil(tester, find.text('周一'));
     await tapTodayCell(tester);
 
-    expect(find.text('记一笔'), findsNothing);
+    // 只读角色可查看明细（无写入口，明细为只读列表）
+    await pumpUntil(tester, find.textContaining('净额'));
+    expect(find.textContaining('净额'), findsOneWidget);
   });
 
   testWidgets('long pressing a date shows the day detail sheet', (tester) async {

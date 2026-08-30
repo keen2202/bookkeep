@@ -35,7 +35,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('分类'), findsWidgets);
-    expect(find.text('周期记账'), findsWidgets);
+    // BK-DOC-26：主导航收敛为 账单/分类/报表；周期记账下沉设置、日历并入报表
+    expect(find.text('报表'), findsOneWidget);
+    expect(find.text('周期记账'), findsNothing);
+    expect(find.text('日历'), findsNothing);
   });
 
   testWidgets('秒开分支：appShellBuilder 拼装 ThemeTransition + AppBackground + LockGate',

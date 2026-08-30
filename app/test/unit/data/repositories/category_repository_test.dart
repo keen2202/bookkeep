@@ -133,6 +133,32 @@ void main() {
     expect(category.isSystem, isFalse);
   });
 
+  test('creates a second-level category under a parent; icon persists and updates (BK-DOC-26 需求7)',
+      () async {
+    final parentId = await repo.createCategory(
+      name: '娱乐',
+      icon: 'movie',
+      color: 0xFF7E57C2,
+      kind: CategoryKind.expense,
+    );
+    final childId = await repo.createCategory(
+      name: '电影',
+      icon: 'movie',
+      color: 0xFF7E57C2,
+      kind: CategoryKind.expense,
+      parentId: parentId,
+    );
+
+    final child = await repo.getCategory(childId);
+    expect(child.parentId, parentId);
+    expect(child.icon, 'movie');
+
+    // 编辑图标（自定义图标在编辑态同样可改）
+    await repo.updateCategory(childId, icon: 'sports_esports');
+    expect((await repo.getCategory(childId)).icon, 'sports_esports');
+    expect((await repo.getCategory(childId)).parentId, parentId);
+  });
+
   test('refuses to delete a category referenced by transactions', () async {
     final id = await repo.createCategory(
       name: '被引用',

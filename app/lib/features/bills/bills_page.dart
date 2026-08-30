@@ -179,7 +179,14 @@ class _BillTile extends StatelessWidget {
       ),
       title: Text(name),
       subtitle: Text(tx.note == null || tx.note!.isEmpty ? time : '$time · ${tx.note}'),
-      trailing: AppAmountText.minor(tx.amountMinor, masked: masked, tone: amountTone),
+      // BK-DOC-26 需求1：金额字号与页面标题（titleLarge）一致，统一视觉层级；
+      // 等宽数字与收支语义着色由 AppAmountText 保持
+      trailing: AppAmountText.minor(
+        tx.amountMinor,
+        masked: masked,
+        tone: amountTone,
+        style: context.text.titleLarge,
+      ),
       dense: true,
       onTap: onTap,
     );

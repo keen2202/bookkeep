@@ -16,12 +16,12 @@ import 'package:bookkeep_app/features/settings/appearance_page.dart';
 import 'package:bookkeep_app/shared/theme/glass_prefs.dart';
 import 'package:bookkeep_app/shared/theme/theme_controller.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
-import 'package:bookkeep_app/shared/theme/theme_settings.dart';
 
 import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
 
-/// "外观"设置页（FGDS v1.0）：8 套预制主题即时生效 + 图标风格 + 玻璃磨砂降级开关。
+/// "外观"设置页（FGDS v1.0）：8 套预制主题即时生效 + 玻璃磨砂降级开关。
+/// 「图标风格」分区已随 Spec §2.3（BK-DOC-26）移除。
 /// 旧「个性背景 / 环境光」控制区已随纯净背景约束拆除（Spec §2.2，AC-02）。
 void main() {
   late Directory tempDir;
@@ -124,24 +124,6 @@ void main() {
     expect(persisted.mode, ThemeMode.dark);
   });
 
-  testWidgets('icon pack switch applies immediately and persists', (tester) async {
-    final db = await harnessDb();
-    await pumpPage(tester, pageHarness(db));
-
-    expect(find.byIcon(Icons.calendar_month_outlined), findsOneWidget);
-
-    await tapVisible(tester, find.text('圆角'));
-    await tester.pump();
-
-    final container =
-        ProviderScope.containerOf(tester.element(find.byType(AppearancePage)));
-    expect(container.read(themeControllerProvider).iconPack, IconPack.rounded);
-    expect(find.byIcon(Icons.calendar_month_rounded), findsOneWidget);
-
-    final persisted = await SettingsRepository(db).themeSettings();
-    expect(persisted.iconPack, IconPack.rounded);
-  });
-
   // ── FGDS：玻璃质感唯一可调项——磨砂降级开关（BK-FG-003）──
 
   testWidgets('玻璃降级开关：即时生效并持久化', (tester) async {
@@ -183,9 +165,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('主题方案'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('图标风格'), 120,
-        scrollable: find.byType(Scrollable).first);
-    expect(find.text('图标风格'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('玻璃质感'), 120,
         scrollable: find.byType(Scrollable).first);
     expect(find.text('玻璃质感'), findsOneWidget);

@@ -119,6 +119,9 @@ void main() {
     await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
     await tester.pump(const Duration(milliseconds: 400)); // 弹窗入场动画完成
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '旅行');
+    // 弹层内含图标库较高：保存按钮先滚入可视区再点击
+    await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
+    await tester.pump();
     await tester.tap(find.widgetWithText(AppButton, '保存'));
     await pumpUntilGone(tester, find.text('保存')); // 弹窗完全关闭
     await pumpUntil(tester, find.byType(ListView)); // 数据视图已刷新
@@ -177,6 +180,8 @@ void main() {
     await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
     await tester.pumpAndSettle(); // 编辑弹层入场动画完成（否则保存按钮尚在屏外）
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '早点铺');
+    await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
+    await tester.pump();
     await tester.tap(find.widgetWithText(AppButton, '保存'));
     await pumpUntilGone(tester, find.widgetWithText(TextFormField, '分类名称'));
 
@@ -230,5 +235,92 @@ void main() {
     await tester.tap(find.text('餐饮'));
     await tester.pump();
     expect(find.text('早餐'), findsOneWidget);
+  });
+
+  // ── BK-DOC-26 需求7：层级选择 + 自定义图标 ──
+
+  testWidgets('creating a second-level category: pick level and parent', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(shellHarness(db));
+    await tester.tap(find.text('分类').last);
+    await tester.pump(const Duration(milliseconds: 300));
+    await pumpUntil(tester, find.text('餐饮'));
+
+    await tester.tap(find.byTooltip('新建分类'));
+    await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '商务打车');
+    // 选择二级层级 → 出现「归属一级分类」下拉
+    await tester.ensureVisible(find.text('二级分类'));
+    await tester.pump();
+    await tester.tap(find.text('二级分类'));
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('归属一级分类'));
+    await tester.pump();
+    await tester.tap(find.text('归属一级分类'));
+    await tester.pumpAndSettle();
+    // 支出型父级候选含「交通」；菜单项覆盖列表同名组头，取最后一个
+    await tester.tap(find.text('交通').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(AppButton, '保存'));
+    await pumpUntilGone(tester, find.text('保存'));
+    await pumpUntil(tester, find.byType(ListView));
+
+    await tester.scrollUntilVisible(find.text('商务打车'), 300,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('商务打车'), findsOneWidget);
+
+    // 落库校验：归属父级（交通），为二级分类
+    final repo = CategoryRepository(db, bookId: testBookId);
+    final all = await repo.listCategories();
+    final created = all.firstWhere((c) => c.name == '商务打车');
+    final parent = all.firstWhere((c) => c.id == created.parentId);
+    expect(created.parentId, isNotNull);
+    expect(parent.name, '交通');
+  });
+
+  testWidgets('creating a category with a custom icon', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(shellHarness(db));
+    await tester.tap(find.text('分类').last);
+    await tester.pump(const Duration(milliseconds: 300));
+    await pumpUntil(tester, find.text('餐饮'));
+
+    await tester.tap(find.byTooltip('新建分类'));
+    await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '电影之夜');
+    // 图标库选择 movie（背景列表无同名图标，命中唯一）
+    await tester.ensureVisible(find.byIcon(Icons.movie));
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.movie).first);
+    await tester.pump();
+
+    await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(AppButton, '保存'));
+    await pumpUntilGone(tester, find.text('保存'));
+    await pumpUntil(tester, find.byType(ListView));
+
+    await tester.scrollUntilVisible(find.text('电影之夜'), 300,
+        scrollable: find.byType(Scrollable).first);
+    // 列表行渲染所选图标
+    expect(
+      find.descendant(
+        of: find.widgetWithText(ListTile, '电影之夜'),
+        matching: find.byIcon(Icons.movie),
+      ),
+      findsOneWidget,
+    );
   });
 }

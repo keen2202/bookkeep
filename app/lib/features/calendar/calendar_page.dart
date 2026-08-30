@@ -12,14 +12,14 @@ import '../../data/local/tables/transactions_table.dart';
 import '../../data/repositories/reports_repository.dart';
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart'
-    show currentBookIdProvider, currentRoleProvider, reportsRepositoryProvider;
-import '../quick_entry/quick_entry_sheet.dart' show openQuickEntrySheet;
+    show currentBookIdProvider, reportsRepositoryProvider;
 import '../reports/reports_page.dart' show ReportWindow, reportRatesProvider;
 import 'cashflow_chart.dart';
 
-/// 日历/现金流视图（Spec §4.6 / BK-T-015）：
-/// 月历日格显示收支净额（复用报表按日聚合），点击日进明细；
+/// 日历视图（BK-DOC-26 需求6：日历并入报表页；原 Spec §4.6 / BK-T-015）：
+/// 月历日格显示收支净额（复用报表按日聚合），**点击日查看当天账单明细**；
 /// 月份切换懒加载（仅拉取可见月份区间）；下方为 30 天滑动窗口现金流趋势。
+/// 以 [CalendarPage] 形式嵌入报表页「日历」视图（无内层 Scaffold/AppBar）。
 class CalendarPage extends ConsumerStatefulWidget {
   const CalendarPage({super.key});
 
@@ -113,7 +113,6 @@ class _MonthTotalsScope extends ConsumerWidget {
       orElse: () => <String, DailyTotal>{},
     );
     final masked = ref.watch(amountMaskProvider);
-    final viewer = ref.watch(currentRoleProvider) == 'viewer';
 
     return TableCalendar<DailyTotal>(
       firstDay: DateTime(2020, 1, 1),
@@ -127,15 +126,13 @@ class _MonthTotalsScope extends ConsumerWidget {
       headerStyle: const HeaderStyle(formatButtonVisible: false),
       focusedDay: focusedDay,
       selectedDayPredicate: (day) => isSameDay(day, selectedDay),
-      // 单击 → 更新选中日并直达当日记账（日期预填）；viewer 只读不跳转
+      // 单击 → 更新选中日并打开当天账单明细（BK-DOC-26 需求6；只读角色可查看）
       onDaySelected: (selected, focused) {
         onSelected(selected);
         onFocused(focused);
-        if (!viewer) {
-          openQuickEntrySheet(context, initialDate: selected);
-        }
+        DayDetailSheet.show(context, selected);
       },
-      // 长按 → 当日明细弹层（Spec §4.6 点击日进明细）
+      // 长按 → 当日明细弹层（与单击同语义，保留手势兼容）
       onDayLongPressed: (day, focused) {
         onSelected(day);
         onFocused(focused);

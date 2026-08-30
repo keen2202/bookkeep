@@ -7,11 +7,15 @@ import '../../data/repositories/reports_repository.dart';
 import '../accounts/accounts_providers.dart' show exchangeRateServiceProvider;
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart' show reportsRepositoryProvider;
+import '../calendar/calendar_page.dart' show CalendarPage;
 import '../../shared/theme/glass_tokens.dart';
 import '../../shared/widgets/glass_panel.dart';
 import 'charts/report_charts.dart';
 
 typedef ReportWindow = ({DateTime start, DateTime end});
+
+/// 报表视图（BK-DOC-26 需求6：日历并入报表）：图表 / 日历双视图
+enum ReportsView { charts, calendar }
 
 /// 报表汇率表（非主币种 → kRateScale 刻度；Spec §4.5 折算主币种）。
 /// watch 账本版本号：手动改汇率先 bump 版本（汇率管理页），
@@ -64,8 +68,9 @@ final periodBucketsProvider =
   );
 });
 
-/// 报表页（Spec §3.5 / BK-P0-005）：饼图（分类占比）/ 柱状（周期对比，
-/// 支出/收入双柱）
+/// 报表页（Spec §3.5 / BK-P0-005；BK-DOC-26 需求6 日历并入）：
+/// 图表视图 = 饼图（分类占比）/ 柱状（周期对比，支出/收入双柱）；
+/// 日历视图 = 月历每日收支净额，点日查看当天账单明细。
 class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
 
@@ -74,6 +79,7 @@ class ReportsPage extends ConsumerStatefulWidget {
 }
 
 class _ReportsPageState extends ConsumerState<ReportsPage> {
+  ReportsView _view = ReportsView.charts;
   ReportRange _range = ReportRange.month;
   DateTime? _customStart; // 含当日
   DateTime? _customEnd; // 含当日
@@ -113,90 +119,122 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 审查 U-1：无内层 Scaffold/AppBar；IndexedStack 保持 _view/_range/_hideAmounts
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // BK-DOC-26 需求6：图表 / 日历双视图切换
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+          child: SegmentedButton<ReportsView>(
+            segments: const [
+              ButtonSegment(
+                value: ReportsView.charts,
+                label: Text('图表'),
+                icon: Icon(Icons.pie_chart_outline),
+              ),
+              ButtonSegment(
+                value: ReportsView.calendar,
+                label: Text('日历'),
+                icon: Icon(Icons.calendar_month_outlined),
+              ),
+            ],
+            selected: {_view},
+            onSelectionChanged: (s) => setState(() => _view = s.first),
+          ),
+        ),
+        if (_view == ReportsView.charts)
+          ..._chartsBody()
+        else
+          // 日历视图：月历日格每日收支净额 + 点日明细 + 现金流趋势
+          const Expanded(child: CalendarPage()),
+      ],
+    );
+  }
+
+  /// 图表视图内容（原报表页主体；取数仅在图表态触发）
+  List<Widget> _chartsBody() {
     final window = _window;
     final slices = ref.watch(categoryBreakdownProvider(window));
     final buckets = ref.watch(periodBucketsProvider((window: window, range: _range)));
     // 隐私锁锁定/后台态强制脱敏（Spec §3.6），叠加用户手动隐藏金额开关
     final hideAmounts = _hideAmounts || ref.watch(amountMaskProvider);
 
-    // 审查 U-1：无内层 Scaffold/AppBar；隐藏金额开关内联（IndexedStack 保持 _range/_hideAmounts）
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: SegmentedButton<ReportRange>(
-                segments: const [
-                  ButtonSegment(value: ReportRange.day, label: Text('日')),
-                  ButtonSegment(value: ReportRange.week, label: Text('周')),
-                  ButtonSegment(value: ReportRange.month, label: Text('月')),
-                  ButtonSegment(value: ReportRange.year, label: Text('年')),
-                ],
-                selected: {_range == ReportRange.custom ? ReportRange.month : _range},
-                onSelectionChanged: (s) => setState(() => _range = s.first),
-              ),
-            ),
-            IconButton(
-              tooltip: '自定义时间范围',
-              icon: Icon(
-                _range == ReportRange.custom ? Icons.date_range : Icons.date_range_outlined,
-              ),
-              onPressed: _pickCustomRange,
-            ),
-            IconButton(
-              tooltip: _hideAmounts ? '显示金额' : '隐藏金额',
-              icon: Icon(_hideAmounts ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _hideAmounts = !_hideAmounts),
-            ),
-          ],
-        ),
-        if (_range == ReportRange.custom && _customStart != null && _customEnd != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-            child: Row(
-              children: [
-                ActionChip(
-                  avatar: const Icon(Icons.date_range, size: 18),
-                  label: Text(
-                    '${_fmtDate(_customStart!)} ~ ${_fmtDate(_customEnd!)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  onPressed: _pickCustomRange,
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _range = ReportRange.month),
-                  child: const Text('退出自定义'),
-                ),
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: SegmentedButton<ReportRange>(
+              segments: const [
+                ButtonSegment(value: ReportRange.day, label: Text('日')),
+                ButtonSegment(value: ReportRange.week, label: Text('周')),
+                ButtonSegment(value: ReportRange.month, label: Text('月')),
+                ButtonSegment(value: ReportRange.year, label: Text('年')),
               ],
+              selected: {_range == ReportRange.custom ? ReportRange.month : _range},
+              onSelectionChanged: (s) => setState(() => _range = s.first),
             ),
           ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(8),
+          IconButton(
+            tooltip: '自定义时间范围',
+            icon: Icon(
+              _range == ReportRange.custom ? Icons.date_range : Icons.date_range_outlined,
+            ),
+            onPressed: _pickCustomRange,
+          ),
+          IconButton(
+            tooltip: _hideAmounts ? '显示金额' : '隐藏金额',
+            icon: Icon(_hideAmounts ? Icons.visibility_off : Icons.visibility),
+            onPressed: () => setState(() => _hideAmounts = !_hideAmounts),
+          ),
+        ],
+      ),
+      if (_range == ReportRange.custom && _customStart != null && _customEnd != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+          child: Row(
             children: [
-              // 审查 U-11：错误态带重试（invalidate 对应 provider 重建）
-              _Section(
-                title: '分类占比',
-                child: _chartOrRetry(
-                  slices,
-                  (s) => CategoryPieChart(slices: s, hideAmounts: hideAmounts),
-                  () => ref.invalidate(categoryBreakdownProvider(window)),
+              ActionChip(
+                avatar: const Icon(Icons.date_range, size: 18),
+                label: Text(
+                  '${_fmtDate(_customStart!)} ~ ${_fmtDate(_customEnd!)}',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
+                onPressed: _pickCustomRange,
               ),
-              // 需求：取消「收支趋势」折线图；周期对比承载收支双柱
-              _Section(
-                title: '周期对比',
-                child: _chartOrRetry(
-                  buckets,
-                  (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts),
-                  () => ref.invalidate(periodBucketsProvider((window: window, range: _range))),
-                ),
+              TextButton(
+                onPressed: () => setState(() => _range = ReportRange.month),
+                child: const Text('退出自定义'),
               ),
             ],
           ),
         ),
-      ],
-    );
+      Expanded(
+        child: ListView(
+          padding: const EdgeInsets.all(8),
+          children: [
+            // 审查 U-11：错误态带重试（invalidate 对应 provider 重建）
+            _Section(
+              title: '分类占比',
+              child: _chartOrRetry(
+                slices,
+                (s) => CategoryPieChart(slices: s, hideAmounts: hideAmounts),
+                () => ref.invalidate(categoryBreakdownProvider(window)),
+              ),
+            ),
+            // 需求：取消「收支趋势」折线图；周期对比承载收支双柱
+            _Section(
+              title: '周期对比',
+              child: _chartOrRetry(
+                buckets,
+                (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts),
+                () => ref.invalidate(periodBucketsProvider((window: window, range: _range))),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
   }
 }
 

@@ -41,10 +41,6 @@ class ThemeController extends Notifier<ThemeSettings> {
           mode: mode,
         ),
       );
-
-  /// 切换图标包
-  Future<void> setIconPack(IconPack pack) =>
-      _apply(state.copyWith(iconPack: pack));
 }
 
 /// 当前主题设置（默认值在 main() 启动时被持久化值覆盖）

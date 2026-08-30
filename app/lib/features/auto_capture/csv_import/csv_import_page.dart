@@ -7,7 +7,6 @@ import '../../../shared/widgets/glass_nav.dart';
 import '../../books/books_providers.dart' show transactionRepositoryProvider;
 import '../capture_confirm_page.dart';
 import '../import_service.dart';
-import '../voice_entry_sheet.dart';
 
 /// CSV 导入页（Spec §4.2 / BK-T-011）：粘贴账单 CSV → 解析 → 去重 → 确认页入账。
 /// 支持支付宝/微信账单格式自动识别。
@@ -138,14 +137,6 @@ class AutoCaptureSettingsEntry extends StatelessWidget {
           subtitle: const Text('支付宝/微信账单导入，自动去重'),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const CsvImportPage()),
-          ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.record_voice_over_outlined),
-          title: const Text('语音记账'),
-          subtitle: const Text('语音识别默认关闭；结果需确认后入账'),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const VoiceEntrySheet()),
           ),
         ),
         const ListTile(

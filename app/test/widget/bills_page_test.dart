@@ -287,6 +287,28 @@ void main() {
     expect(txs.every((t) => t.deletedAt != null), isTrue);
   });
 
+  testWidgets('bill row amount matches the page-title text slot and keeps tabular figures',
+      (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final ids = await seedDb(db);
+    await seedExpense(db, ids);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntilFound(tester, find.text('餐饮 / 早餐'));
+
+    // 账单行金额字号 == 页面标题字阶槽位（titleLarge；FGDS 主题下为 17sp）
+    final amount = tester.widget<Text>(find.text('-¥25.50'));
+    final context = tester.element(find.text('餐饮 / 早餐'));
+    expect(amount.style?.fontSize, Theme.of(context).textTheme.titleLarge?.fontSize);
+    // 等宽数字保留（金额列纵向对齐）
+    expect(amount.style?.fontFeatures, isNotNull);
+    expect(
+      amount.style!.fontFeatures!.map((f) => f.feature).toList(),
+      contains('tnum'),
+    );
+  });
+
   testWidgets('viewer role cannot open detail sheet (read-only)', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
