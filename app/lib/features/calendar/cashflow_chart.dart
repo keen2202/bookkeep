@@ -186,7 +186,7 @@ class CashflowChart extends ConsumerWidget {
           children: [
             Text(title, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            child,
+            Expanded(child: child),
           ],
         ),
       ),

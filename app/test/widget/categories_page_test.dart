@@ -119,6 +119,9 @@ void main() {
     await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
     await tester.pump(const Duration(milliseconds: 400)); // 弹窗入场动画完成
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '旅行');
+    // 输入框聚焦状态会影响弹层内后续点击命中，先取消焦点再操作
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     // 弹层内含图标库较高：保存按钮先滚入可视区再点击
     await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
     await tester.pump();
@@ -180,6 +183,8 @@ void main() {
     await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
     await tester.pumpAndSettle(); // 编辑弹层入场动画完成（否则保存按钮尚在屏外）
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '早点铺');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
     await tester.pump();
     await tester.tap(find.widgetWithText(AppButton, '保存'));
@@ -253,6 +258,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '商务打车');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     // 选择二级层级 → 出现「归属一级分类」下拉
     await tester.ensureVisible(find.text('二级分类'));
     await tester.pump();
@@ -300,6 +307,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '电影之夜');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     // 图标库选择 movie（背景列表无同名图标，命中唯一）
     await tester.ensureVisible(find.byIcon(Icons.movie));
     await tester.pump();

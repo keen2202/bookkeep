@@ -193,6 +193,10 @@ void main() {
   testWidgets('calendar view: toggle shows month grid, tapping a day opens detail',
       (tester) async {
     await initializeDateFormatting('zh_CN');
+    // 日历/图表按手机竖屏尺寸验证，避免默认 800×600 下日历纵向空间不足
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final accountId = await db.into(db.accounts).insert(AccountsCompanion.insert(
@@ -249,6 +253,10 @@ void main() {
     await tester.tap(todayCell);
     await pumpUntilFound(tester, find.textContaining('净额'));
     expect(find.textContaining('净额'), findsOneWidget);
+
+    // 关闭当日明细弹层（modal bottom sheet），否则会遮住报表页按钮
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
 
     // 切回图表视图正常
     await tester.tap(find.text('图表'));

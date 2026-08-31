@@ -70,7 +70,7 @@ const _icons = <String, IconData>{
   'medication': Icons.medication,
   'monitor_heart': Icons.monitor_heart,
   'health_and_safety': Icons.health_and_safety,
-  'vaccination': Icons.vaccination,
+  'vaccination': Icons.vaccines,
   // 教育
   'school': Icons.school,
   'cast_for_education': Icons.cast_for_education,

@@ -16,6 +16,7 @@ import 'package:bookkeep_app/features/settings/appearance_page.dart';
 import 'package:bookkeep_app/shared/theme/glass_prefs.dart';
 import 'package:bookkeep_app/shared/theme/theme_controller.dart';
 import 'package:bookkeep_app/shared/theme/theme_presets.dart';
+import 'package:bookkeep_app/shared/theme/theme_settings.dart';
 
 import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;

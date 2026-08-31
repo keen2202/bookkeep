@@ -190,6 +190,14 @@ class _FabHostState extends State<_FabHost> {
   }
 
   @override
+  void didUpdateWidget(covariant _FabHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.anchor != widget.anchor) {
+      _anchor = widget.anchor;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return DraggableGlassFab(
       icon: Icons.add,

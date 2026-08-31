@@ -12,7 +12,7 @@ typedef FabAnchor = ({double ax, double ay});
 /// （与 `themeControllerProvider` 的启动注入模式一致）；拖拽结束后
 /// [save] 即时落库，重启保持。
 class FabAnchorController extends Notifier<FabAnchor?> {
-  FabAnchorController({FabAnchor? initial}) : _initial = initial;
+  FabAnchorController({this._initial});
 
   final FabAnchor? _initial;
 

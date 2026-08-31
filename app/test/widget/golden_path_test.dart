@@ -115,6 +115,10 @@ void main() {
 
     expect(find.text('已保存'), findsOneWidget);
 
+    // 等待 SnackBar 消失，避免其浮层遮住 FAB
+    await tester.pump(const Duration(milliseconds: 3000));
+    await tester.pumpAndSettle();
+
     // ── ② 数据落库 + 同步 op 入队（乐观写，Spec §3.1）──
     final txs = await db.select(db.transactions).get();
     expect(txs, hasLength(1));
