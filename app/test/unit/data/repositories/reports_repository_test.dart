@@ -137,7 +137,7 @@ void main() {
     expect(weeks, hasLength(3));
     expect(weeks.map((w) => w.expenseMinor).toList(), [1000, 2000, 4000]);
     expect(weeks[1].incomeMinor, 500);
-    expect(weeks.first.label, '08-03 周');
+    expect(weeks.first.label, '8/3');
   });
 
   test('comparison buckets slice recent-year windows with expense/income', () async {
@@ -259,20 +259,21 @@ void main() {
       expect(crossYear.last.label, '2026-01');
     });
 
-    test('comparison windows: day range spans last 7 days', () {
+    test('comparison windows: day range spans last 7 days (weekday labels)', () {
       final windows = comparisonWindows(ReportRange.day, DateTime(2026, 8, 9));
       expect(windows, hasLength(7));
+      // 2026-08-09 为周日，本周一为 08-03
       expect(windows.first,
-          (label: '08-03', start: DateTime(2026, 8, 3), end: DateTime(2026, 8, 4)));
+          (label: '周一', start: DateTime(2026, 8, 3), end: DateTime(2026, 8, 4)));
       expect(windows.last,
-          (label: '08-09', start: DateTime(2026, 8, 9), end: DateTime(2026, 8, 10)));
+          (label: '周日', start: DateTime(2026, 8, 9), end: DateTime(2026, 8, 10)));
     });
 
     test('comparison windows: week range spans last 5 weeks (Mon-based)', () {
       final windows = comparisonWindows(ReportRange.week, DateTime(2026, 8, 9));
       // 2026-08-09 为周日，本周一为 08-03
       expect(windows.map((w) => w.label).toList(),
-          ['07-06 周', '07-13 周', '07-20 周', '07-27 周', '08-03 周']);
+          ['7/6', '7/13', '7/20', '7/27', '8/3']);
       for (final w in windows) {
         expect(w.start.weekday, DateTime.monday);
         expect(w.end.difference(w.start), const Duration(days: 7));

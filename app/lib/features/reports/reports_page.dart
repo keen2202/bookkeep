@@ -42,6 +42,12 @@ final categoryBreakdownProvider =
       .categoryBreakdown(start: window.start, end: window.end, rates: rates);
 });
 
+/// 自定义范围分桶粒度：≤62 天按周，更长按月（取数与副标题共用同一判定）
+BucketGranularity customBucketGranularity(ReportWindow window) =>
+    window.end.difference(window.start).inDays <= 62
+        ? BucketGranularity.week
+        : BucketGranularity.month;
+
 final periodBucketsProvider =
     FutureProvider.family<List<PeriodBucket>, ({ReportWindow window, ReportRange range})>(
         (ref, key) async {
@@ -57,13 +63,10 @@ final periodBucketsProvider =
     );
   }
   // 自定义范围：按范围长度选周/月粒度分桶
-  final duration = key.window.end.difference(key.window.start);
-  final granularity =
-      duration.inDays <= 62 ? BucketGranularity.week : BucketGranularity.month;
   return repo.periodBuckets(
     start: key.window.start,
     end: key.window.end,
-    granularity: granularity,
+    granularity: customBucketGranularity(key.window),
     rates: rates,
   );
 });
@@ -83,7 +86,6 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   ReportRange _range = ReportRange.month;
   DateTime? _customStart; // 含当日
   DateTime? _customEnd; // 含当日
-  bool _hideAmounts = false;
 
   /// 当前窗口（custom 维度走自定义起止；其余维度相对今天）
   ReportWindow get _window {
@@ -119,7 +121,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 审查 U-1：无内层 Scaffold/AppBar；IndexedStack 保持 _view/_range/_hideAmounts
+    // 审查 U-1：无内层 Scaffold/AppBar；IndexedStack 保持 _view/_range
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -157,8 +159,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     final window = _window;
     final slices = ref.watch(categoryBreakdownProvider(window));
     final buckets = ref.watch(periodBucketsProvider((window: window, range: _range)));
-    // 隐私锁锁定/后台态强制脱敏（Spec §3.6），叠加用户手动隐藏金额开关
-    final hideAmounts = _hideAmounts || ref.watch(amountMaskProvider);
+    // 隐私锁锁定/后台态强制脱敏（Spec §3.6）；手动隐藏开关已按需求移除
+    final hideAmounts = ref.watch(amountMaskProvider);
 
     return [
       Row(
@@ -181,11 +183,6 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
               _range == ReportRange.custom ? Icons.date_range : Icons.date_range_outlined,
             ),
             onPressed: _pickCustomRange,
-          ),
-          IconButton(
-            tooltip: _hideAmounts ? '显示金额' : '隐藏金额',
-            icon: Icon(_hideAmounts ? Icons.visibility_off : Icons.visibility),
-            onPressed: () => setState(() => _hideAmounts = !_hideAmounts),
           ),
         ],
       ),
@@ -216,6 +213,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             // 审查 U-11：错误态带重试（invalidate 对应 provider 重建）
             _Section(
               title: '分类占比',
+              subtitle: _pieSubtitle(),
               child: _chartOrRetry(
                 slices,
                 (s) => CategoryPieChart(slices: s, hideAmounts: hideAmounts),
@@ -225,6 +223,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             // 需求：取消「收支趋势」折线图；周期对比承载收支双柱
             _Section(
               title: '周期对比',
+              subtitle: _comparisonSubtitle(),
               child: _chartOrRetry(
                 buckets,
                 (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts),
@@ -236,6 +235,26 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       ),
     ];
   }
+
+  /// 分类占比统计口径（自定义范围由上方日期 chip 表达，不重复）
+  String? _pieSubtitle() => switch (_range) {
+        ReportRange.day => '当天',
+        ReportRange.week => '本周',
+        ReportRange.month => '本月',
+        ReportRange.year => '今年',
+        ReportRange.custom => null,
+      };
+
+  /// 周期对比取数口径：说明各维度对比的连续周期数（自定义范围标注分桶粒度）
+  String? _comparisonSubtitle() => switch (_range) {
+        ReportRange.day => '最近7天',
+        ReportRange.week => '最近5周',
+        ReportRange.month => '最近5个月',
+        ReportRange.year => '最近5年',
+        ReportRange.custom => customBucketGranularity(_window) == BucketGranularity.week
+            ? '按周汇总'
+            : '按月汇总',
+      };
 }
 
 String _fmtDate(DateTime d) =>
@@ -263,9 +282,10 @@ Widget _chartOrRetry<T>(
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child});
+  const _Section({required this.title, this.subtitle, required this.child});
 
   final String title;
+  final String? subtitle;
   final Widget child;
 
   @override
@@ -277,7 +297,21 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              if (subtitle != null)
+                Text(
+                  subtitle!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+            ],
+          ),
           const SizedBox(height: 8),
           child,
         ],

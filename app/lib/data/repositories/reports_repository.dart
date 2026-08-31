@@ -113,19 +113,31 @@ List<({String label, DateTime start, DateTime end})> comparisonWindows(
   };
 }
 
-/// 单日窗口（本地零点起 24h），标签 MM-DD
+/// 单日窗口（本地零点起 24h），标签「周几」——最近 7 天按星期对齐对比，
+/// 比拥挤的 MM-DD 更窄且直接可读（具体日期由账单页承载）
 ({String label, DateTime start, DateTime end}) _dayWindow(DateTime day) => (
-      label: '${_two(day.month)}-${_two(day.day)}',
+      label: _weekdayLabel(day),
       start: DateTime(day.year, day.month, day.day),
       end: DateTime(day.year, day.month, day.day + 1),
     );
 
-/// 单周窗口（周一起 7 天），标签「MM-DD 周」（周一日期）
+/// 单周窗口（周一起 7 天），标签周一日期「M/D」
 ({String label, DateTime start, DateTime end}) _weekWindow(DateTime monday) => (
-      label: '${_two(monday.month)}-${_two(monday.day)} 周',
+      label: '${monday.month}/${monday.day}',
       start: DateTime(monday.year, monday.month, monday.day),
       end: DateTime(monday.year, monday.month, monday.day + 7),
     );
+
+/// 周几标签（周一…周日）
+String _weekdayLabel(DateTime day) => switch (day.weekday) {
+      DateTime.monday => '周一',
+      DateTime.tuesday => '周二',
+      DateTime.wednesday => '周三',
+      DateTime.thursday => '周四',
+      DateTime.friday => '周五',
+      DateTime.saturday => '周六',
+      _ => '周日',
+    };
 
 /// 单月窗口，标签 YYYY-MM
 ({String label, DateTime start, DateTime end}) _monthWindow(DateTime month) => (
@@ -315,9 +327,7 @@ class ReportsRepository {
         final week = int.parse(parts[1]);
         final monday = mondayOfIsoWeek(year, week);
         results.add(PeriodBucket(
-          label: monday == null
-              ? bucket
-              : '${_two(monday.month)}-${_two(monday.day)} 周',
+          label: monday == null ? bucket : '${monday.month}/${monday.day}',
           expenseMinor: amounts.expense,
           incomeMinor: amounts.income,
         ));

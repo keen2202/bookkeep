@@ -27,45 +27,46 @@ LinearGradient chartAreaGradient(Color color) => LinearGradient(
       colors: [color.withValues(alpha: 0.12), color.withValues(alpha: 0)],
     );
 
-/// X 轴标签压缩：桶间「共有」的部分对区分各桶没有贡献（跨年对比的同期后缀、
-/// 同年的年份前缀），剥离后仅保留区分维度，避免长日期标签在窄屏上相互重叠。
-/// - 跨年对比（各桶年份不同、同期相同）→ 仅保留年份：`2021-08-09` → `2021`；
-/// - 按月分桶（自定义范围，含跨年）→ 仅保留月：`2026-01` → `01`；
-/// - 其余（如「年」对比、按周）→ 保持原样。
-List<String> compactPeriodAxisLabels(List<String> labels) {
-  if (labels.length < 2) return List.of(labels);
-  final suffix = _commonSuffix(labels);
-  final yearPrefixed = labels.every(_startsWithYear);
-  // 跨年对比：年份变化、同期后缀固定 → 保留年份
-  if (yearPrefixed && suffix.length >= 2) {
-    return [
-      for (final l in labels) l.substring(0, l.length - suffix.length),
-    ];
+/// x 轴两行周期标签：top 为次级信息（年份，可空）、main 为主标签。
+/// 主标签只保留区分维度，避免长日期在窄屏上相互重叠。
+typedef PeriodAxisLabel = ({String? top, String main});
+
+/// 周期标签渲染规则（与 reports_repository 的源标签格式一一对应）：
+/// - 日（周一…周日）、年（YYYY）：原样单行；
+/// - 月（YYYY-MM）：主标签「M月」，顶行年份仅在首桶与跨年处出现一次；
+/// - 周（周一日期 M/D，兼容旧格式 MM-DD / MM-DD 周）：主标签「M/D」。
+List<PeriodAxisLabel> periodAxisLabels(List<String> labels) {
+  final result = <PeriodAxisLabel>[];
+  String? lastYear;
+  for (final label in labels) {
+    final month = _monthBucket(label);
+    if (month != null) {
+      final (year, mon) = month;
+      result.add((top: year == lastYear ? null : year, main: '$mon月'));
+      lastYear = year;
+      continue;
+    }
+    final week = _weekMondayLabel(label);
+    if (week != null) {
+      result.add((top: null, main: week));
+      continue;
+    }
+    result.add((top: null, main: label));
   }
-  // 按月分桶（YYYY-MM…）：剥离「YYYY-」年份前缀，保留月份
-  if (yearPrefixed && labels.every(_hasYearSeparator)) {
-    return [for (final l in labels) l.substring(5)];
-  }
-  return List.of(labels);
+  return result;
 }
 
-bool _startsWithYear(String label) {
-  if (label.length < 4) return false;
-  return int.tryParse(label.substring(0, 4)) != null;
+/// 「YYYY-MM」月桶 → (年, 月)
+(String, int)? _monthBucket(String label) {
+  final m = RegExp(r'^(\d{4})-(\d{1,2})$').firstMatch(label);
+  return m == null ? null : (m.group(1)!, int.parse(m.group(2)!));
 }
 
-bool _hasYearSeparator(String label) =>
-    label.length > 4 && label.codeUnitAt(4) == 0x2D; // '-'
-
-String _commonSuffix(List<String> labels) {
-  final first = labels.first;
-  var len = 0;
-  while (len < first.length) {
-    final c = first[first.length - 1 - len];
-    if (labels.any((l) => len >= l.length || l[l.length - 1 - len] != c)) break;
-    len++;
-  }
-  return first.substring(first.length - len);
+/// 周一日期桶（「M/D」「MM-DD」「MM-DD 周」）→「M/D」
+String? _weekMondayLabel(String label) {
+  final m = RegExp(r'^(\d{1,2})[-/](\d{1,2})( 周)?$').firstMatch(label);
+  if (m == null) return null;
+  return '${int.parse(m.group(1)!)}/${int.parse(m.group(2)!)}';
 }
 
 /// 分类占比饼图（Spec §3.5；审查 U-11：扇区仅百分比，金额进外置图例；
@@ -148,6 +149,8 @@ class CategoryPieChart extends StatelessWidget {
 /// 周期对比柱状图（Spec §3.5；需求：日/周/月/年各桶以「支出红 / 收入绿」
 /// 双柱并列呈现，实心加深语义色替代 α 渐变淡柱，x 轴每个周期下可直接
 /// 对比当期收支；审查 U-11：touch tooltip 金额格式化 + 可读刻度）。
+/// x 轴标签按维度语义紧凑化（[periodAxisLabels]）：日=周几、周=周一日期
+/// 「M/D」、月=「M月」（跨年顶行标年份）、年=YYYY；柱宽随桶数自适应。
 class PeriodBarChart extends StatelessWidget {
   const PeriodBarChart({super.key, required this.buckets, required this.hideAmounts});
 
@@ -171,9 +174,11 @@ class PeriodBarChart extends StatelessWidget {
     // x/y 轴比例均衡：显式「好看」刻度步长（约 4 档），避免 fl_chart 默认间隔
     // 在极端量级下产生过密刻度或柱高与刻度错位的观感
     final yInterval = niceAxisStep((maxAmount == 0 ? 1 : maxAmount) * 1.2 / 4);
-    final axisLabels = compactPeriodAxisLabels([
+    final axisLabels = periodAxisLabels([
       for (final b in buckets) b.label,
     ]);
+    // 月桶带年份顶行 → 底部预留两行高度
+    final hasYearLine = axisLabels.any((l) => l.top != null);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -194,83 +199,107 @@ class PeriodBarChart extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(
-          height: 220,
-          child: BarChart(
-            BarChartData(
-              // 允许某周期无数据（0 柱）；maxY 兜底避免 0 刻度
-              maxY: (maxAmount == 0 ? 1 : maxAmount).toDouble() * 1.2,
-              // v3 网格线：divider α0.5（GLS-007，刻度不受档位影响）
-              gridData: glassGridData(context),
-              barTouchData: BarTouchData(
-                enabled: !hideAmounts,
-                touchTooltipData: BarTouchTooltipData(
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
-                    '${rodIndex == 0 ? '支出' : '收入'} ${formatMoney(rod.toY.round())}',
-                    TextStyle(color: rodIndex == 0 ? expenseColor : incomeColor),
+        // 柱宽随桶数/屏宽自适应（日=7 桶、周/月/年=5 桶观感一致，
+        // 窄屏自动收窄；左轴刻度区仅在金额可见时计入）
+        LayoutBuilder(builder: (context, constraints) {
+          final axisReserved = hideAmounts ? 0.0 : 52.0;
+          final slot = (constraints.maxWidth - axisReserved) / buckets.length;
+          final barWidth = ((slot - AppSpacing.xs) / 2).clamp(6.0, 14.0).toDouble();
+          return SizedBox(
+            height: 220,
+            child: BarChart(
+              BarChartData(
+                // 允许某周期无数据（0 柱）；maxY 兜底避免 0 刻度
+                maxY: (maxAmount == 0 ? 1 : maxAmount).toDouble() * 1.2,
+                // v3 网格线：divider α0.5（GLS-007，刻度不受档位影响）
+                gridData: glassGridData(context),
+                barTouchData: BarTouchData(
+                  enabled: !hideAmounts,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) =>
+                        BarTooltipItem(
+                      '${rodIndex == 0 ? '支出' : '收入'} ${formatMoney(rod.toY.round())}',
+                      TextStyle(color: rodIndex == 0 ? expenseColor : incomeColor),
+                    ),
                   ),
                 ),
-              ),
-              titlesData: FlTitlesData(
-                leftTitles: hideAmounts
-                    ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
-                    : AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 52,
-                          interval: yInterval,
-                          getTitlesWidget: (value, meta) {
-                            if (value <= 0) return const SizedBox.shrink();
-                            return SideTitleWidget(
-                              meta: meta,
-                              space: 4,
-                              child: Text(compactTickLabel(value.round()), style: axisStyle),
-                            );
-                          },
+                titlesData: FlTitlesData(
+                  leftTitles: hideAmounts
+                      ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
+                      : AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 52,
+                            interval: yInterval,
+                            getTitlesWidget: (value, meta) {
+                              if (value <= 0) return const SizedBox.shrink();
+                              return SideTitleWidget(
+                                meta: meta,
+                                space: 4,
+                                child: Text(compactTickLabel(value.round()),
+                                    style: axisStyle),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 32,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index < 0 || index >= buckets.length) return const SizedBox.shrink();
-                      return SideTitleWidget(
-                        meta: meta,
-                        space: 4,
-                        child: Text(axisLabels[index], style: axisStyle),
-                      );
-                    },
+                  rightTitles:
+                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles:
+                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: hasYearLine ? 46 : 32,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= axisLabels.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final label = axisLabels[index];
+                        return SideTitleWidget(
+                          meta: meta,
+                          space: 6,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (label.top != null)
+                                Text(label.top!,
+                                    style: axisStyle?.copyWith(fontSize: 10)),
+                              Text(label.main, style: axisStyle),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
+                barGroups: [
+                  for (var i = 0; i < buckets.length; i++)
+                    BarChartGroupData(
+                      x: i,
+                      barsSpace: AppSpacing.xs,
+                      barRods: [
+                        BarChartRodData(
+                          toY: buckets[i].expenseMinor.toDouble(),
+                          color: expenseColor,
+                          width: barWidth,
+                          borderRadius:
+                              const BorderRadius.vertical(top: Radius.circular(2)),
+                        ),
+                        BarChartRodData(
+                          toY: buckets[i].incomeMinor.toDouble(),
+                          color: incomeColor,
+                          width: barWidth,
+                          borderRadius:
+                              const BorderRadius.vertical(top: Radius.circular(2)),
+                        ),
+                      ],
+                    ),
+                ],
               ),
-              barGroups: [
-                for (var i = 0; i < buckets.length; i++)
-                  BarChartGroupData(
-                    x: i,
-                    barsSpace: AppSpacing.xs,
-                    barRods: [
-                      BarChartRodData(
-                        toY: buckets[i].expenseMinor.toDouble(),
-                        color: expenseColor,
-                        width: 12,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
-                      ),
-                      BarChartRodData(
-                        toY: buckets[i].incomeMinor.toDouble(),
-                        color: incomeColor,
-                        width: 12,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
-                      ),
-                    ],
-                  ),
-              ],
             ),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }

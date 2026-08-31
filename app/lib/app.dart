@@ -160,7 +160,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
                     }
                     return false;
                   },
-                  // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range/_hideAmounts）
+                  // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range 等）
                   child: IndexedStack(
                     index: _tab,
                     children: const [
