@@ -263,8 +263,7 @@ class PeriodBarChart extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (label.top != null)
-                                Text(label.top!,
-                                    style: axisStyle?.copyWith(fontSize: 10)),
+                                Text(label.top!, style: context.text.labelSmall),
                               Text(label.main, style: axisStyle),
                             ],
                           ),
