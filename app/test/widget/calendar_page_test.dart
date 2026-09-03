@@ -405,9 +405,17 @@ void main() {
     await pumpUntil(tester, find.text('净额'));
     await settlePanel(tester);
 
-    // AC2-5：只读角色可查看明细（纯展示列表，无写入口）
+    // AC2-5：只读角色可查看明细（纯展示列表，无写入口）；
+    // 金额需限定在明细面板内——当日仅一笔时月历日格净额同为「-¥25.50」
     expect(find.text('测试父类 / 测试子类'), findsOneWidget);
-    expect(find.text('-¥25.50'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byWidgetPredicate((w) => w.key is ValueKey<String>),
+        matching: find.text('-¥25.50'),
+      ),
+      findsWidgets,
+    );
+    expect(find.text('-¥25.50'), findsWidgets);
     expect(find.byType(BottomSheet), findsNothing);
   });
 

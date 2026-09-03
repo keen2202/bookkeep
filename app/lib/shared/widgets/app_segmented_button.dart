@@ -16,8 +16,8 @@ const double _kSelectedFillAlpha = 0.12;
 /// 不变的部分：
 /// - 选中语义仍由 `SegmentedButton` 承担，读屏可辨 selected，颜色不是唯一
 ///   语义通道（AC7-3 无障碍）；
-/// - 禁用段不受影响——框架仅对非禁用段套用 `selectedBackgroundColor` /
-///   `selectedForegroundColor`，故记账页「转账」锁定态样式照旧（AC7-3）。
+/// - 禁用段不受影响——禁用段状态集不含 `WidgetState.selected`，选中着色
+///   不生效，故记账页「转账」锁定态样式照旧（AC7-3）。
 class AppSegmentedButton<T> extends StatelessWidget {
   const AppSegmentedButton({
     super.key,
@@ -45,10 +45,15 @@ class AppSegmentedButton<T> extends StatelessWidget {
       multiSelectionEnabled: multiSelectionEnabled,
       showSelectedIcon: false,
       style: ButtonStyle(
-        selectedBackgroundColor: WidgetStatePropertyAll(
-          palette.primary.withValues(alpha: _kSelectedFillAlpha),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? palette.primary.withValues(alpha: _kSelectedFillAlpha)
+              : null,
         ),
-        selectedForegroundColor: WidgetStatePropertyAll(palette.primary),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.selected) ? palette.primary : null,
+        ),
       ),
     );
   }

@@ -94,6 +94,20 @@ class ReportTimeSelection {
         ? this
         : ReportTimeSelection(year: year, month: m, day: next);
   }
+
+  /// 值相等：联动/选择的纯数据模型按字段比较（单测直接 expect 实例）
+  @override
+  bool operator ==(Object other) =>
+      other is ReportTimeSelection &&
+      other.year == year &&
+      other.month == month &&
+      other.day == day;
+
+  @override
+  int get hashCode => Object.hash(year, month, day);
+
+  @override
+  String toString() => 'ReportTimeSelection($label)';
 }
 
 /// 报表汇率表（非主币种 → kRateScale 刻度；Spec §4.5 折算主币种）。

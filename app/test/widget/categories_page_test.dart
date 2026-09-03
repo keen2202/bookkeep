@@ -112,7 +112,12 @@ void main() {
     await tester.scrollUntilVisible(find.text('分类管理'), 120,
         scrollable: find.byType(Scrollable).last);
     await tester.tap(find.text('分类管理'));
-    await tester.pump(const Duration(milliseconds: 400)); // 路由入场动画完成
+    // 路由入场动画完成：设置弹层之上再 push 独立页，过渡约 600ms。
+    // 须分帧推进假时钟——单次长 pump 只渲染一帧，过渡不推进，
+    // 未结束即点 AppBar 动作会因页面仍在滑动而命中视口外坐标
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 
   testWidgets('seed categories install and render expense groups collapsed',
@@ -395,12 +400,19 @@ void main() {
     await tester.pump();
     expect(find.text('工资'), findsOneWidget);
 
-    // 返回主 shell（GlassScaffold 对可返回路由自动提供返回键）
-    await tester.pageBack();
+    // 返回主 shell（GlassScaffold 对可返回路由自动提供返回键）；
+    // 中文 locale 下 BackButton tooltip 为「返回」，pageBack 找不到，
+    // 直接按类型找（同 golden_path_test 既有约定）
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
+    // 返回后落回仍开着的设置弹层（分类页自弹层之上 push，未消费弹层，
+    // 与周期记账/备份入口行为一致），重进直接点「分类管理」
+    await tester.tap(find.text('分类管理'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     // AC4-3：重进 → 默认「支出」tab 且全折叠（tab 状态 autoDispose，不持久化）
-    await openCategoryManagement(tester);
     await pumpUntil(tester, find.text('餐饮'));
     expect(find.text('工资'), findsNothing);
     expect(find.text('早餐'), findsNothing);

@@ -39,13 +39,16 @@ void main() {
     // AC7-2 / AC7-4：选中色收敛在共享组件内——primary α0.12 底（玻璃规范
     // AC-07 禁实色填充）+ primary 前景
     expect(
-      segmented.style?.selectedBackgroundColor?.resolve({WidgetState.selected}),
+      segmented.style?.backgroundColor?.resolve({WidgetState.selected}),
       primary.withValues(alpha: 0.12),
     );
     expect(
-      segmented.style?.selectedForegroundColor?.resolve({WidgetState.selected}),
+      segmented.style?.foregroundColor?.resolve({WidgetState.selected}),
       primary,
     );
+    // 未选中态回落主题默认（null → 交给 SegmentedButton 主题解析）
+    expect(segmented.style?.backgroundColor?.resolve(const {}), isNull);
+    expect(segmented.style?.foregroundColor?.resolve(const {}), isNull);
   });
 
   testWidgets('selection still fires and disabled segments stay inert',

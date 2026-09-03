@@ -12,6 +12,8 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/data/repositories/transaction_repository.dart';
 import 'package:bookkeep_app/features/auth_lock/lock_controller.dart';
 import 'package:bookkeep_app/features/bills/bills_page.dart';
+import 'package:bookkeep_app/shared/theme/app_theme.dart';
+import 'package:bookkeep_app/shared/theme/theme_presets.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 
@@ -30,7 +32,12 @@ void main() {
         if (masked) amountMaskProvider.overrideWith((ref) => true),
         if (viewer) currentRoleProvider.overrideWith((ref) => 'viewer'),
       ],
-      child: const MaterialApp(home: Scaffold(body: BillsPage())),
+      // 需求8 字号断言依赖 FGDS 主题字阶（bodyMedium = 13sp），
+      // 与 dense ListTile 标题字号一致；故 harness 挂应用主题而非默认主题
+      child: MaterialApp(
+        theme: buildTheme(findPresetById('t1')!),
+        home: const Scaffold(body: BillsPage()),
+      ),
     );
   }
 
@@ -67,7 +74,7 @@ void main() {
     // W3 迁移至 AppEmpty：title 与 message 拆分为独立 Text（Spec §6）
     await pumpUntilFound(tester, find.text('还没有账单'));
     expect(find.text('还没有账单'), findsOneWidget);
-    expect(find.text('点击右下角 + 记一笔'), findsOneWidget);
+    expect(find.text('点击底部 + 记一笔'), findsOneWidget);
   });
 
   testWidgets('groups bills by day with totals and category rows', (tester) async {

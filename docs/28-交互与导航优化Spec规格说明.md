@@ -6,14 +6,15 @@
 | 版本 | v1.1 |
 | 日期 | 2026-09-02 |
 | 代码基线 | `4da0c8f`（2026-09-01，origin/master 最新；分析基线说明见「版本记录」） |
-| 状态 | 已实施（代码落地完成；`flutter analyze` / 测试 / 门禁 / golden 再生成待在有 SDK 的环境执行） |
+| 状态 | 已实施并验证（v1.2 于 2026-09-04：`flutter analyze` 零告警、572 用例全过、三项门禁通过、golden 基线再生成；仅剩真机手工走查建议择机执行） |
 | 关联文档 | `docs/26-界面与功能优化Spec规格说明.md`（本次多项需求为其反向调整，见 §3）、`docs/09-UI设计文档-主题与视觉体系.md`、`docs/20-玻璃拟态全链路Spec规格说明.md` |
 | 任务拆解 | `docs/29-交互与导航优化任务分解.md` |
 | 适用范围 | `app/`（Flutter 3.44.x，Riverpod 2.6，Drift，table_calendar，fl_chart） |
 
 > **版本记录**
 > - v1.0（2026-09-02）：初版，基于 `afc079f` 分析生成。
-> - v1.1（2026-09-02）：按最新拉取代码（`4da0c8f`）逐文件复核后重新生成。与 v1.0 分析基线相比，远端新增两个提交：`94d9792`（发布构建修复：`cashflow_chart.dart` 图表区改 `Expanded`、`fab_position.dart` 构造器写法、`category_icon.dart` 图标名 `vaccination→vaccines`、golden 基线再生成）与 `4da0c8f`（`report_charts.dart` 年份顶行标签去裸字号改 `context.text.labelSmall`）。以上均为一行级修复，**不影响本 Spec 九项需求的设计、冲突结论与任务拆分**；v1.1 同步修订：§2.9 实现要点补充轴标签 Token 现状、§6.2 golden 基线说明按 94d9792 更新。
+> - v1.1（2026-09-02）：按最新拉取代码（`4da0c8f`）逐文件复核后重新生成。
+> - v1.2（2026-09-04）：运行验证完成回填——`flutter analyze` / `flutter test --coverage`（572 全过）/ 三项门禁 / golden 再生成（24 张）全部通过；验证中修复 4 处遗留缺陷（`AppSegmentedButton` 的 `ButtonStyle` 参数误用、`ReportTimeSelection` 值相等、两处测试基建），详见 BK-DOC-29 v1.3。设计、冲突结论与验收标准不变。与 v1.0 分析基线相比，远端新增两个提交：`94d9792`（发布构建修复：`cashflow_chart.dart` 图表区改 `Expanded`、`fab_position.dart` 构造器写法、`category_icon.dart` 图标名 `vaccination→vaccines`、golden 基线再生成）与 `4da0c8f`（`report_charts.dart` 年份顶行标签去裸字号改 `context.text.labelSmall`）。以上均为一行级修复，**不影响本 Spec 九项需求的设计、冲突结论与任务拆分**；v1.1 同步修订：§2.9 实现要点补充轴标签 Token 现状、§6.2 golden 基线说明按 94d9792 更新。
 
 ---
 
