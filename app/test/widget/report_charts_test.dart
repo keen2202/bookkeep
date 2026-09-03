@@ -73,4 +73,45 @@ void main() {
     expect(find.text('8/3'), findsOneWidget);
     expect(find.text('8/10'), findsOneWidget);
   });
+
+  testWidgets('showLeadingYear=false drops the year header for same-year month buckets',
+      (tester) async {
+    // 年维度「收支趋势」：同年 12 桶，年份已由区块副标题承载（BK-DOC-28 §2.9）
+    final buckets = [
+      for (var m = 1; m <= 12; m++)
+        PeriodBucket(
+          label: '2026-${m.toString().padLeft(2, '0')}',
+          expenseMinor: m * 100,
+          incomeMinor: m * 50,
+        ),
+    ];
+
+    await tester.pumpWidget(harness(
+      SizedBox(
+        width: 350,
+        child: PeriodBarChart(
+          buckets: buckets,
+          hideAmounts: false,
+          showLeadingYear: false,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 12 个月主标签齐备（补零桶为 0 柱但标签不缺），且不出现年份顶行
+    for (final m in ['1月', '6月', '12月']) {
+      expect(find.text(m), findsOneWidget);
+    }
+    expect(find.text('2026'), findsNothing);
+
+    // 对照：默认值（周期对比调用点）仍在首桶标一次年份，行为未回退
+    await tester.pumpWidget(harness(
+      SizedBox(
+        width: 350,
+        child: PeriodBarChart(buckets: buckets, hideAmounts: false),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('2026'), findsOneWidget);
+  });
 }

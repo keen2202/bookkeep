@@ -204,9 +204,24 @@ class GlassNavItem {
   final IconData? tintIcon;
 }
 
+/// 底栏中央动作（BK-DOC-28 需求6）：夹在两个 Tab 之间的主操作按钮。
+/// 非 Tab 项——不参与 [GlassBottomBar.selectedIndex] 选中态，点按不切换页面。
+typedef GlassCenterAction = ({
+  IconData icon,
+  String semanticLabel,
+  VoidCallback onTap,
+});
+
+/// 中央动作按钮直径（底栏内收敛尺寸；[GlassFab] 的 56 用于内容区悬浮）
+const double _centerActionSize = 48;
+
 /// FG-NAV 底部导航栏（Spec §4.6；BK-FG-021）：G3 通栏玻璃 + 顶部
 /// 0.5px 分隔线（滚动联动语义同 AppBar）；图标项 28 档 [GlassIcon]，
 /// 选中项以 [GlassSelection] 呈现 FG-SEL 四层。
+///
+/// [centerAction] 非空时在 items 中点插入固定 [_centerActionSize] 圆形主操作
+/// 按钮（BK-DOC-28 需求6：记账入口下沉底栏中央、不可拖拽），两侧 Tab 经
+/// [Expanded] 均分剩余宽度；为 null 时与纯 items 均分布局完全一致。
 class GlassBottomBar extends StatelessWidget {
   const GlassBottomBar({
     super.key,
@@ -214,6 +229,7 @@ class GlassBottomBar extends StatelessWidget {
     required this.selectedIndex,
     required this.onTap,
     this.showDivider = false,
+    this.centerAction,
   });
 
   final List<GlassNavItem> items;
@@ -222,6 +238,9 @@ class GlassBottomBar extends StatelessWidget {
   final ValueChanged<int> onTap;
 
   final bool showDivider;
+
+  /// 中央主操作按钮（可选；null = 纯 items 均分布局）
+  final GlassCenterAction? centerAction;
 
   @override
   Widget build(BuildContext context) {
@@ -252,8 +271,12 @@ class GlassBottomBar extends StatelessWidget {
             top: false,
             child: Row(
               children: [
-                for (var i = 0; i < items.length; i++)
+                for (var i = 0; i < items.length; i++) ...[
+                  // 中央动作槽插在 items 中点（2 Tab → [Tab0][＋][Tab1]）
+                  if (centerAction != null && i == items.length ~/ 2)
+                    _centerButton(context, centerAction!),
                   Expanded(child: _item(context, i)),
+                ],
               ],
             ),
           ),
@@ -297,6 +320,38 @@ class GlassBottomBar extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 中央主操作按钮：与 [GlassFab] 同一主操作着色玻璃配方（G5 + primary
+  /// fill α 走 [GlassButtonTokens]），尺寸收敛为 [_centerActionSize] 圆形以
+  /// 适配底栏高度；不参与 Tab 选中态（BK-DOC-28 需求6）。
+  Widget _centerButton(BuildContext context, GlassCenterAction action) {
+    final palette = context.palette;
+    final dark = context.tokens.isDark;
+    final fill = palette.primary.withValues(
+      alpha: dark
+          ? GlassButtonTokens.primaryFillDark
+          : GlassButtonTokens.primaryFillLight,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      child: Semantics(
+        button: true,
+        label: action.semanticLabel,
+        child: GlassPanel(
+          level: GlassLevel.g5,
+          borderRadius: AppRadius.pillAll,
+          fillOverride: fill,
+          onTap: action.onTap,
+          child: SizedBox.square(
+            dimension: _centerActionSize,
+            child: Center(
+              child: Icon(action.icon, size: 24, color: palette.onPrimary),
+            ),
+          ),
         ),
       ),
     );

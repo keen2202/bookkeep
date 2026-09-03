@@ -69,18 +69,31 @@ Future<void> pumpUntilGone(WidgetTester tester, Finder finder, {int maxTries = 1
 }
 
 void main() {
-  Widget harness(AppDatabase db) {
+  /// 仅含支出分类的 seed：用于验证「收入」tab 的空态（AC5-4）
+  const expenseOnlySeed = CategorySeed(
+    version: 1,
+    parents: [
+      CategorySeedNode(
+        name: '餐饮',
+        icon: 'restaurant',
+        color: 0xFFFF7043,
+        kind: CategoryKind.expense,
+      ),
+    ],
+  );
+
+  Widget harness(AppDatabase db, {CategorySeed seed = testSeed}) {
     return ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
         currentBookIdProvider.overrideWith((ref) => testBookId),
-        categorySeedProvider.overrideWith((ref) async => testSeed),
+        categorySeedProvider.overrideWith((ref) async => seed),
       ],
       child: const MaterialApp(home: Scaffold(body: CategoriesPage())),
     );
   }
 
-  // 审查 U-1：新建分类动作已上移到主 shell AppBar
+  // 审查 U-1：新建分类动作已上移到宿主页 AppBar
   Widget shellHarness(AppDatabase db) {
     return ProviderScope(
       overrides: [
@@ -92,17 +105,30 @@ void main() {
     );
   }
 
-  testWidgets('seed categories install and render parent groups', (tester) async {
+  /// BK-DOC-28 需求6：分类入口自底部 Tab 下沉至设置弹层 → 独立分类管理页
+  Future<void> openCategoryManagement(WidgetTester tester) async {
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('分类管理'), 120,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('分类管理'));
+    await tester.pump(const Duration(milliseconds: 400)); // 路由入场动画完成
+  }
+
+  testWidgets('seed categories install and render expense groups collapsed',
+      (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
     await tester.pumpWidget(harness(db));
     await pumpUntil(tester, find.text('餐饮'));
 
+    // 需求5 AC5-1：默认「支出」tab → 收入型分类（工资/基本工资）不在列表
     expect(find.text('交通'), findsOneWidget);
-    expect(find.text('早餐'), findsOneWidget);
-    expect(find.text('工资'), findsOneWidget);
-    expect(find.text('基本工资'), findsOneWidget);
+    expect(find.text('工资'), findsNothing);
+    // 需求4 AC4-1：进入即全折叠 → 二级分类不可见
+    expect(find.text('早餐'), findsNothing);
+    expect(find.text('基本工资'), findsNothing);
   });
 
   testWidgets('creating a custom category appends it to the list', (tester) async {
@@ -110,9 +136,8 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db));
-    // 默认主页为账单，切换到分类 tab
-    await tester.tap(find.text('分类').last);
-    await tester.pump(const Duration(milliseconds: 300));
+    // 需求6：分类入口下沉设置弹层 → 独立分类管理页
+    await openCategoryManagement(tester);
     await pumpUntil(tester, find.text('餐饮'));
 
     await tester.tap(find.byTooltip('新建分类'));
@@ -131,7 +156,16 @@ void main() {
 
     await tester.scrollUntilVisible(find.text('旅行'), 300,
         scrollable: find.byType(Scrollable).first);
+    // 新建的一级支出分类落在默认「支出」tab；组头不受折叠态影响，直接可见
     expect(find.text('旅行'), findsOneWidget);
+    // 需求4 AC4-2：无子级的组头不渲染折叠箭头
+    expect(
+      find.descendant(
+        of: find.widgetWithText(ListTile, '旅行'),
+        matching: find.byIcon(Icons.expand_more),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('deleting a custom category removes it from the list', (tester) async {
@@ -169,6 +203,9 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(harness(db));
+    await pumpUntil(tester, find.text('餐饮'));
+    // 需求4：默认全折叠 → 先展开「餐饮」组头才能操作其二级分类
+    await tester.tap(find.text('餐饮'));
     await pumpUntil(tester, find.text('早餐'));
     await tester.pump(const Duration(milliseconds: 200));
 
@@ -189,6 +226,8 @@ void main() {
     await tester.pump();
     await tester.tap(find.widgetWithText(AppButton, '保存'));
     await pumpUntilGone(tester, find.widgetWithText(TextFormField, '分类名称'));
+    // Spec §2.4 边界：数据刷新不重置展开态 → 改名后的二级分类仍在展开的组内
+    await pumpUntil(tester, find.text('早点铺'));
 
     expect(find.text('早点铺'), findsOneWidget);
     expect(find.text('早餐'), findsNothing);
@@ -200,6 +239,9 @@ void main() {
 
     await tester.pumpWidget(harness(db));
     await pumpUntil(tester, find.text('餐饮'));
+    // 需求4：默认全折叠 → 先展开，末尾才能断言子分类未被删掉
+    await tester.tap(find.text('餐饮'));
+    await pumpUntil(tester, find.text('早餐'));
     await tester.pump(const Duration(milliseconds: 200));
 
     // 「餐饮」含子分类（早餐/晚餐）→ 删除应被拒绝并提示
@@ -215,12 +257,12 @@ void main() {
     await tester.tap(find.text('删除').last); // 确认删除 → 仓库拒绝并提示
     await pumpUntilGone(tester, find.text('删除分类'));
     await pumpUntil(tester, find.textContaining('包含子分类'));
-    // 分类仍在列表中
+    // 分类仍在列表中（删除被拒 → 未触发刷新，展开态与子分类均保持）
     expect(find.text('餐饮'), findsOneWidget);
     expect(find.text('早餐'), findsOneWidget);
   });
 
-  testWidgets('collapsing a parent header hides its children', (tester) async {
+  testWidgets('默认全折叠：点组头展开二级分类，再点收起', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -228,18 +270,140 @@ void main() {
     await pumpUntil(tester, find.text('餐饮'));
     await tester.pump(const Duration(milliseconds: 200));
 
-    // 默认全部展开：子分类可见
-    expect(find.text('早餐'), findsOneWidget);
+    // AC4-1：进入即全折叠 → 二级分类不可见；收起态箭头指向「可展开」
+    expect(find.text('早餐'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.widgetWithText(ListTile, '餐饮'),
+        matching: find.byIcon(Icons.expand_more),
+      ),
+      findsOneWidget,
+    );
 
-    // 点击父分类标题折叠 → 子分类隐藏
+    // AC4-2：点击组头展开 → 子分类可见，箭头翻转为「可收起」
+    // （「交通」同样有子级但保持收起，故 expand_less 全局唯一）
+    await tester.tap(find.text('餐饮'));
+    await tester.pump();
+    expect(find.text('早餐'), findsOneWidget);
+    expect(find.byIcon(Icons.expand_less), findsOneWidget);
+
+    // 再次点击收起 → 子分类隐藏
     await tester.tap(find.text('餐饮'));
     await tester.pump();
     expect(find.text('早餐'), findsNothing);
+    expect(find.byIcon(Icons.expand_less), findsNothing);
+  });
 
-    // 再次点击展开 → 子分类恢复
+  // ── BK-DOC-28 需求5：分类页顶部支出/收入两栏 tab ──
+
+  testWidgets('切换收支 tab 过滤列表并重置为全折叠', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntil(tester, find.text('餐饮'));
+
+    // AC5-1：顶部两栏 tab，选中态沿用需求7（无 ✔、颜色突显）
+    expect(find.text('支出'), findsOneWidget);
+    expect(find.text('收入'), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsNothing);
+
+    // 支出 tab：展开「餐饮」看到二级分类
     await tester.tap(find.text('餐饮'));
+    await pumpUntil(tester, find.text('早餐'));
+
+    // AC5-2：切到「收入」→ 仅收入型分类，且列表回到全折叠
+    await tester.tap(find.text('收入'));
     await tester.pump();
-    expect(find.text('早餐'), findsOneWidget);
+    expect(find.text('工资'), findsOneWidget);
+    expect(find.text('餐饮'), findsNothing);
+    expect(find.text('基本工资'), findsNothing);
+
+    // AC4-3：切回「支出」→ 展开态已随 tab 切换清空，仍为全折叠
+    await tester.tap(find.text('支出'));
+    await tester.pump();
+    expect(find.text('餐饮'), findsOneWidget);
+    expect(find.text('工资'), findsNothing);
+    expect(find.text('早餐'), findsNothing);
+  });
+
+  testWidgets('空收入类型显示空态提示', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(harness(db, seed: expenseOnlySeed));
+    await pumpUntil(tester, find.text('餐饮'));
+
+    // AC5-4：该账本无收入分类 → 收入 tab 走空态引导而非空白列表
+    await tester.tap(find.text('收入'));
+    await pumpUntil(tester, find.text('暂无收入分类，点击右上角新建'));
+    expect(find.text('暂无收入分类，点击右上角新建'), findsOneWidget);
+  });
+
+  testWidgets('从收入 tab 新建分类默认预填收入类型', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(shellHarness(db));
+    await openCategoryManagement(tester);
+    await pumpUntil(tester, find.text('餐饮'));
+
+    await tester.tap(find.text('收入'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('新建分类'));
+    await pumpUntil(tester, find.widgetWithText(TextFormField, '分类名称'));
+    await tester.pump(const Duration(milliseconds: 400)); // 弹窗入场动画完成
+
+    // AC5-3：弹层类型分段控件预选「收入」——页面 tab 同为
+    // SegmentedButton<CategoryKind>，故限定在 BottomSheet 内取
+    expect(
+      tester
+          .widget<SegmentedButton<CategoryKind>>(find.descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(SegmentedButton<CategoryKind>),
+          ))
+          .selected,
+      {CategoryKind.income},
+    );
+
+    await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '奖金');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(AppButton, '保存'));
+    await pumpUntilGone(tester, find.text('保存'));
+    // 预填生效 → 新分类落在当前（收入）tab，支出分类不在列表
+    await pumpUntil(tester, find.text('奖金'));
+    expect(find.text('奖金'), findsOneWidget);
+    expect(find.text('工资'), findsOneWidget);
+    expect(find.text('餐饮'), findsNothing);
+  });
+
+  testWidgets('退出分类页再进入恢复默认支出 tab 与全折叠', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(shellHarness(db));
+    await openCategoryManagement(tester);
+    await pumpUntil(tester, find.text('餐饮'));
+
+    // 制造非默认状态：展开「餐饮」+ 切到「收入」tab
+    await tester.tap(find.text('餐饮'));
+    await pumpUntil(tester, find.text('早餐'));
+    await tester.tap(find.text('收入'));
+    await tester.pump();
+    expect(find.text('工资'), findsOneWidget);
+
+    // 返回主 shell（GlassScaffold 对可返回路由自动提供返回键）
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // AC4-3：重进 → 默认「支出」tab 且全折叠（tab 状态 autoDispose，不持久化）
+    await openCategoryManagement(tester);
+    await pumpUntil(tester, find.text('餐饮'));
+    expect(find.text('工资'), findsNothing);
+    expect(find.text('早餐'), findsNothing);
   });
 
   // ── BK-DOC-26 需求7：层级选择 + 自定义图标 ──
@@ -249,8 +413,7 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db));
-    await tester.tap(find.text('分类').last);
-    await tester.pump(const Duration(milliseconds: 300));
+    await openCategoryManagement(tester);
     await pumpUntil(tester, find.text('餐饮'));
 
     await tester.tap(find.byTooltip('新建分类'));
@@ -280,8 +443,9 @@ void main() {
     await pumpUntilGone(tester, find.text('保存'));
     await pumpUntil(tester, find.byType(ListView));
 
-    await tester.scrollUntilVisible(find.text('商务打车'), 300,
-        scrollable: find.byType(Scrollable).first);
+    // 需求4：默认全折叠 → 展开「交通」组头才能看到新建的二级分类
+    await tester.tap(find.text('交通'));
+    await pumpUntil(tester, find.text('商务打车'));
     expect(find.text('商务打车'), findsOneWidget);
 
     // 落库校验：归属父级（交通），为二级分类
@@ -298,8 +462,7 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db));
-    await tester.tap(find.text('分类').last);
-    await tester.pump(const Duration(milliseconds: 300));
+    await openCategoryManagement(tester);
     await pumpUntil(tester, find.text('餐饮'));
 
     await tester.tap(find.byTooltip('新建分类'));

@@ -19,16 +19,27 @@ enum CategoryLevel { top, sub }
 /// 新建/编辑分类（Spec §3.3 / BK-P0-003；BK-DOC-26 需求7：
 /// 层级选择 + 自定义图标）
 class CategoryEditSheet extends ConsumerStatefulWidget {
-  const CategoryEditSheet({super.key, this.category});
+  const CategoryEditSheet({super.key, this.category, this.initialKind});
 
   final Category? category;
 
-  static Future<void> show(BuildContext context, {Category? category}) {
+  /// 新建时的收支类型预填（BK-DOC-28 需求5 AC5-3：来自分类页当前 tab）；
+  /// 编辑态忽略——既有分类的 kind 不可改
+  final CategoryKind? initialKind;
+
+  static Future<void> show(
+    BuildContext context, {
+    Category? category,
+    CategoryKind? initialKind,
+  }) {
     // AppSheet 统一底部弹层（拖拽柄 / 圆角 lg / scrim 54%）
     return showAppSheet<void>(
       context,
       title: category == null ? '新建分类' : '编辑分类',
-      child: CategoryEditSheet(category: category),
+      child: CategoryEditSheet(
+        category: category,
+        initialKind: category == null ? initialKind : null,
+      ),
     );
   }
 
@@ -56,7 +67,8 @@ class _CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
     super.initState();
     final category = widget.category;
     _nameController = TextEditingController(text: category?.name ?? '');
-    _kind = category?.kind ?? CategoryKind.expense;
+    // 编辑态用既有 kind；新建态预填来源 tab（需求5 AC5-3），无则默认支出
+    _kind = category?.kind ?? widget.initialKind ?? CategoryKind.expense;
     // 图标预填：编辑态沿用既有图标；新建默认通用标签
     _iconName = category?.icon ?? 'tag';
     _colorIndex = _palette.indexWhere((c) => c == category?.color);

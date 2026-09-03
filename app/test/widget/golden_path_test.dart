@@ -15,7 +15,7 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/data/repositories/lock_repository.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
-import 'package:bookkeep_app/shared/widgets/draggable_fab.dart';
+import 'package:bookkeep_app/shared/widgets/glass_nav.dart';
 
 import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
@@ -39,10 +39,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 30));
   }
 
-  /// 主界面「记一笔」按钮（BK-DOC-26 需求4 起为可拖拽 DraggableGlassFab，
-  /// 组件本身铺满内容区，真实按钮经加号图标定位）
-  Finder fabButton() => find.descendant(
-        of: find.byType(DraggableGlassFab),
+  /// 底栏中央「记一笔」按钮（BK-DOC-28 需求6：固定底栏中央、不可拖拽，
+  /// 非 Tab 项，经加号图标定位）
+  Finder addEntryButton() => find.descendant(
+        of: find.byType(GlassBottomBar),
         matching: find.byIcon(Icons.add),
       );
 
@@ -88,8 +88,8 @@ void main() {
     await tester.pumpWidget(harness(db));
     await tester.pump(const Duration(milliseconds: 600));
 
-    // ── ① 记账：FAB → 快速记账 25.5 元 ──
-    await tester.tap(fabButton());
+    // ── ① 记账：底栏中央 ＋ → 快速记账 25.5 元 ──
+    await tester.tap(addEntryButton());
     await tester.pumpAndSettle();
     await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
     for (final key in ['2', '5', '.', '5']) {
@@ -115,10 +115,6 @@ void main() {
 
     expect(find.text('已保存'), findsOneWidget);
 
-    // 等待 SnackBar 消失，避免其浮层遮住 FAB
-    await tester.pump(const Duration(milliseconds: 3000));
-    await tester.pumpAndSettle();
-
     // ── ② 数据落库 + 同步 op 入队（乐观写，Spec §3.1）──
     final txs = await db.select(db.transactions).get();
     expect(txs, hasLength(1));
@@ -135,7 +131,7 @@ void main() {
     expect(find.text('支出：'), findsOneWidget);
     expect(find.text('¥25.50'), findsOneWidget);
     expect(find.text('餐饮 / 早餐'), findsOneWidget);
-    await tester.tap(fabButton());
+    await tester.tap(addEntryButton());
     await tester.pumpAndSettle();
     await pumpUntilFound(tester, find.text('本月预算'));
     expect(find.text('已花 ¥25.50 / 总额 ¥100.00'), findsOneWidget);
@@ -144,12 +140,14 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
-    // ── ④ 报表页：饼图 + 周期对比双柱图（当月区间；收支趋势已按需求取消）──
+    // ── ④ 报表页：饼图 + 双柱图（默认年粒度含「周期对比」「收支趋势」，需求9）──
     await tester.tap(find.text('报表'));
     await tester.pumpAndSettle();
     expect(find.byType(PieChart), findsOneWidget);
-    expect(find.byType(BarChart), findsOneWidget);
-    expect(find.text('收支趋势'), findsNothing);
+    // 区块是否全部进入 ListView 构建窗口取决于视口，粒度专项断言见 reports_page_test
+    expect(find.byType(BarChart), findsWidgets);
+    // 需求1：折线图取消
+    expect(find.byType(LineChart), findsNothing);
 
     // ── ⑤ 设置 → 开启隐私锁 → 立即锁定 → 锁屏覆盖 → PIN 解锁 ──
     await tester.tap(find.byIcon(Icons.settings_outlined));

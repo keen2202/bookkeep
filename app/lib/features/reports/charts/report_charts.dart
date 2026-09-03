@@ -151,11 +151,21 @@ class CategoryPieChart extends StatelessWidget {
 /// 对比当期收支；审查 U-11：touch tooltip 金额格式化 + 可读刻度）。
 /// x 轴标签按维度语义紧凑化（[periodAxisLabels]）：日=周几、周=周一日期
 /// 「M/D」、月=「M月」（跨年顶行标年份）、年=YYYY；柱宽随桶数自适应。
+/// [showLeadingYear] = false 时抑制月桶首行的年份顶行（BK-DOC-28 §2.9：
+/// 年维度「收支趋势」同年 12 桶，年份已由区块副标题承载，省下顶行高度给柱区）。
 class PeriodBarChart extends StatelessWidget {
-  const PeriodBarChart({super.key, required this.buckets, required this.hideAmounts});
+  const PeriodBarChart({
+    super.key,
+    required this.buckets,
+    required this.hideAmounts,
+    this.showLeadingYear = true,
+  });
 
   final List<PeriodBucket> buckets;
   final bool hideAmounts;
+
+  /// 月桶是否渲染首桶/跨年处的年份顶行（默认渲染）
+  final bool showLeadingYear;
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +188,7 @@ class PeriodBarChart extends StatelessWidget {
       for (final b in buckets) b.label,
     ]);
     // 月桶带年份顶行 → 底部预留两行高度
-    final hasYearLine = axisLabels.any((l) => l.top != null);
+    final hasYearLine = showLeadingYear && axisLabels.any((l) => l.top != null);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -256,14 +266,15 @@ class PeriodBarChart extends StatelessWidget {
                           return const SizedBox.shrink();
                         }
                         final label = axisLabels[index];
+                        final top = showLeadingYear ? label.top : null;
                         return SideTitleWidget(
                           meta: meta,
                           space: 6,
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (label.top != null)
-                                Text(label.top!, style: context.text.labelSmall),
+                              if (top != null)
+                                Text(top, style: context.text.labelSmall),
                               Text(label.main, style: axisStyle),
                             ],
                           ),

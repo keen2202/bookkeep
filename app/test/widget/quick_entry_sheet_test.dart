@@ -138,6 +138,32 @@ void main() {
     expect(find.byIcon(Icons.close), findsNothing);
   });
 
+  testWidgets('类型分段控件选中段无 ✔，改由颜色突显', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDb(db);
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntilFound(tester, find.byType(DropdownButtonFormField<int>));
+
+    // BK-DOC-28 需求7（AC7-1）：选中「支出」段不渲染 ✔（框架默认 showSelectedIcon）
+    expect(find.byType(SegmentedButton<TransactionType>), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsNothing);
+
+    // AC7-2：去掉 ✔ 后选中态仍可切换——点「收入」改选，且仍无 ✔
+    // （账户为自动回填、与类型无关，故直接读分段控件的 selected 断言）
+    await tester.tap(find.text('收入'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check), findsNothing);
+    expect(
+      tester
+          .widget<SegmentedButton<TransactionType>>(
+              find.byType(SegmentedButton<TransactionType>))
+          .selected,
+      {TransactionType.income},
+    );
+  });
+
   testWidgets('新增记账提供备注栏，填写后随保存入库', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);

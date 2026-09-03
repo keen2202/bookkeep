@@ -23,7 +23,6 @@ import 'features/auth_lock/biometric.dart';
 import 'features/auth_lock/lock_controller.dart';
 import 'features/books/books_providers.dart';
 import 'features/recurring/recurring_service.dart';
-import 'features/settings/fab_position.dart';
 import 'features/sync/sync_providers.dart';
 import 'shared/theme/glass_prefs.dart';
 import 'shared/theme/theme_controller.dart';
@@ -62,9 +61,6 @@ Future<void> main() async {
   // 玻璃拟态 v3（GLS-014）：玻璃质感 + 环境光设置启动注入（5 个新键，
   // 缺失回退默认 standard）
   final glassPrefs = await settingsRepo.glassPrefs();
-  // 记账按钮拖拽位置（BK-DOC-26 需求4）：缺失回落默认底部正中
-  final (fabAx, fabAy) = await settingsRepo.fabAnchor();
-  final fabAnchor = (fabAx != null && fabAy != null) ? (ax: fabAx, ay: fabAy) : null;
   // 隐私锁初始状态：进程被杀重进仍锁（Spec §3.6 / BK-P0-006 / BK-T-008）
   final lockRepo = LockRepository(db);
   final initialLock = await lockRepo.initialState();
@@ -83,7 +79,6 @@ Future<void> main() async {
       currentBookIdProvider.overrideWith((ref) => currentBook),
       themeControllerProvider.overrideWith(() => ThemeController(initial: themeSettings)),
       glassPrefsProvider.overrideWith(() => GlassPrefsController(initial: glassPrefs)),
-      fabAnchorProvider.overrideWith(() => FabAnchorController(initial: fabAnchor)),
       lockControllerProvider.overrideWith((ref) => LockController(
             lockRepo,
             LocalAuthBiometric(),

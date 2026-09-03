@@ -11,6 +11,7 @@ import '../../data/local/tables/transactions_table.dart';
 import '../../domain/usecases/create_transaction.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/tokens.dart';
+import '../../shared/widgets/app_segmented_button.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/app_snack.dart';
 import '../../shared/widgets/category_picker.dart';
@@ -27,7 +28,8 @@ import 'amount_keyboard.dart';
 import 'amount_parser.dart';
 import 'quick_entry_controller.dart';
 
-/// 共享导航：打开记账页（FAB / 日历日期跳转共用），保存成功回传 true 弹「已保存」
+/// 共享导航：打开记账页（底栏中央「记一笔」/ 日历日期跳转共用），
+/// 保存成功回传 true 弹「已保存」
 Future<void> openQuickEntrySheet(BuildContext context, {DateTime? initialDate}) async {
   final saved = await Navigator.of(context).push<bool>(
     MaterialPageRoute(builder: (_) => QuickEntrySheet(initialDate: initialDate)),
@@ -160,7 +162,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       // 需求：取消右上角「退出」按钮——返回由系统返回手势/导航返回键承担
       body: Column(
         children: [
-          SegmentedButton<TransactionType>(
+          // BK-DOC-28 需求7：选中态去 ✔，改颜色突显（样式收敛于共享组件）；
+          // 禁用段（编辑收支时的转账）不受选中色影响
+          AppSegmentedButton<TransactionType>(
             segments: [
               ButtonSegment(
                 value: TransactionType.expense,

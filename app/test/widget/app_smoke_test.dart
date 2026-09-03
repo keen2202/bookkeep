@@ -34,11 +34,30 @@ void main() {
       find.descendant(of: find.byType(GlassAppBar), matching: find.text('账单')),
       findsOneWidget,
     );
-    expect(find.text('分类'), findsWidgets);
-    // BK-DOC-26：主导航收敛为 账单/分类/报表；周期记账下沉设置、日历并入报表
-    expect(find.text('报表'), findsOneWidget);
+    // BK-DOC-28 需求6：主导航收敛为 账单 / 报表 两 Tab + 底栏中央记一笔动作按钮
+    expect(
+      find.descendant(of: find.byType(GlassBottomBar), matching: find.text('报表')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(GlassBottomBar), matching: find.text('分类')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(GlassBottomBar),
+        matching: find.byIcon(Icons.add),
+      ),
+      findsOneWidget,
+    );
+    // BK-DOC-26：周期记账下沉设置、日历并入报表（均不作为主导航项）
     expect(find.text('周期记账'), findsNothing);
     expect(find.text('日历'), findsNothing);
+
+    // 分类入口移至设置弹层（需求6 AC6-3）
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('分类管理'), findsOneWidget);
   });
 
   testWidgets('秒开分支：appShellBuilder 拼装 ThemeTransition + AppBackground + LockGate',

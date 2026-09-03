@@ -14,7 +14,7 @@ import 'package:bookkeep_app/features/accounts/accounts_page.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/books/books_page.dart' show showBookActions;
 import 'package:bookkeep_app/features/books/books_providers.dart';
-import 'package:bookkeep_app/shared/widgets/draggable_fab.dart';
+import 'package:bookkeep_app/shared/widgets/glass_nav.dart';
 
 import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
@@ -46,27 +46,37 @@ void main() {
     );
   }
 
-  Future<void> switchTab(WidgetTester tester, String label) async {
-    await tester.tap(find.text(label).last);
-    await tester.pump(const Duration(milliseconds: 400));
-  }
+  /// 底栏中央「记一笔」动作按钮（BK-DOC-28 需求6：非 Tab 项，固定不可拖拽）
+  Finder centerAddButton() => find.descendant(
+        of: find.byType(GlassBottomBar),
+        matching: find.byIcon(Icons.add),
+      );
 
-  testWidgets('viewer 隐藏主界面「记一笔」FAB', (tester) async {
+  testWidgets('viewer 隐藏底栏中央「记一笔」按钮', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db, role: 'viewer'));
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byType(DraggableGlassFab), findsNothing);
+    expect(centerAddButton(), findsNothing);
+    // 中央按钮隐藏后两侧 Tab 仍齐备（Expanded 均分补位）
+    expect(
+      find.descendant(of: find.byType(GlassBottomBar), matching: find.text('账单')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(GlassBottomBar), matching: find.text('报表')),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('owner 显示主界面「记一笔」FAB', (tester) async {
+  testWidgets('owner 显示底栏中央「记一笔」按钮', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
     await tester.pumpWidget(shellHarness(db));
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byType(DraggableGlassFab), findsOneWidget);
+    expect(centerAddButton(), findsOneWidget);
   });
 
   testWidgets('viewer 隐藏账户页「新建账户」FAB 且长按无编辑菜单', (tester) async {
@@ -116,17 +126,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     // W3 迁移至 AppEmpty：title 与 message 拆分为独立 Text
     expect(find.text('还没有账单'), findsOneWidget);
-    expect(find.text('点击右下角 + 记一笔'), findsOneWidget);
+    expect(find.text('点击底部 + 记一笔'), findsOneWidget);
   });
 
-  /// 周期记账已下沉为设置项（BK-DOC-26 §2.5）：设置弹层 → 周期记账
-  /// （设置项较多时先滚动到可见）
-  Future<void> openRecurringSettings(WidgetTester tester) async {
+  /// 下沉到设置弹层的功能入口（BK-DOC-26 §2.5 周期记账、BK-DOC-28 需求6 分类管理）：
+  /// 设置弹层 → 目标项（设置项较多时先滚动到可见）
+  Future<void> openSettingsEntry(WidgetTester tester, String label) async {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('周期记账'), 120,
+    await tester.scrollUntilVisible(find.text(label), 120,
         scrollable: find.byType(Scrollable).last);
-    await tester.tap(find.text('周期记账'));
+    await tester.tap(find.text(label));
     await tester.pumpAndSettle();
   }
 
@@ -136,7 +146,7 @@ void main() {
 
     await tester.pumpWidget(shellHarness(db, role: 'viewer'));
     await tester.pump(const Duration(milliseconds: 600));
-    await openRecurringSettings(tester);
+    await openSettingsEntry(tester, '周期记账');
     expect(find.byTooltip('新建规则'), findsNothing);
     expect(find.byTooltip('立即补跑'), findsNothing);
   });
@@ -147,12 +157,12 @@ void main() {
 
     await tester.pumpWidget(shellHarness(db));
     await tester.pump(const Duration(milliseconds: 600));
-    await openRecurringSettings(tester);
+    await openSettingsEntry(tester, '周期记账');
     expect(find.byTooltip('新建规则'), findsOneWidget);
     expect(find.byTooltip('立即补跑'), findsOneWidget);
   });
 
-  testWidgets('viewer 隐藏分类页新建动作与自定义分类编辑入口', (tester) async {
+  testWidgets('viewer 分类管理页只读：隐藏新建动作与分类编辑入口', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     await CategoryRepository(db, bookId: testBookId).createCategory(
@@ -164,10 +174,34 @@ void main() {
 
     await tester.pumpWidget(shellHarness(db, role: 'viewer'));
     await tester.pump(const Duration(milliseconds: 600));
-    await switchTab(tester, '分类');
+    // 需求6：分类入口自底部 Tab 下沉至设置弹层 → 独立分类管理页
+    await openSettingsEntry(tester, '分类管理');
     expect(find.byTooltip('新建分类'), findsNothing);
     expect(find.byIcon(Icons.more_vert), findsNothing);
     expect(find.text('旅行'), findsOneWidget);
+  });
+
+  testWidgets('owner 分类管理页可新建与编辑分类', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await CategoryRepository(db, bookId: testBookId).createCategory(
+      name: '旅行',
+      icon: 'tag',
+      color: 0xFF000000,
+      kind: CategoryKind.expense,
+    );
+
+    await tester.pumpWidget(shellHarness(db));
+    await tester.pump(const Duration(milliseconds: 600));
+    await openSettingsEntry(tester, '分类管理');
+    expect(find.byTooltip('新建分类'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.widgetWithText(ListTile, '旅行'),
+        matching: find.byIcon(Icons.more_vert),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('viewer 不可见邀请成员入口，成员管理可见', (tester) async {

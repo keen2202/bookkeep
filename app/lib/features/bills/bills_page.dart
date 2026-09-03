@@ -37,7 +37,7 @@ class BillsPage extends ConsumerWidget {
           return AppEmpty(
             icon: Icons.receipt_long_outlined,
             title: viewer ? '暂无账单' : '还没有账单',
-            message: viewer ? null : '点击右下角 + 记一笔',
+            message: viewer ? null : '点击底部 + 记一笔',
           );
         }
         final categoriesAsync = ref.watch(categoriesViewModelProvider);
@@ -52,7 +52,7 @@ class BillsPage extends ConsumerWidget {
             for (final t in day.items) _BillRow.tx(t),
           ],
         ];
-        // 审查 U-10：惰性构建；底部留白防 FAB 遮挡
+        // 审查 U-10：惰性构建；底部留白为末行提供滚动余量
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 88),
           itemCount: rows.length,
@@ -179,13 +179,14 @@ class _BillTile extends StatelessWidget {
       ),
       title: Text(name),
       subtitle: Text(tx.note == null || tx.note!.isEmpty ? time : '$time · ${tx.note}'),
-      // BK-DOC-26 需求1：金额字号与页面标题（titleLarge）一致，统一视觉层级；
-      // 等宽数字与收支语义着色由 AppAmountText 保持
+      // BK-DOC-28 需求8（冲突 C3，反向调整 BK-DOC-26 需求1）：金额字号降到
+      // 与同行分类名称一致（dense ListTile 标题 = bodyMedium），减轻列表压迫感；
+      // 保留 w600 字重，等宽数字与收支语义着色由 AppAmountText 保持
       trailing: AppAmountText.minor(
         tx.amountMinor,
         masked: masked,
         tone: amountTone,
-        style: context.text.titleLarge,
+        style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
       ),
       dense: true,
       onTap: onTap,

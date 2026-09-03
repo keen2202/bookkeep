@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// 功能模块（底部导航主 Tab；BK-DOC-26：周期记账下沉设置、日历并入报表后
-/// 收敛为三模块）
+/// 功能模块（底部导航主 Tab；BK-DOC-28 需求6：分类入口下沉设置后
+/// 收敛为两模块，记账入口为底栏中央动作按钮而非 Tab）
 enum AppModule {
   bills('账单'),
-  categories('分类'),
   reports('报表');
 
   const AppModule(this.label);
@@ -15,6 +14,5 @@ enum AppModule {
 /// Spec §2.3 / BK-DOC-26——`IconPack` 配置面整体收敛）
 IconData moduleIcon(AppModule module) => switch (module) {
       AppModule.bills => Icons.receipt_long_outlined,
-      AppModule.categories => Icons.category_outlined,
       AppModule.reports => Icons.bar_chart_outlined,
     };

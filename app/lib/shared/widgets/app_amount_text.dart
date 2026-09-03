@@ -64,8 +64,8 @@ class AppAmountText extends StatelessWidget {
   /// 显式颜色优先于语气着色
   final Color? color;
 
-  /// 字阶覆盖（BK-DOC-26 需求1：如账单行金额对齐页面标题 titleLarge）；
-  /// 语义着色与等宽数字仍然生效
+  /// 字阶覆盖（如账单行金额对齐分类名称的 bodyMedium 槽位，
+  /// BK-DOC-28 需求8）；语义着色与等宽数字仍然生效
   final TextStyle? style;
 
   final TextAlign? textAlign;

@@ -104,36 +104,8 @@ class SettingsRepository {
     });
   }
 
-  // FAB 拖拽位置（BK-DOC-26 需求4）：归一化锚点（按钮中心 / 内容区宽高比）。
-  // 键缺失或数值非法返回 (null, null) → 调用方回落默认底部正中位置。
-  static const _fabAnchorXKey = 'fab_anchor_x';
-  static const _fabAnchorYKey = 'fab_anchor_y';
-
-  Future<(double?, double?)> fabAnchor() async {
-    final rows = await (db.select(db.appMeta)
-          ..where((t) => t.key.isIn({_fabAnchorXKey, _fabAnchorYKey})))
-        .get();
-    final map = {for (final r in rows) r.key: r.value};
-    final ax = double.tryParse(map[_fabAnchorXKey] ?? '');
-    final ay = double.tryParse(map[_fabAnchorYKey] ?? '');
-    if (ax == null || ay == null) return (null, null);
-    return (ax, ay);
-  }
-
-  Future<void> setFabAnchor(double ax, double ay) async {
-    await db.batch((batch) {
-      batch.insert(
-        db.appMeta,
-        AppMetaCompanion.insert(key: _fabAnchorXKey, value: '$ax'),
-        onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('$ax'))),
-      );
-      batch.insert(
-        db.appMeta,
-        AppMetaCompanion.insert(key: _fabAnchorYKey, value: '$ay'),
-        onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('$ay'))),
-      );
-    });
-  }
+  // FAB 拖拽位置键（fab_anchor_x / fab_anchor_y）随记账按钮下沉底栏中央废弃
+  // （BK-DOC-28 需求6，冲突 C1）：历史键读取时忽略、不再写入。
 
   Color? _parseHexColor(String? hex) {
     if (hex == null) return null;

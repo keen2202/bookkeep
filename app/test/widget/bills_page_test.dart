@@ -287,7 +287,7 @@ void main() {
     expect(txs.every((t) => t.deletedAt != null), isTrue);
   });
 
-  testWidgets('bill row amount matches the page-title text slot and keeps tabular figures',
+  testWidgets('bill row amount matches the category-name text slot and keeps tabular figures',
       (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
@@ -297,10 +297,20 @@ void main() {
     await tester.pumpWidget(harness(db));
     await pumpUntilFound(tester, find.text('餐饮 / 早餐'));
 
-    // 账单行金额字号 == 页面标题字阶槽位（titleLarge；FGDS 主题下为 17sp）
+    // 需求8 AC8-1：金额渲染字号 == 同行分类名称渲染字号
+    // （dense ListTile 标题走 bodyMedium 槽位；FGDS 主题下为 13sp）
     final amount = tester.widget<Text>(find.text('-¥25.50'));
-    final context = tester.element(find.text('餐饮 / 早餐'));
-    expect(amount.style?.fontSize, Theme.of(context).textTheme.titleLarge?.fontSize);
+    final categoryElement = tester.element(find.text('餐饮 / 早餐'));
+    expect(
+      amount.style?.fontSize,
+      DefaultTextStyle.of(categoryElement).style.fontSize,
+    );
+    expect(
+      amount.style?.fontSize,
+      Theme.of(categoryElement).textTheme.bodyMedium?.fontSize,
+    );
+    // AC8-2：字重保持 w600（金额仍需与分类名区分主次）
+    expect(amount.style?.fontWeight, FontWeight.w600);
     // 等宽数字保留（金额列纵向对齐）
     expect(amount.style?.fontFeatures, isNotNull);
     expect(

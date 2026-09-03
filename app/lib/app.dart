@@ -17,7 +17,7 @@ import 'features/books/book_switcher.dart';
 import 'features/books/books_page.dart' show serverBooksProvider;
 import 'features/books/books_providers.dart' show currentBookIdProvider, currentRoleProvider;
 import 'features/bills/bills_page.dart';
-import 'features/categories/categories_page.dart' show CategoriesPage, categoriesPageAction;
+import 'features/categories/categories_page.dart' show CategoryManagementPage;
 import 'features/currency/currency_manage_page.dart';
 import 'features/quick_entry/quick_entry_sheet.dart';
 import 'features/recurring/recurring_page.dart' show RecurringSettingsPage;
@@ -25,11 +25,9 @@ import 'features/recurring/recurring_providers.dart' show recurringServiceProvid
 import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/appearance_page.dart';
-import 'features/settings/fab_position.dart';
 import 'shared/theme/app_icons.dart';
 import 'shared/theme/theme_controller.dart';
 import 'shared/theme/theme_transition.dart';
-import 'shared/widgets/draggable_fab.dart';
 import 'shared/widgets/glass_nav.dart';
 import 'shared/theme/background/app_background.dart';
 
@@ -50,7 +48,7 @@ Widget appShellBuilder(BuildContext context, Widget? child) => ThemeTransition(
       ),
     );
 
-/// App 根组件：底部导航（记账/账户/分类）+ 秒开模式入口
+/// App 根组件：底部导航（账单 / 报表 两 Tab + 中央记账按钮）+ 秒开模式入口
 class BookkeepApp extends ConsumerStatefulWidget {
   const BookkeepApp({super.key, this.startInQuickEntry = false});
 
@@ -121,7 +119,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   /// 需传入 Navigator 内的 context（state.context 在 MaterialApp 之上，无法定位 Navigator）
   Future<void> _openQuickEntry(BuildContext navContext) => openQuickEntrySheet(navContext);
 
-  static const _tabTitles = ['账单', '分类', '报表'];
+  static const _tabTitles = ['账单', '报表'];
 
   @override
   Widget build(BuildContext context) {
@@ -150,40 +148,22 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
           ref.watch(serverBooksProvider);
           final viewer = ref.watch(currentRoleProvider) == 'viewer';
           return Scaffold(
-            body: Stack(
-              children: [
-                NotificationListener<UserScrollNotification>(
-                  onNotification: (n) {
-                    final scrolled = n.metrics.pixels > 0;
-                    if (scrolled != _scrolled) {
-                      setState(() => _scrolled = scrolled);
-                    }
-                    return false;
-                  },
-                  // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表 _range 等）
-                  child: IndexedStack(
-                    index: _tab,
-                    children: const [
-                      BillsPage(),
-                      CategoriesPage(),
-                      ReportsPage(),
-                    ],
-                  ),
-                ),
-                // BK-DOC-26 需求4：可拖拽记账按钮——长按拖动自由移动，
-                // 默认底部正中；松手持久化归一化锚点，重启还原；viewer 隐藏
-                if (!viewer)
-                  Positioned.fill(
-                    child: DraggableGlassFab(
-                      icon: Icons.add,
-                      semanticLabel: '记一笔',
-                      anchor: ref.watch(fabAnchorProvider),
-                      onTap: () => _openQuickEntry(navContext),
-                      onPlacementChanged: (a) =>
-                          ref.read(fabAnchorProvider.notifier).save(a),
-                    ),
-                  ),
-              ],
+            body: NotificationListener<UserScrollNotification>(
+              onNotification: (n) {
+                final scrolled = n.metrics.pixels > 0;
+                if (scrolled != _scrolled) {
+                  setState(() => _scrolled = scrolled);
+                }
+                return false;
+              },
+              // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表时间选择等）
+              child: IndexedStack(
+                index: _tab,
+                children: const [
+                  BillsPage(),
+                  ReportsPage(),
+                ],
+              ),
             ),
             bottomNavigationBar: GlassBottomBar(
               selectedIndex: _tab,
@@ -196,6 +176,14 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
                     label: m.label,
                   ),
               ],
+              // 需求6：记账入口下沉底栏中央（固定、不可拖拽）；viewer 只读隐藏
+              centerAction: viewer
+                  ? null
+                  : (
+                      icon: Icons.add,
+                      semanticLabel: '记一笔',
+                      onTap: () => _openQuickEntry(navContext),
+                    ),
             ),
             // FG-NAV（BK-FG-021）：G3 吸顶玻璃栏；滚动后分隔线渐显
             appBar: PreferredSize(
@@ -204,7 +192,6 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
                 title: Text(_tabTitles[_tab]),
                 showDivider: _scrolled,
                 actions: [
-                  ..._tabActions(navContext),
                   const BookSwitcher(),
                   GlassAppBarAction(
                     icon: Icons.settings_outlined,
@@ -218,14 +205,6 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
         },
       ),
     );
-  }
-
-  /// 当前 Tab 的动作（viewer 只读时为空，Spec §4.1 双重拒绝）
-  List<Widget> _tabActions(BuildContext navContext) {
-    return switch (_tab) {
-      1 => [ ?categoriesPageAction(navContext, ref) ],
-      _ => const [],
-    };
   }
 
   void _showSettings(BuildContext navContext) {
@@ -261,6 +240,15 @@ class _SettingsSheet extends ConsumerWidget {
                 subtitle: const Text('主题方案 / 玻璃质感'),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AppearancePage()),
+                ),
+              ),
+              // 需求6：分类入口下沉设置（同周期记账下沉先例），进入独立分类管理页
+              ListTile(
+                leading: const Icon(Icons.category_outlined),
+                title: const Text('分类管理'),
+                subtitle: const Text('支出 / 收入分类的新建与整理'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CategoryManagementPage()),
                 ),
               ),
               const Divider(),

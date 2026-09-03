@@ -5,10 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/repository_exceptions.dart';
-import '../../core/ledger_version.dart';import '../../data/local/database.dart';
+import '../../core/ledger_version.dart';
+import '../../data/local/database.dart';
+import '../../data/local/tables/categories_table.dart';
 import '../../domain/models/category_seed.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
+import '../../shared/widgets/app_segmented_button.dart';
+import '../../shared/widgets/glass_nav.dart' show GlassScaffold;
 import '../books/books_providers.dart'
     show categoryRepositoryProvider, currentRoleProvider;
 import 'category_edit_sheet.dart';
@@ -28,8 +32,37 @@ final categoriesViewModelProvider = FutureProvider<List<Category>>((ref) async {
   return repo.listCategories(includeDeleted: false);
 });
 
-/// 分类管理页（Spec §3.3 / BK-P0-003）；无内层 Scaffold/AppBar/FAB
-/// （审查 U-1：单 AppBar 单 FAB 由主 shell 组装，动作经 [categoriesPageAction] 暴露）
+/// 分类页当前收支 tab（BK-DOC-28 需求5 / Spec §2.5）：列表过滤与 AppBar
+/// 「新建分类」预填同源（AC5-3），故状态放在页面之外而非列表 State 内。
+///
+/// autoDispose：退出路由后无监听者即销毁，重进恢复默认「支出」——与需求4
+/// 「重进恢复全折叠、不持久化」的心智一致。
+final categoryKindTabProvider =
+    StateProvider.autoDispose<CategoryKind>((ref) => CategoryKind.expense);
+
+/// 分类管理页（BK-DOC-28 需求6）：分类入口自底部 Tab 下沉设置弹层后的
+/// 独立路由页（同「周期记账」下沉先例）——`GlassScaffold`
+/// 提供 G3 吸顶玻璃栏与返回键，AppBar 动作复用 [categoriesPageAction]。
+///
+/// 路由化后不再驻留主 shell 的 `IndexedStack`：每次进入重新加载，
+/// 滚动位置、展开状态与收支 tab 均不保留（需求4「进入默认折叠」、
+/// 需求5「默认支出」语义）。
+class CategoryManagementPage extends ConsumerWidget {
+  const CategoryManagementPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GlassScaffold(
+      title: const Text('分类'),
+      actions: [ ?categoriesPageAction(context, ref) ],
+      body: const CategoriesPage(),
+    );
+  }
+}
+
+/// 分类列表内容（Spec §3.3 / BK-P0-003；BK-DOC-28 需求5 顶部收支 tab）；
+/// 无内层 Scaffold/AppBar/FAB（审查 U-1：单 AppBar 单 FAB 由宿主
+/// [CategoryManagementPage] 组装，动作经 [categoriesPageAction] 暴露）
 class CategoriesPage extends ConsumerWidget {
   const CategoriesPage({super.key});
 
@@ -37,10 +70,34 @@ class CategoriesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categories = ref.watch(categoriesViewModelProvider);
     final viewer = ref.watch(currentRoleProvider) == 'viewer';
-    return categories.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('加载失败：$e')),
-      data: (list) => _CategoryList(categories: list, viewer: viewer),
+    final kind = ref.watch(categoryKindTabProvider);
+    return Column(
+      children: [
+        // 需求5：AppBar 之下、列表之上的「支出 / 收入」两栏 tab（默认支出）；
+        // 选中态样式沿用需求7 的共享分段控件（无 ✔、颜色突显）
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+          child: AppSegmentedButton<CategoryKind>(
+            segments: const [
+              ButtonSegment(value: CategoryKind.expense, label: Text('支出')),
+              ButtonSegment(value: CategoryKind.income, label: Text('收入')),
+            ],
+            selected: {kind},
+            // 切换 tab → 列表重置全折叠由 _CategoryList.didUpdateWidget 承担
+            onSelectionChanged: (s) =>
+                ref.read(categoryKindTabProvider.notifier).state = s.first,
+          ),
+        ),
+        Expanded(
+          child: categories.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('加载失败：$e')),
+            data: (list) =>
+                _CategoryList(categories: list, viewer: viewer, kind: kind),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -51,43 +108,74 @@ Widget? categoriesPageAction(BuildContext context, WidgetRef ref) {
   return IconButton(
     tooltip: '新建分类',
     icon: const Icon(Icons.add),
-    onPressed: () => CategoryEditSheet.show(context),
+    // 需求5 AC5-3：预填当前 tab 的收支类型（弹层内仍可手动改）；
+    // 点击时再读，避免 tab 切换连带重建 AppBar
+    onPressed: () => CategoryEditSheet.show(
+      context,
+      initialKind: ref.read(categoryKindTabProvider),
+    ),
   );
 }
 
 class _CategoryList extends ConsumerStatefulWidget {
-  const _CategoryList({required this.categories, required this.viewer});
+  const _CategoryList({
+    required this.categories,
+    required this.viewer,
+    required this.kind,
+  });
 
   final List<Category> categories;
 
   /// viewer 只读：隐藏编辑/删除入口（Spec §4.1 权限矩阵）
   final bool viewer;
 
+  /// 当前收支 tab（BK-DOC-28 需求5）：仅展示该类型的一级分类及其子级
+  final CategoryKind kind;
+
   @override
   ConsumerState<_CategoryList> createState() => _CategoryListState();
 }
 
 class _CategoryListState extends ConsumerState<_CategoryList> {
-  /// 有子级父分类的折叠集（默认全部展开）
-  final Set<int> _collapsed = {};
+  /// 已展开的父分类集（BK-DOC-28 需求4：默认空 = 全部折叠，不持久化）
+  final Set<int> _expanded = {};
+
+  @override
+  void didUpdateWidget(covariant _CategoryList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // AC4-3 / AC5-2：切换收支 tab 重置为全折叠；增删改引发的数据刷新
+    // 走同一 State（kind 未变），展开态按 Spec §2.4 边界保持不动
+    if (oldWidget.kind != widget.kind) _expanded.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
+    // 需求5：按 tab 过滤一级分类（二级须与父级同类型，随父级一并展示）
     final categories = widget.categories;
-    final parents = categories.where((c) => c.parentId == null).toList();
+    final parents = categories
+        .where((c) => c.parentId == null && c.kind == widget.kind)
+        .toList();
+    if (parents.isEmpty) {
+      final label = widget.kind == CategoryKind.expense ? '支出' : '收入';
+      return Center(
+        // viewer 无新建入口（Spec §4.1），文案不引导点击不存在的按钮
+        child: Text(
+            widget.viewer ? '暂无$label分类' : '暂无$label分类，点击右上角新建'),
+      );
+    }
     // 审查 U-10：扁平化后经 ListView.builder 惰性构建（大分类数下 60fps）
     final tiles = <Widget>[
       for (final parent in parents) ...[
         _ParentHeader(
           parent: parent,
           hasChildren: categories.any((c) => c.parentId == parent.id),
-          collapsed: _collapsed.contains(parent.id),
+          expanded: _expanded.contains(parent.id),
           onToggle: () => setState(() {
-            if (!_collapsed.add(parent.id)) _collapsed.remove(parent.id);
+            if (!_expanded.add(parent.id)) _expanded.remove(parent.id);
           }),
           onMore: widget.viewer ? null : () => _showActions(context, ref, parent),
         ),
-        if (!_collapsed.contains(parent.id))
+        if (_expanded.contains(parent.id))
           for (final child in categories.where((c) => c.parentId == parent.id))
             _ChildTile(
               child: child,
@@ -171,19 +259,21 @@ class _CategoryListState extends ConsumerState<_CategoryList> {
 }
 
 /// 一级分类组头（需求：与二级分类直观区分）：
-/// 分类自身色调淡底 + 圆角通栏条，标题加粗着色，右侧折叠/操作入口
+/// 分类自身色调淡底 + 圆角通栏条，标题加粗着色，右侧折叠/操作入口。
+/// 箭头语义（BK-DOC-28 需求4 / Spec §2.4）：默认收起 → `expand_more`
+/// （可展开），展开后 → `expand_less`（可收起）；无子级则不渲染箭头。
 class _ParentHeader extends StatelessWidget {
   const _ParentHeader({
     required this.parent,
     required this.hasChildren,
-    required this.collapsed,
+    required this.expanded,
     required this.onToggle,
     this.onMore,
   });
 
   final Category parent;
   final bool hasChildren;
-  final bool collapsed;
+  final bool expanded;
   final VoidCallback onToggle;
   final VoidCallback? onMore;
 
@@ -215,7 +305,7 @@ class _ParentHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (hasChildren)
-                  Icon(collapsed ? Icons.expand_less : Icons.expand_more),
+                  Icon(expanded ? Icons.expand_less : Icons.expand_more),
                 if (onMore != null)
                   IconButton(icon: const Icon(Icons.more_vert), onPressed: onMore),
               ],
