@@ -149,7 +149,7 @@ final periodBucketsProvider =
       );
 });
 
-/// 年维度收支趋势（需求9 / Spec §2.9）：选中年 1–12 月支出/收入双柱。
+/// 年维度收支趋势（需求9 / Spec §2.9）：选中年 1–12 月支出/收入折线。
 /// 口径与报表其余区块一致（账本过滤 + 记账汇率快照回退汇率表）；
 /// repo 只回有数据的月份，补零交给 [yearlyTrendBuckets]。
 final yearlyTrendProvider =
@@ -190,7 +190,7 @@ List<PeriodBucket> yearlyTrendBuckets(int year, List<PeriodBucket> sparse) {
 
 /// 报表页（Spec §3.5 / BK-P0-005；BK-DOC-26 需求6 日历并入）：
 /// 图表视图 = 饼图（分类占比）/ 柱状（周期对比，支出/收入双柱）
-/// + 年粒度追加「收支趋势」12 月双柱（BK-DOC-28 需求9），
+/// + 年粒度追加「收支趋势」折线（BK-DOC-28 需求9 数据源不变，展示改折线），
 /// 时间筛选为滚轮式年 → 月 → 日（BK-DOC-28 需求3）；
 /// 日历视图 = 月历每日收支净额，点日下方展开当日明细。
 class ReportsPage extends ConsumerStatefulWidget {
@@ -288,7 +288,6 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                 () => ref.invalidate(categoryBreakdownProvider(window)),
               ),
             ),
-            // 需求1：折线图取消，收支双柱由「周期对比」承载
             _Section(
               title: '周期对比',
               subtitle: _comparisonSubtitle,
@@ -300,14 +299,14 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                 ),
               ),
             ),
-            // 需求9：选中年 1–12 月收支走势（AC9-1 ~ AC9-4）
+            // 需求9：选中年 1–12 月收支走势；使用折线呈现，图例可切换收支显隐
             if (trend != null)
               _Section(
                 title: '收支趋势',
                 subtitle: '${selection.year}年 · 按月汇总',
                 child: _chartOrRetry(
                   trend,
-                  (b) => PeriodBarChart(
+                  (b) => TrendLineChart(
                     buckets: b,
                     hideAmounts: hideAmounts,
                     // 同年 12 桶：年份已由副标题承载，轴顶行让位给柱区

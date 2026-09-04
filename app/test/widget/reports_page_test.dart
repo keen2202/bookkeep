@@ -143,12 +143,9 @@ void main() {
     expect(find.text('分类占比'), findsOneWidget);
     expect(find.text('周期对比'), findsOneWidget);
     expect(find.byType(PieChart), findsOneWidget);
-    // 年粒度下「周期对比」与「收支趋势」（需求9）均为柱状图；默认视口里第三
-    // 区块是否进入 ListView 构建窗口不确定，12 桶断言交给手机竖屏专项用例
+    // 年粒度下「周期对比」为柱状，「收支趋势」（需求9）为折线；默认视口里第三
+    // 区块是否进入 ListView 构建窗口不确定，12 桶/折线断言交给手机竖屏专项用例
     expect(find.byType(BarChart), findsWidgets);
-
-    // BK-DOC-28 需求1：折线图取消（收支趋势改由柱状承载）
-    expect(find.byType(LineChart), findsNothing);
 
     // BK-DOC-28 需求7（AC7-1）：「图表 / 日历」分段控件选中段不渲染 ✔
     expect(find.byType(SegmentedButton<ReportsView>), findsOneWidget);
@@ -304,9 +301,9 @@ void main() {
         scrollable: reportsScrollable());
     expect(find.text('收支趋势'), findsOneWidget);
     expect(find.text('${now.year}年 · 按月汇总'), findsOneWidget);
-    // AC9-2：「周期对比」+「收支趋势」两张双柱图；折线图已按需求1 取消
-    expect(find.byType(BarChart), findsNWidgets(2));
-    expect(find.byType(LineChart), findsNothing);
+    // AC9-2：「周期对比」为柱状，「收支趋势」为折线图
+    expect(find.byType(BarChart), findsOneWidget);
+    expect(find.byType(LineChart), findsOneWidget);
 
     // AC9-4：滚轮换年后区块随之更新（副标题带新年份）
     await tester.tap(find.byIcon(Icons.schedule_outlined));

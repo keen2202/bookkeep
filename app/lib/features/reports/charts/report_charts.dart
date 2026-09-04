@@ -151,8 +151,8 @@ class CategoryPieChart extends StatelessWidget {
 /// 对比当期收支；审查 U-11：touch tooltip 金额格式化 + 可读刻度）。
 /// x 轴标签按维度语义紧凑化（[periodAxisLabels]）：日=周几、周=周一日期
 /// 「M/D」、月=「M月」（跨年顶行标年份）、年=YYYY；柱宽随桶数自适应。
-/// [showLeadingYear] = false 时抑制月桶首行的年份顶行（BK-DOC-28 §2.9：
-/// 年维度「收支趋势」同年 12 桶，年份已由区块副标题承载，省下顶行高度给柱区）。
+/// [showLeadingYear] = false 时抑制月桶首行的年份顶行（用于区块副标题已承载
+/// 年份的同年月维度，避免重复占用柱区高度）。
 class PeriodBarChart extends StatelessWidget {
   const PeriodBarChart({
     super.key,
@@ -319,4 +319,314 @@ class PeriodBarChart extends StatelessWidget {
         height: 10,
         decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
       );
+}
+
+/// 收支趋势折线图（BK-DOC-28 需求9 由柱状改折线的展示层）：
+/// 数据仍为 [PeriodBucket] 列表，支出/收入各渲染一条折线，保留与
+/// [PeriodBarChart] 相同的语义色、图例、脱敏与 x/y 轴刻度策略。
+/// 图例可点击切换对应折线显隐；触摸/悬停 tooltip 显示分支、金额与时间。
+class TrendLineChart extends StatefulWidget {
+  const TrendLineChart({
+    super.key,
+    required this.buckets,
+    required this.hideAmounts,
+    this.showLeadingYear = true,
+  });
+
+  final List<PeriodBucket> buckets;
+  final bool hideAmounts;
+
+  /// 月桶是否渲染首桶/跨年处的年份顶行（默认渲染）
+  final bool showLeadingYear;
+
+  @override
+  State<TrendLineChart> createState() => _TrendLineChartState();
+}
+
+enum _TrendSeries { expense, income }
+
+class _TrendLineChartState extends State<TrendLineChart> {
+  bool _expenseVisible = true;
+  bool _incomeVisible = true;
+
+  void _toggle(_TrendSeries series) {
+    setState(() {
+      switch (series) {
+        case _TrendSeries.expense:
+          _expenseVisible = !_expenseVisible;
+        case _TrendSeries.income:
+          _incomeVisible = !_incomeVisible;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final buckets = widget.buckets;
+    if (buckets.isEmpty) {
+      return const Center(child: Text('暂无数据'));
+    }
+
+    final expenseColor = context.appColors.expense;
+    final incomeColor = context.appColors.income;
+    final axisStyle = context.text.bodySmall;
+    final maxAmount = buckets.fold<int>(
+      0,
+      (a, b) => a > b.expenseMinor
+          ? a
+          : (b.expenseMinor > b.incomeMinor ? b.expenseMinor : b.incomeMinor),
+    );
+    final yInterval = niceAxisStep((maxAmount == 0 ? 1 : maxAmount) * 1.2 / 4);
+    final axisLabels = periodAxisLabels([for (final b in buckets) b.label]);
+    final hasYearLine =
+        widget.showLeadingYear && axisLabels.any((l) => l.top != null);
+
+    final expenseSpots = [
+      for (var i = 0; i < buckets.length; i++)
+        FlSpot(i.toDouble(), buckets[i].expenseMinor.toDouble()),
+    ];
+    final incomeSpots = [
+      for (var i = 0; i < buckets.length; i++)
+        FlSpot(i.toDouble(), buckets[i].incomeMinor.toDouble()),
+    ];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 可点击图例：点击后切换对应折线显示/隐藏
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _legendItem(
+                context: context,
+                color: expenseColor,
+                label: '支出',
+                visible: _expenseVisible,
+                onTap: () => _toggle(_TrendSeries.expense),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              _legendItem(
+                context: context,
+                color: incomeColor,
+                label: '收入',
+                visible: _incomeVisible,
+                onTap: () => _toggle(_TrendSeries.income),
+              ),
+            ],
+          ),
+        ),
+        LayoutBuilder(builder: (context, constraints) {
+          final axisReserved = widget.hideAmounts ? 0.0 : 52.0;
+          final chartWidth =
+              (constraints.maxWidth - axisReserved).clamp(1.0, double.infinity);
+          // 窄屏/多桶时自动隔一个刻度，避免月份/日期标签互相重叠
+          final axisInterval =
+              chartWidth / axisLabels.length < 34 ? 2.0 : 1.0;
+          return SizedBox(
+            height: 220,
+            child: LineChart(
+              LineChartData(
+                minX: -0.5,
+                maxX: (buckets.length - 1).toDouble() + 0.5,
+                minY: 0,
+                maxY: (maxAmount == 0 ? 1 : maxAmount).toDouble() * 1.2,
+                gridData: glassGridData(context),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  _buildLine(
+                    color: expenseColor,
+                    spots: expenseSpots,
+                    visible: _expenseVisible,
+                  ),
+                  _buildLine(
+                    color: incomeColor,
+                    spots: incomeSpots,
+                    visible: _incomeVisible,
+                  ),
+                ],
+                lineTouchData: LineTouchData(
+                  enabled: !widget.hideAmounts,
+                  touchTooltipData: LineTouchTooltipData(
+                    maxContentWidth: 180,
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipItems: (touchedSpots) => [
+                      for (final touched in touchedSpots)
+                        if (touched.barIndex >= 0 &&
+                            touched.barIndex < 2 &&
+                            touched.spotIndex >= 0 &&
+                            touched.spotIndex < buckets.length)
+                          LineTooltipItem(
+                            _tooltipText(touched.barIndex, touched.spotIndex),
+                            TextStyle(
+                              color: touched.barIndex == 0
+                                  ? expenseColor
+                                  : incomeColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: widget.hideAmounts
+                      ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
+                      : AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 52,
+                            interval: yInterval,
+                            getTitlesWidget: (value, meta) {
+                              if (value <= 0) return const SizedBox.shrink();
+                              return SideTitleWidget(
+                                meta: meta,
+                                space: 4,
+                                child: Text(
+                                  compactTickLabel(value.round()),
+                                  style: axisStyle,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: hasYearLine ? 46 : 32,
+                      interval: axisInterval,
+                      getTitlesWidget: (value, meta) {
+                        if (value < 0 ||
+                            value > buckets.length - 1 ||
+                            (value - value.toInt()).abs() > 0.001) {
+                          return const SizedBox.shrink();
+                        }
+                        final index = value.toInt();
+                        final label = axisLabels[index];
+                        final top = widget.showLeadingYear ? label.top : null;
+                        return SideTitleWidget(
+                          meta: meta,
+                          space: 6,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (top != null)
+                                Text(top, style: context.text.labelSmall),
+                              Text(label.main, style: axisStyle),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  LineChartBarData _buildLine({
+    required Color color,
+    required List<FlSpot> spots,
+    required bool visible,
+  }) {
+    return LineChartBarData(
+      spots: spots,
+      show: visible,
+      color: color,
+      barWidth: 2,
+      isCurved: false,
+      dotData: FlDotData(
+        show: true,
+        getDotPainter: (spot, percent, barData, index) {
+          return FlDotCirclePainter(
+            radius: 3,
+            color: color,
+            strokeWidth: 0,
+          );
+        },
+      ),
+      // 保持玻璃设计「线下透光」语义，但两条折线同时开启时不会影响阅读
+      belowBarData: BarAreaData(
+        show: visible,
+        gradient: chartAreaGradient(color),
+      ),
+    );
+  }
+
+  String _tooltipText(int barIndex, int spotIndex) {
+    final branch = barIndex == 0 ? '支出' : '收入';
+    final bucket = widget.buckets[spotIndex];
+    final amount = barIndex == 0
+        ? bucket.expenseMinor
+        : bucket.incomeMinor;
+    return '$branch ${formatMoney(amount)}\n${_timeLabel(bucket.label)}';
+  }
+
+  String _timeLabel(String label) {
+    final month = _monthBucket(label);
+    if (month != null) {
+      final (year, mon) = month;
+      return '$year年$mon月';
+    }
+    final year = int.tryParse(label);
+    if (year != null) return '$year年';
+    return label;
+  }
+
+  Widget _legendItem({
+    required BuildContext context,
+    required Color color,
+    required String label,
+    required bool visible,
+    required VoidCallback onTap,
+  }) {
+    final palette = context.palette;
+    final axisStyle = context.text.bodySmall;
+    final lineColor = visible ? color : palette.textDisabled;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.xs / 2,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 18,
+              height: 3,
+              decoration: BoxDecoration(
+                color: lineColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: axisStyle?.copyWith(
+                color: visible
+                    ? palette.textSecondary
+                    : palette.textDisabled,
+                decoration: visible ? TextDecoration.none : TextDecoration.lineThrough,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -140,14 +140,12 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
-    // ── ④ 报表页：饼图 + 双柱图（默认年粒度含「周期对比」「收支趋势」，需求9）──
+    // ── ④ 报表页：饼图 + 柱状（周期对比）+ 折线（收支趋势，默认年粒度）──
     await tester.tap(find.text('报表'));
     await tester.pumpAndSettle();
     expect(find.byType(PieChart), findsOneWidget);
     // 区块是否全部进入 ListView 构建窗口取决于视口，粒度专项断言见 reports_page_test
     expect(find.byType(BarChart), findsWidgets);
-    // 需求1：折线图取消
-    expect(find.byType(LineChart), findsNothing);
 
     // ── ⑤ 设置 → 开启隐私锁 → 立即锁定 → 锁屏覆盖 → PIN 解锁 ──
     await tester.tap(find.byIcon(Icons.settings_outlined));
