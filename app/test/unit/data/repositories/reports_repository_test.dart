@@ -20,6 +20,9 @@ void main() {
   late int accountId;
   late int foodId;
   late int transportId;
+  late int breakfastId;
+  late int lunchId;
+  late int dinnerId;
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
@@ -47,6 +50,33 @@ void main() {
           kind: CategoryKind.expense,
           updatedAt: DateTime(2026, 8, 1),
         ));
+    breakfastId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
+          parentId: Value(foodId),
+          name: '早餐',
+          icon: 'free_breakfast',
+          color: 0xFF111111,
+          kind: CategoryKind.expense,
+          updatedAt: DateTime(2026, 8, 1),
+        ));
+    lunchId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
+          parentId: Value(foodId),
+          name: '午餐',
+          icon: 'lunch_dining',
+          color: 0xFF111111,
+          kind: CategoryKind.expense,
+          updatedAt: DateTime(2026, 8, 1),
+        ));
+    dinnerId = await db.into(db.categories).insert(CategoriesCompanion.insert(
+          bookId: testBookId,
+          parentId: Value(foodId),
+          name: '晚餐',
+          icon: 'dinner_dining',
+          color: 0xFF111111,
+          kind: CategoryKind.expense,
+          updatedAt: DateTime(2026, 8, 1),
+        ));
   });
 
   tearDown(() async {
@@ -61,6 +91,8 @@ void main() {
     required DateTime occurredAt,
     TransactionType type = TransactionType.expense,
     bool deleted = false,
+    String currency = 'CNY',
+    int? rateSnapshot,
   }) {
     return db.into(db.transactions).insert(TransactionsCompanion.insert(
           bookId: testBookId,
@@ -68,7 +100,10 @@ void main() {
           categoryId: Value(categoryId),
           type: type,
           amountMinor: amountMinor,
-          currency: 'CNY',
+          currency: currency,
+          rateSnapshot: rateSnapshot == null
+              ? const Value.absent()
+              : Value(rateSnapshot),
           occurredAt: occurredAt,
           updatedAt: DateTime(2026, 8, 1),
           deletedAt: deleted ? Value(DateTime(2026, 8, 2)) : const Value.absent(),
@@ -123,6 +158,63 @@ void main() {
     expect(food.categoryName, '餐饮');
     final transport = slices.firstWhere((s) => s.categoryId == transportId);
     expect(transport.amountMinor, 1500);
+  });
+
+  test('category breakdown aggregates subcategories into first-level categories', () async {
+    await insertTx(categoryId: breakfastId, amountMinor: -1000, occurredAt: DateTime(2026, 8, 1));
+    await insertTx(categoryId: lunchId, amountMinor: -2000, occurredAt: DateTime(2026, 8, 2));
+    await insertTx(categoryId: foodId, amountMinor: -500, occurredAt: DateTime(2026, 8, 3));
+    await insertTx(categoryId: dinnerId, amountMinor: -8000, occurredAt: DateTime(2026, 9, 1));
+
+    final slices = await repo.categoryBreakdown(
+        start: DateTime(2026, 8, 1), end: DateTime(2026, 9, 1));
+
+    expect(slices, hasLength(1));
+    final food = slices.single;
+    expect(food.categoryId, foodId);
+    expect(food.categoryName, '餐饮');
+    expect(food.amountMinor, 3500);
+    expect(slices.any((s) => s.categoryId == breakfastId), isFalse);
+    expect(slices.any((s) => s.categoryId == lunchId), isFalse);
+    expect(slices.any((s) => s.categoryName == '早餐'), isFalse);
+    expect(slices.any((s) => s.categoryName == '午餐'), isFalse);
+  });
+
+  test('category breakdown converts child transactions with rate snapshots to parent', () async {
+    await insertTx(
+      categoryId: breakfastId,
+      amountMinor: -1000,
+      occurredAt: DateTime(2026, 8, 1),
+      currency: 'USD',
+      rateSnapshot: 7100000,
+    );
+    await insertTx(categoryId: lunchId, amountMinor: -300, occurredAt: DateTime(2026, 8, 2));
+
+    final slices = await repo.categoryBreakdown(
+        start: DateTime(2026, 8, 1), end: DateTime(2026, 9, 1));
+
+    expect(slices, hasLength(1));
+    expect(slices.single.categoryId, foodId);
+    expect(slices.single.categoryName, '餐饮');
+    expect(slices.single.amountMinor, 7400);
+  });
+
+  test('category breakdown falls back to child name when parent is deleted', () async {
+    await insertTx(categoryId: lunchId, amountMinor: -1200, occurredAt: DateTime(2026, 8, 1));
+    await (db.update(db.categories)..where((t) => t.id.equals(foodId))).write(
+      CategoriesCompanion(
+        deletedAt: Value(DateTime(2026, 8, 2)),
+        updatedAt: Value(DateTime(2026, 8, 2)),
+      ),
+    );
+
+    final slices = await repo.categoryBreakdown(
+        start: DateTime(2026, 8, 1), end: DateTime(2026, 9, 1));
+
+    expect(slices, hasLength(1));
+    expect(slices.single.categoryId, lunchId);
+    expect(slices.single.categoryName, '午餐');
+    expect(slices.single.amountMinor, 1200);
   });
 
   test('period buckets group by week and month granularity', () async {

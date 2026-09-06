@@ -23,6 +23,9 @@ class GlassSelection extends StatelessWidget {
     required this.selected,
     this.borderRadius,
     this.hostFillAlpha,
+    this.edgeWidth = 0.5,
+    this.edgeAlphaLight,
+    this.edgeAlphaDark,
   });
 
   final Widget child;
@@ -36,6 +39,12 @@ class GlassSelection extends StatelessWidget {
   /// 宿主当前 fill α（用于计算层①增量；缺省按 G2 面板 0.60/0.12 处理，
   /// 表格行请传斑马纹实际值）
   final double? hostFillAlpha;
+
+  /// 层④ 外缘描边宽度/透明度。默认保持 FG-SEL 既有 0.5px/0.30（浅）、
+  /// 0.35（深）；调用方可按需增强（如分类弹窗 1px + α0.6），不改共享默认语义。
+  final double edgeWidth;
+  final double? edgeAlphaLight;
+  final double? edgeAlphaDark;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +74,9 @@ class GlassSelection extends StatelessWidget {
                       key: const ValueKey('fg-sel-layers'),
                       borderRadius: borderRadius ?? BorderRadius.zero,
                       hostFillAlpha: hostFillAlpha,
+                      edgeWidth: edgeWidth,
+                      edgeAlphaLight: edgeAlphaLight,
+                      edgeAlphaDark: edgeAlphaDark,
                     )
                   : const SizedBox.shrink(key: ValueKey('fg-sel-none')),
             ),
@@ -81,10 +93,16 @@ class _SelectionLayers extends StatelessWidget {
     super.key,
     required this.borderRadius,
     this.hostFillAlpha,
+    this.edgeWidth = 0.5,
+    this.edgeAlphaLight,
+    this.edgeAlphaDark,
   });
 
   final BorderRadius borderRadius;
   final double? hostFillAlpha;
+  final double edgeWidth;
+  final double? edgeAlphaLight;
+  final double? edgeAlphaDark;
 
   @override
   Widget build(BuildContext context) {
@@ -108,11 +126,12 @@ class _SelectionLayers extends StatelessWidget {
           ),
         ],
         border: Border.all(
-          // 层④ 外缘 primary 细线
+          // 层④ 外缘 primary 细线（分类弹窗可增强为 1px/α0.6）
           color: palette.primary.withValues(
-              alpha:
-                  dark ? GlassSelectionTokens.outerEdgeAlphaDark : GlassSelectionTokens.outerEdgeAlphaLight),
-          width: 0.5,
+              alpha: dark
+                  ? (edgeAlphaDark ?? GlassSelectionTokens.outerEdgeAlphaDark)
+                  : (edgeAlphaLight ?? GlassSelectionTokens.outerEdgeAlphaLight)),
+          width: edgeWidth,
         ),
         // 层① 玻璃增亮（白基增量层）
         color: Colors.white.withValues(alpha: brightenDelta),

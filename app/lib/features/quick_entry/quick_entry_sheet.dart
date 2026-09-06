@@ -63,6 +63,7 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
 class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   late QuickEntryController _controller;
   late final TextEditingController _noteController;
+  late final FocusNode _noteFocusNode;
 
   @override
   void initState() {
@@ -77,6 +78,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     );
     _controller.addListener(_onController);
     _noteController = TextEditingController(text: _controller.note);
+    _noteFocusNode = FocusNode();
     // 编辑模式直接以既有数据为准，不加载/覆盖 lastDefaults 默认回填
     if (widget.editTarget == null) _loadDefaults();
   }
@@ -118,6 +120,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     _controller.removeListener(_onController);
     _controller.dispose();
     _noteController.dispose();
+    _noteFocusNode.dispose();
     super.dispose();
   }
 
@@ -157,35 +160,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         ? const <Account>[]
         : [for (final e in accountsAsync.valueOrNull!.accounts) e.account];
 
+    final isEditing = widget.editTarget != null;
+    final systemKeyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return GlassScaffold(
-      title: Text(widget.editTarget != null ? '编辑账单' : '记一笔'),
+      title: _buildTitle(isEditing: isEditing),
       // 需求：取消右上角「退出」按钮——返回由系统返回手势/导航返回键承担
       body: Column(
         children: [
-          // BK-DOC-28 需求7：选中态去 ✔，改颜色突显（样式收敛于共享组件）；
-          // 禁用段（编辑收支时的转账）不受选中色影响
-          AppSegmentedButton<TransactionType>(
-            segments: [
-              ButtonSegment(
-                value: TransactionType.expense,
-                label: const Text('支出'),
-                enabled: !_controller.typeLocked,
-              ),
-              ButtonSegment(
-                value: TransactionType.income,
-                label: const Text('收入'),
-                enabled: !_controller.typeLocked,
-              ),
-              ButtonSegment(
-                value: TransactionType.transfer,
-                label: const Text('转账'),
-                // 编辑收支时禁选转账（单行流水不可转双边结构，需删除重记）
-                enabled: _controller.transferOptionEnabled && !_controller.typeLocked,
-              ),
-            ],
-            selected: {_controller.type},
-            onSelectionChanged: (s) => _controller.setType(s.first),
-          ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
             child: Text(
@@ -201,7 +183,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           Expanded(
             child: ListView(
               children: [
-                if (widget.editTarget == null) const BudgetSummaryCard(),
+                if (!isEditing && _controller.type == TransactionType.expense)
+                  const BudgetSummaryCard(),
                 // 需求：新增记账同样提供备注栏（编辑模式此前已有）
                 _buildNoteField(),
                 _buildSelections(
@@ -215,15 +198,59 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               ],
             ),
           ),
-          AmountKeyboard(
-            onKey: _controller.pressKey,
-            onConfirm: _save,
-            onBackspace: _controller.backspace,
-            onClear: _controller.clear,
-          ),
+          // UI-04：系统输入法弹起时隐藏自绘金额键盘，避免双键盘堆叠；
+          // 收起后 viewInsets 归零，自动恢复金额键盘。
+          if (!systemKeyboardVisible)
+            AmountKeyboard(
+              onKey: _controller.pressKey,
+              onConfirm: _save,
+              onBackspace: _controller.backspace,
+              onClear: _controller.clear,
+            ),
         ],
       ),
     );
+  }
+
+  /// UI-02：新增态类型分段上移至标题栏；编辑态保留「编辑账单」且不展示分段。
+  /// 新增态标题栏空间有限，使用 FittedBox 在窄屏收缩而非溢出/截断。
+  Widget _buildTitle({required bool isEditing}) {
+    if (isEditing) {
+      return Text('编辑账单');
+    }
+    return Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: AppSegmentedButton<TransactionType>(
+          segments: [
+            ButtonSegment(
+              value: TransactionType.expense,
+              label: const Text('支出'),
+              enabled: !_controller.typeLocked,
+            ),
+            ButtonSegment(
+              value: TransactionType.income,
+              label: const Text('收入'),
+              enabled: !_controller.typeLocked,
+            ),
+            ButtonSegment(
+              value: TransactionType.transfer,
+              label: const Text('转账'),
+              // 编辑收支时禁选转账（单行流水不可转双边结构，需删除重记）
+              enabled: _controller.transferOptionEnabled && !_controller.typeLocked,
+            ),
+          ],
+          selected: {_controller.type},
+          onSelectionChanged: _handleTypeChanged,
+        ),
+      ),
+    );
+  }
+
+  void _handleTypeChanged(Set<TransactionType> selection) {
+    // UI-04：切 Tab 时主动释放备注焦点，收起系统键盘后再按新类型重绘。
+    _noteFocusNode.unfocus();
+    _controller.setType(selection.first);
   }
 
   /// 备注字段（新增/编辑通用）：账单列表展示备注，记一笔即可填写
@@ -232,6 +259,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm),
       child: TextField(
         controller: _noteController,
+        focusNode: _noteFocusNode,
         onChanged: _controller.setNote,
         decoration: const InputDecoration(
           labelText: '备注',

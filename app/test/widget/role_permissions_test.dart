@@ -140,7 +140,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('viewer 隐藏周期记账页「新建规则/立即补跑」动作', (tester) async {
+  testWidgets('viewer 隐藏周期记账页「新建规则」动作', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -151,7 +151,7 @@ void main() {
     expect(find.byTooltip('立即补跑'), findsNothing);
   });
 
-  testWidgets('owner 周期记账页可新建规则与补跑', (tester) async {
+  testWidgets('owner 周期记账页仅保留新建规则，不展示已移除的补跑按钮', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -159,7 +159,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     await openSettingsEntry(tester, '周期记账');
     expect(find.byTooltip('新建规则'), findsOneWidget);
-    expect(find.byTooltip('立即补跑'), findsOneWidget);
+    expect(find.byTooltip('立即补跑'), findsNothing);
   });
 
   testWidgets('viewer 分类管理页只读：隐藏新建动作与分类编辑入口', (tester) async {

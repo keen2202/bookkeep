@@ -2,7 +2,6 @@ import 'package:drift/drift.dart' hide Column, isNotNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_button.dart';
@@ -16,16 +15,7 @@ import 'anchor_resolver.dart';
 import 'recurring_engine.dart';
 import 'recurring_providers.dart';
 
-/// 立即补跑全部到期规则（主 shell AppBar 动作；生成流水后 bump 刷新总线）
-Future<void> runAllRecurringRules(WidgetRef ref) async {
-  final bookId = ref.read(currentBookIdProvider);
-  await ref.read(recurringServiceProvider).runAll(bookId: bookId);
-  // 补跑生成了流水：规则 nextDue 前移 + 全页（账户/预算/报表）经总线刷新
-  ref.invalidate(recurringRulesProvider);
-  ref.read(ledgerVersionProvider.notifier).state++;
-}
-
-/// 周期记账页 AppBar 动作：新建规则 + 立即补跑（viewer 只读 → 空，
+/// 周期记账页 AppBar 动作：新建规则（viewer 只读 → 空，
 /// Spec §4.1 双重拒绝；BK-DOC-26 需求5 后承载于设置入口 [RecurringSettingsPage]）
 List<Widget> recurringPageActions(BuildContext context, WidgetRef ref) {
   if (ref.watch(currentRoleProvider) == 'viewer') return const [];
@@ -34,11 +24,6 @@ List<Widget> recurringPageActions(BuildContext context, WidgetRef ref) {
       tooltip: '新建规则',
       icon: const Icon(Icons.add),
       onPressed: () => RuleEditSheet.show(context),
-    ),
-    IconButton(
-      tooltip: '立即补跑',
-      icon: const Icon(Icons.play_arrow),
-      onPressed: () => runAllRecurringRules(ref),
     ),
   ];
 }
@@ -58,7 +43,7 @@ class RecurringSettingsPage extends ConsumerWidget {
   }
 }
 
-/// 周期/分期记账页（Spec §4.4 / BK-T-013）：规则列表 + 新建规则 + 立即补跑
+/// 周期/分期记账页（Spec §4.4 / BK-T-013）：规则列表 + 新建规则
 class RecurringPage extends ConsumerStatefulWidget {
   const RecurringPage({super.key});
 

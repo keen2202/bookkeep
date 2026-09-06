@@ -222,9 +222,11 @@ void main() {
     expect(find.text('备注'), findsOneWidget); // 详情层信息行 + 编辑页输入字段
     expect(find.byType(TextField), findsOneWidget);
 
-    // 收支行不可切转账类型：点「转账」段无响应（enabled=false，不出现双边账户字段）
-    await tester.tap(find.text('转账'));
-    await tester.pump();
+    // UI-02：编辑态不再展示类型分段控件；类型由编辑目标锁定，
+    // 也不应出现转账切换入口或双边账户字段。
+    expect(find.text('支出'), findsNothing);
+    expect(find.text('收入'), findsNothing);
+    expect(find.text('转账'), findsNothing);
     expect(find.text('转出账户'), findsNothing);
     expect(find.text('转入账户'), findsNothing);
 

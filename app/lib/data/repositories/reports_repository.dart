@@ -235,12 +235,16 @@ class ReportsRepository {
   }) async {
     final currentBookId = bookId;
     final rows = await db.customSelect(
-      'SELECT t.category_id, c.name AS category_name, t.currency, t.rate_snapshot, '
+      'SELECT COALESCE(p.id, t.category_id) AS category_id, '
+      'COALESCE(p.name, c.name) AS category_name, '
+      't.currency, t.rate_snapshot, '
       'COALESCE(SUM(-t.amount_minor), 0) AS amount '
-      'FROM transactions t LEFT JOIN categories c ON c.id = t.category_id '
+      'FROM transactions t '
+      'LEFT JOIN categories c ON c.id = t.category_id '
+      'LEFT JOIN categories p ON p.id = c.parent_id AND p.deleted_at IS NULL '
       'WHERE t.type = ? AND t.deleted_at IS NULL AND t.book_id = ? '
       'AND t.occurred_at >= ? AND t.occurred_at < ? '
-      'GROUP BY t.category_id, t.currency, t.rate_snapshot',
+      'GROUP BY COALESCE(p.id, t.category_id), t.currency, t.rate_snapshot',
       variables: [
         Variable.withString('expense'),
         Variable.withString(currentBookId),

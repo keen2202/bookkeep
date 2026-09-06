@@ -108,9 +108,15 @@ class _ParentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+    final iconColor = selected ? palette.primary : Color(parent.color);
     return GlassSelection(
       selected: selected,
       borderRadius: AppRadius.smAll,
+      // UI-05：分类弹窗选中态增强外缘，与 FG-SEL 四层叠加共存；默认行为不变。
+      edgeWidth: 1,
+      edgeAlphaLight: 0.6,
+      edgeAlphaDark: 0.6,
       // ListTile 背景与水波纹画在最近 Material 祖先上：透明 Material 隔离
       // GlassSelection 的着色 DecoratedBox，避免「背景不可见」断言
       child: Material(
@@ -119,12 +125,12 @@ class _ParentTile extends StatelessWidget {
         dense: true,
         contentPadding: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
-        leading: Icon(categoryIcon(parent.icon), color: Color(parent.color)),
+        leading: Icon(categoryIcon(parent.icon), color: iconColor),
         // 一级分类加粗主文字色，与下方缩进的二级 chip 形成层级对比
         title: Text(
           parent.name,
           style: context.text.titleSmall
-              ?.copyWith(color: context.palette.textPrimary),
+              ?.copyWith(color: selected ? palette.primary : palette.textPrimary),
         ),
         trailing: hasChildren
             ? Icon(expanded ? Icons.expand_more : Icons.expand_less, size: 18)
@@ -152,12 +158,17 @@ class _CategoryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = context.tokens.isDark;
+    final palette = context.palette;
     final g4 = resolveGlassSpec(level: GlassLevel.g4, brightness: context.tokens.brightness);
-    final iconColor = Color(category.color);
+    final iconColor = selected ? palette.primary : Color(category.color);
     return GlassSelection(
       selected: selected,
       hostFillAlpha: dark ? GlassLevel.g4.fillAlphaDark : GlassLevel.g4.fillAlphaLight,
       borderRadius: AppRadius.pillAll,
+      // UI-05：选中态外缘增强为 1px primary α0.6，兼顾浅/深主题辨识度。
+      edgeWidth: 1,
+      edgeAlphaLight: 0.6,
+      edgeAlphaDark: 0.6,
       child: InkWell(
         onTap: onTap,
         borderRadius: AppRadius.pillAll,
@@ -182,7 +193,7 @@ class _CategoryChip extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs + 2),
               DefaultTextStyle.merge(
                 style: context.text.bodyMedium
-                    ?.copyWith(color: context.palette.textPrimary),
+                    ?.copyWith(color: selected ? palette.primary : palette.textPrimary),
                 child: Text(category.name),
               ),
             ],

@@ -5,6 +5,7 @@ import '../../data/local/database.dart';
 import '../../domain/services/budget_progress_calculator.dart';
 import '../../features/quick_entry/amount_parser.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_segmented_button.dart';
 import '../books/books_providers.dart' show budgetRepositoryProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'budget_providers.dart' show budgetsViewModelProvider, monthBudgetSummaryProvider;
@@ -171,7 +172,7 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
           children: [
             Text(_isEdit ? '编辑预算' : '新建预算', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
-            SegmentedButton<bool>(
+            AppSegmentedButton<bool>(
               segments: const [
                 ButtonSegment(value: true, label: Text('总预算')),
                 ButtonSegment(value: false, label: Text('分类预算')),
