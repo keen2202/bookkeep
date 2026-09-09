@@ -8,6 +8,7 @@ import '../../shared/theme/tokens.dart';
 import '../../shared/widgets/app_amount_text.dart';
 import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/app_choice_chip.dart';
 import '../../shared/widgets/app_dialog.dart';
 import '../../shared/widgets/app_empty.dart';
 import '../../shared/widgets/app_sheet.dart';
@@ -49,7 +50,8 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                 runSpacing: AppSpacing.sm,
                 children: [
                   for (final p in kThemePresetsV2)
-                    ChoiceChip(
+                    // BK-DOC-31 需求2 遗留项：选中态去 ✔（AppChoiceChip 统一收敛出口）
+                    AppChoiceChip(
                       label: Text(p.name),
                       selected: _preset.id == p.id,
                       onSelected: (_) => setState(() => _preset = p),

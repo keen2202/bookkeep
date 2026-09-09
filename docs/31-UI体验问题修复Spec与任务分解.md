@@ -3,7 +3,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 文档编号 | BK-DOC-31 |
-| 版本 | v1.0（已实施并验证） |
+| 版本 | v1.1（已实施并验证；v1.1 追加遗留项去 ✔ 收尾） |
 | 日期 | 2026-09-10 |
 | 范围 | Flutter App（`app/`）4 项 UI/UX 问题的修复：收支趋势按日汇总、周期记账去 ✔、分类选中光晕收敛、App 图标圆圈居中 |
 | 关联文档 | 28-交互与导航优化Spec（需求7 选中态去 ✔、需求9 收支趋势）、29-交互与导航优化任务分解、30-UI体验问题修复Spec（T07 备查项）、19-玻璃拟态全链路设计文档 |
@@ -220,12 +220,41 @@
 ## 全局验证（已完成）
 
 - [x] `flutter analyze`：**No issues found!**
-- [x] `flutter test --no-pub`：**602 项全部通过**（含全部 golden，无基线变更）
+- [x] `flutter test --no-pub`：**603 项全部通过**（含全部 golden）
 - [x] `dart run tool/check_ui_tokens.dart`：✓ lib/ 无裸色值/ARGB 字面量/裸字号残留
 - [x] `bash tool/check_glass_consistency.sh`：FGDS 一致性门禁全部通过
 - [x] `dart tool/check_fg_contrast.dart`：硬性失败 0 组（7 组规格矛盾告警为既有偏差）
 - [x] 图标生成脚本自校验通过（环心实测 `(0.5000, 0.4995)`）
+- [x] v1.1 golden 基线重建 2 张（`t1_gallery.png` / `t6_gallery.png`），其余 48 张无变更
 
-## 遗留（不在本次范围）
+## 遗留（本次范围外，已于 v1.1 收尾）
 
-- `category_edit_sheet.dart`（一级/二级分类）、`appearance_page.dart`（浅色/深色/跟随系统）、`component_gallery_page.dart`（主题切换 chip）仍为裸 `SegmentedButton` / `ChoiceChip`，选中态仍带 ✔。按 BK-DOC-30 T07 的登记，建议后续按 AC7-4 统一收敛到 `AppSegmentedButton` / `AppChoiceChip`（外观页涉及 8 张 golden 基线重建，故未纳入本次）。
+- ~~`category_edit_sheet.dart`（一级/二级分类）、`appearance_page.dart`（浅色/深色/跟随系统）、`component_gallery_page.dart`（主题切换 chip）仍为裸 `SegmentedButton` / `ChoiceChip`，选中态仍带 ✔。~~ **v1.1 已统一收敛**，见下方「追加：遗留项收尾」。
+
+---
+
+# 追加（v1.1）：同类遗留选中态去 ✔ 统一收敛
+
+BK-DOC-30 T07 登记的「其余裸 `SegmentedButton` / `ChoiceChip` 散写点」按 AC7-4 一次性收尾，与需求2 同一口径：**分段控件与可选 chip 的选中态不得渲染 ✔，改以 primary 前景 + primary α0.12 底突显**。
+
+## T07 遗留散写点收敛
+
+- **模块**：`app/lib/features/categories/category_edit_sheet.dart`、`app/lib/features/settings/appearance_page.dart`、`app/lib/features/settings/component_gallery_page.dart`
+- **优先级**：P2　**Status**：done
+
+**Checklist**
+- [x] 分类编辑弹层「支出/收入」`SegmentedButton<CategoryKind>` → `AppSegmentedButton`
+- [x] 分类编辑弹层「一级分类/二级分类」`SegmentedButton<CategoryLevel>` → `AppSegmentedButton`
+- [x] 外观自定义主题弹层「浅色/深色/跟随系统」`SegmentedButton<ThemeMode>` → `AppSegmentedButton`
+- [x] 组件样板间主题切换 `ChoiceChip` → `AppChoiceChip`
+- [x] 全局复检：`lib/` 下不再存在裸 `SegmentedButton<T>` / `ChoiceChip(` / `FilterChip(`（唯一出口 = `AppSegmentedButton` / `AppChoiceChip`）
+- [x] 测试：`categories_page_test`（弹层两处分段控件 `showSelectedIcon == false` 且子树无 ✔）、`appearance_page_test`（外观模式分段控件同断言）、新增 `component_gallery_test`（主题 chip `showCheckmark == false`、切换后仍无 ✔）
+- [x] golden 基线：仅 `t1_gallery.png` / `t6_gallery.png` 重建（样板间顶部主题 chip 去 ✔，差异 3.56%）；外观页 golden 不变（分段控件位于「自定义主题」弹层内，不进入页面基线）
+
+**说明**：分类编辑弹层的颜色色板与外观页的种子色圆点仍用 `Icons.check` 表示「已选颜色」——那是**取色控件**的语义（非分段/chip 选中态），保留；相关断言均按子树范围限定，避免误判。
+
+**验证方式**
+- `flutter test test/widget/categories_page_test.dart test/widget/appearance_page_test.dart test/widget/component_gallery_test.dart`
+- `flutter test --update-goldens test/golden/golden_ui_test.dart --plain-name "组件样板间"` 后全量回归
+- `flutter analyze` 0 问题；三项静态门禁通过
+

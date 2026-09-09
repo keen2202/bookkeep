@@ -11,6 +11,7 @@ import '../../shared/theme/theme_settings.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/app_segmented_button.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/glass_nav.dart';
 
@@ -282,7 +283,8 @@ class _CustomThemeSheetState extends State<_CustomThemeSheet> {
       children: [
         Text('外观模式', style: context.text.titleSmall),
         const SizedBox(height: AppSpacing.sm),
-        SegmentedButton<ThemeMode>(
+        // BK-DOC-31 需求2 遗留项：选中态去 ✔（AppSegmentedButton 统一收敛出口）
+        AppSegmentedButton<ThemeMode>(
           segments: const [
             ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
             ButtonSegment(value: ThemeMode.dark, label: Text('深色')),

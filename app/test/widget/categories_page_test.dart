@@ -11,6 +11,8 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/domain/models/category_seed.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
+import 'package:bookkeep_app/features/categories/category_edit_sheet.dart'
+    show CategoryLevel;
 import 'package:bookkeep_app/shared/widgets/app_button.dart';
 
 import '../helpers/fixtures.dart';
@@ -361,15 +363,30 @@ void main() {
 
     // AC5-3：弹层类型分段控件预选「收入」——页面 tab 同为
     // SegmentedButton<CategoryKind>，故限定在 BottomSheet 内取
+    final sheetKindSegment = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(SegmentedButton<CategoryKind>),
+    );
     expect(
-      tester
-          .widget<SegmentedButton<CategoryKind>>(find.descendant(
-            of: find.byType(BottomSheet),
-            matching: find.byType(SegmentedButton<CategoryKind>),
-          ))
-          .selected,
+      tester.widget<SegmentedButton<CategoryKind>>(sheetKindSegment).selected,
       {CategoryKind.income},
     );
+    // BK-DOC-31 需求2 遗留项：弹层两处分段控件均去 ✔（AppSegmentedButton 收敛出口）；
+    // 颜色色板自身的勾选 Icon 不在此范围，故按分段控件子树断言
+    for (final finder in [
+      sheetKindSegment,
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(SegmentedButton<CategoryLevel>),
+      ),
+    ]) {
+      expect(tester.widget<SegmentedButton<dynamic>>(finder).showSelectedIcon,
+          isFalse);
+      expect(
+        find.descendant(of: finder, matching: find.byIcon(Icons.check)),
+        findsNothing,
+      );
+    }
 
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '奖金');
     FocusManager.instance.primaryFocus?.unfocus();

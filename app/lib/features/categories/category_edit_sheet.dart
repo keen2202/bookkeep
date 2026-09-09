@@ -8,6 +8,7 @@ import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_segmented_button.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../books/books_providers.dart' show categoryRepositoryProvider;
 import 'categories_page.dart' show categoriesViewModelProvider;
@@ -143,7 +144,8 @@ class _CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
           ),
           const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
           if (isCreate) ...[
-            SegmentedButton<CategoryKind>(
+            // BK-DOC-31 需求2 遗留项：选中态去 ✔（AppSegmentedButton 统一收敛出口）
+            AppSegmentedButton<CategoryKind>(
               segments: const [
                 ButtonSegment(value: CategoryKind.expense, label: Text('支出')),
                 ButtonSegment(value: CategoryKind.income, label: Text('收入')),
@@ -157,7 +159,7 @@ class _CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
             ),
             const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
             // 层级选择（BK-DOC-26 需求7）：一级 / 二级（归属一级分类）
-            SegmentedButton<CategoryLevel>(
+            AppSegmentedButton<CategoryLevel>(
               segments: const [
                 ButtonSegment(value: CategoryLevel.top, label: Text('一级分类')),
                 ButtonSegment(value: CategoryLevel.sub, label: Text('二级分类')),

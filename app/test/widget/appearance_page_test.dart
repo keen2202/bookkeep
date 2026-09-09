@@ -100,6 +100,20 @@ void main() {
     expect(find.text('自定义主题'), findsOneWidget);
     expect(find.text('外观模式'), findsOneWidget);
 
+    // BK-DOC-31 需求2 遗留项：外观模式分段控件去 ✔（种子色圆点自身的勾选不在范围内）
+    final modeSegment = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(SegmentedButton<ThemeMode>),
+    );
+    expect(
+      tester.widget<SegmentedButton<ThemeMode>>(modeSegment).showSelectedIcon,
+      isFalse,
+    );
+    expect(
+      find.descendant(of: modeSegment, matching: find.byIcon(Icons.check)),
+      findsNothing,
+    );
+
     // 选天蓝种子色 + 深色模式（40×40 种子圆点；主题卡预览里同色 6×6 圆点需排除）
     final target = kThemePresets[1];
     await tester.tap(find.byWidgetPredicate(
