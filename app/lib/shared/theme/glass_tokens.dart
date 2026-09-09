@@ -222,6 +222,12 @@ abstract final class GlassSelectionTokens {
   static const double glowAlpha = 0.25;
   static const double glowBlur = 20;
 
+  /// 层② 紧凑光晕（BK-DOC-31 需求3）：分类选择器等小尺寸 chip/行专用——
+  /// 光晕半径收敛到 8（外溢 ≈4px）并小幅提亮，避免 blur 20 在小控件上
+  /// 外溢成「发散光斑」糊住相邻分类；层①③④ 不变。
+  static const double compactGlowAlpha = 0.30;
+  static const double compactGlowBlur = 8;
+
   /// 层③ 透明叠加层：primary 垂直渐变（顶→底）
   static const double overlayTopLight = 0.12;
   static const double overlayBottomLight = 0.06;

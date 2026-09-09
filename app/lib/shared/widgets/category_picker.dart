@@ -11,6 +11,9 @@ import 'glass_selection.dart';
 /// 两级分类选择器（Spec §3.3 / BK-P0-003；FGDS v1.0 BK-FG-022）：
 /// 选中态由实色 FilterChip 改为 FG-SEL 四层叠加（GlassSelection），
 /// 未选中为 G4 降档玻璃填充——禁止实色填充选中态（AC-07）。
+/// BK-DOC-31 需求3：分类控件尺寸小、间距密，选中光晕收敛为
+/// [GlassSelectionTokens.compactGlowAlpha] / [compactGlowBlur]，
+/// 不再向相邻分类发散（其余四层与默认语义不变）。
 class CategoryPicker extends StatefulWidget {
   const CategoryPicker({
     super.key,
@@ -117,6 +120,9 @@ class _ParentTile extends StatelessWidget {
       edgeWidth: 1,
       edgeAlphaLight: 0.6,
       edgeAlphaDark: 0.6,
+      // BK-DOC-31 需求3：光晕收敛（blur 20 → 8），不再糊住相邻分类行
+      glowAlpha: GlassSelectionTokens.compactGlowAlpha,
+      glowBlur: GlassSelectionTokens.compactGlowBlur,
       // ListTile 背景与水波纹画在最近 Material 祖先上：透明 Material 隔离
       // GlassSelection 的着色 DecoratedBox，避免「背景不可见」断言
       child: Material(
@@ -169,6 +175,9 @@ class _CategoryChip extends StatelessWidget {
       edgeWidth: 1,
       edgeAlphaLight: 0.6,
       edgeAlphaDark: 0.6,
+      // BK-DOC-31 需求3：chip 尺寸小、Wrap 间距仅 8，光晕同样收敛
+      glowAlpha: GlassSelectionTokens.compactGlowAlpha,
+      glowBlur: GlassSelectionTokens.compactGlowBlur,
       child: InkWell(
         onTap: onTap,
         borderRadius: AppRadius.pillAll,

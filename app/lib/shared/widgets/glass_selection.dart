@@ -9,7 +9,8 @@ import '../theme/glass_tokens.dart';
 /// 四层（未选中态四层全部不存在——整组移除，非 α0 常驻）：
 /// ① 玻璃增亮——fill α 提升至 G3 档（浅 0.72 / 深 0.18），以「目标值 −
 ///    宿主填充」的增量层绘制（[hostFillAlpha] 缺省按 G2 面板取值）；
-/// ② 柔和光晕——primary α0.25、blur 20、spread 0、offset 0/0；
+/// ② 柔和光晕——primary α0.25、blur 20、spread 0、offset 0/0（小尺寸
+///    控件可按 [glowAlpha]/[glowBlur] 覆盖为紧凑档）；
 /// ③ 透明叠加层——primary 垂直渐变 α 0.12→0.06（深色 0.10→0.05）；
 /// ④ 描边——内侧高光 0.5px #FFFFFF α0.50（深 0.20）+ 外缘 0.5px
 ///    primary α0.30（深 0.35）。
@@ -26,6 +27,8 @@ class GlassSelection extends StatelessWidget {
     this.edgeWidth = 0.5,
     this.edgeAlphaLight,
     this.edgeAlphaDark,
+    this.glowAlpha,
+    this.glowBlur,
   });
 
   final Widget child;
@@ -45,6 +48,12 @@ class GlassSelection extends StatelessWidget {
   final double edgeWidth;
   final double? edgeAlphaLight;
   final double? edgeAlphaDark;
+
+  /// 层② 光晕透明度/半径覆盖。缺省走 [GlassSelectionTokens]（FG-SEL 默认
+  /// α0.25 / blur 20）；小尺寸控件（分类选择器 chip/行）可传
+  /// [GlassSelectionTokens.compactGlowAlpha] / [compactGlowBlur] 收敛光芒。
+  final double? glowAlpha;
+  final double? glowBlur;
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +86,8 @@ class GlassSelection extends StatelessWidget {
                       edgeWidth: edgeWidth,
                       edgeAlphaLight: edgeAlphaLight,
                       edgeAlphaDark: edgeAlphaDark,
+                      glowAlpha: glowAlpha,
+                      glowBlur: glowBlur,
                     )
                   : const SizedBox.shrink(key: ValueKey('fg-sel-none')),
             ),
@@ -96,6 +107,8 @@ class _SelectionLayers extends StatelessWidget {
     this.edgeWidth = 0.5,
     this.edgeAlphaLight,
     this.edgeAlphaDark,
+    this.glowAlpha,
+    this.glowBlur,
   });
 
   final BorderRadius borderRadius;
@@ -103,6 +116,8 @@ class _SelectionLayers extends StatelessWidget {
   final double edgeWidth;
   final double? edgeAlphaLight;
   final double? edgeAlphaDark;
+  final double? glowAlpha;
+  final double? glowBlur;
 
   @override
   Widget build(BuildContext context) {
@@ -115,13 +130,15 @@ class _SelectionLayers extends StatelessWidget {
     final brightenDelta = (target - host).clamp(0.0, 1.0);
 
     return Container(
-      // 层② 柔和光晕随外缘形状投射（primary α0.25、blur 20、spread 0、offset 0/0）
+      // 层② 柔和光晕随外缘形状投射（默认 primary α0.25、blur 20、spread 0、
+      // offset 0/0；小尺寸控件可传 glowAlpha/glowBlur 收敛，见构造器文档）
       decoration: BoxDecoration(
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
-            color: palette.primary.withValues(alpha: GlassSelectionTokens.glowAlpha),
-            blurRadius: GlassSelectionTokens.glowBlur,
+            color: palette.primary
+                .withValues(alpha: glowAlpha ?? GlassSelectionTokens.glowAlpha),
+            blurRadius: glowBlur ?? GlassSelectionTokens.glowBlur,
             spreadRadius: 0,
           ),
         ],

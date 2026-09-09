@@ -5,7 +5,10 @@
   - 品牌主色 #0A6E52，图形层 #FFFFFF；
   - 图形语义：环形硬币（资产）+ 上扬折线（收支趋势）+ 末端实心圆点（余额）；
   - 1024 栅格下环宽 88、折线宽 76（logo 主栅格），主体落在 80% 安全区，
-    圆角率 22.49%；启动图标按「主图标」预览的实际落位生成；
+    圆角率 22.49%；
+  - 设计稿按视觉重心校正（环心比画布几何中心上移约 3.7%），启动图标按
+    BK-DOC-31 需求4 改为**几何居中**：以环形硬币外接框中心对齐画布中心后
+    再输出（见 [center_ring]）；
   - 线性版用于浅色场景，金标版用于年度账单与会员权益（本脚本只生成
     主图标；Android 自适应图标的 foreground 同时可作为 monochrome 层复用）。
 
@@ -133,9 +136,8 @@ def _split_subpaths(drawing: dict) -> list[list[tuple[str, list[tuple[float, flo
 def extract_design_geometry(pdf_path: Path) -> tuple[dict, list[dict]]:
     """读取 PDF，返回 (主图标画布 rect, 前景路径列表)。
 
-    前景路径坐标归一化到 0..1 的主图画布，并保留设计稿的视觉重心：
-    「主图标」与桌面场景预览中，环形硬币中心比几何中心上移约 3.7%，
-    这是常见的视觉重心校正（optical centering），不做几何居中。
+    前景路径坐标归一化到 0..1 的主图画布，保留设计稿原始落位；
+    几何居中由 [center_ring] 在归一化之后统一处理。
     """
     if not pdf_path.exists():
         raise FileNotFoundError(f"设计稿不存在: {pdf_path}")
@@ -208,6 +210,72 @@ def extract_design_geometry(pdf_path: Path) -> tuple[dict, list[dict]]:
         )
 
     return {"rect": image_rect}, paths
+
+
+def _path_bounds(path: dict) -> tuple[float, float, float, float]:
+    """归一化路径的外接框 (x0, y0, x1, y1)；圆环的四段贝塞尔端点即极值点。"""
+    xs: list[float] = []
+    ys: list[float] = []
+    for subpath in path["subpaths"]:
+        for _op, points in subpath:
+            for x, y in points:
+                xs.append(x)
+                ys.append(y)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _path_area(path: dict) -> float:
+    x0, y0, x1, y1 = _path_bounds(path)
+    return (x1 - x0) * (y1 - y0)
+
+
+def center_ring(paths: list[dict]) -> tuple[float, float]:
+    """把环形硬币（外接框面积最大的路径）的几何中心平移到画布中心。
+
+    设计稿主图标做过视觉重心校正（环心比画布几何中心上移约 3.7%），
+    启动图标按 BK-DOC-31 需求4 改为几何居中：整体平移全部前景路径
+    （环内的折线与圆点随环同步移动，相对关系不变）。
+
+    返回平移量 (dx, dy)，单位为画布比例（0..1）。
+    """
+    ring = max(paths, key=_path_area)
+    x0, y0, x1, y1 = _path_bounds(ring)
+    dx = 0.5 - (x0 + x1) / 2
+    dy = 0.5 - (y0 + y1) / 2
+
+    for path in paths:
+        path["subpaths"] = [
+            [
+                (op, [(x + dx, y + dy) for x, y in points])
+                for op, points in subpath
+            ]
+            for subpath in path["subpaths"]
+        ]
+    return dx, dy
+
+
+def verify_ring_centering(
+    paths: list[dict],
+    size: int = 1024,
+    tolerance: float = 0.005,
+) -> tuple[float, float]:
+    """渲染前景并校验「环 + 折线 + 圆点」外接框中心落在画布中心。
+
+    折线与圆点均位于环内，故整体外接框即环的外接框；[tolerance] 为
+    画布比例容差（默认 0.5%，约 5px@1024）。返回实测中心 (cx, cy)。
+    """
+    alpha = render_foreground_alpha(paths, size)
+    bbox = alpha.getbbox()
+    if bbox is None:
+        raise RuntimeError("前景蒙版为空，无法校验居中")
+    cx = (bbox[0] + bbox[2]) / 2 / size
+    cy = (bbox[1] + bbox[3]) / 2 / size
+    if abs(cx - 0.5) > tolerance or abs(cy - 0.5) > tolerance:
+        raise RuntimeError(
+            f"图形未居中：实测中心 ({cx:.4f}, {cy:.4f})，"
+            f"偏离画布中心超过 {tolerance * 100:.1f}%"
+        )
+    return cx, cy
 
 
 def render_foreground_alpha(paths: list[dict], size: int) -> Image.Image:
@@ -446,10 +514,15 @@ def generate_ios(paths: list[dict]) -> None:
 def main() -> int:
     print(f"设计稿: {DESIGN_PDF}")
     geometry, paths = extract_design_geometry(DESIGN_PDF)
+    rect = geometry["rect"]
+    print(f"主图预览画布: {rect.width:.1f}×{rect.height:.1f}pt")
+
+    dx, dy = center_ring(paths)
+    cx, cy = verify_ring_centering(paths)
     print(
-        "主图预览画布: "
-        f"{geometry['rect'].width:.1f}×{geometry['rect'].height:.1f}pt；"
-        "保留设计稿视觉重心（环心上移约 3.7%）"
+        "环形硬币几何居中（BK-DOC-31 需求4）："
+        f"平移 dx={dx * 100:+.2f}% dy={dy * 100:+.2f}%；"
+        f"实测中心 ({cx:.4f}, {cy:.4f})"
     )
 
     generate_android(paths)

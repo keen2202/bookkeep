@@ -26,7 +26,9 @@ class CategorySlice {
   final int amountMinor;
 }
 
-enum BucketGranularity { week, month }
+/// 周期分桶粒度（[ReportsRepository.periodBuckets]）：
+/// 日桶标签 `YYYY-MM-DD`、周桶 `M/D`（ISO 周归一）、月桶 `YYYY-MM`。
+enum BucketGranularity { day, week, month }
 
 class PeriodBucket {
   const PeriodBucket({
@@ -275,8 +277,9 @@ class ReportsRepository {
     return slices;
   }
 
-  /// 单窗口周期分桶（自定义时间范围用）：周/月粒度，支出/收入双列。
-  /// 周桶按 ISO 周（%G-W%V，与 [mondayOfIsoWeek] 同源，修复跨年周归属错位）；
+  /// 单窗口周期分桶（自定义时间范围用）：日/周/月粒度，支出/收入双列。
+  /// 日桶按本地自然日（`%Y-%m-%d`）；周桶按 ISO 周（%G-W%V，与
+  /// [mondayOfIsoWeek] 同源，修复跨年周归属错位）；
   /// 本地时区口径与 [dailyTotals] 一致；多币种按 (币种, 汇率快照) 折算（审查 F-8）。
   Future<List<PeriodBucket>> periodBuckets({
     required DateTime start,
@@ -285,9 +288,12 @@ class ReportsRepository {
     Map<String, int> rates = const {},
   }) async {
     final currentBookId = bookId;
-    final format = granularity == BucketGranularity.week
-        ? "%G-W%V" // ISO 周：%V 须与 %G（ISO 年）配套，%Y/%W 会错标跨年周
-        : '%Y-%m';
+    final format = switch (granularity) {
+      BucketGranularity.day => '%Y-%m-%d',
+      // ISO 周：%V 须与 %G（ISO 年）配套，%Y/%W 会错标跨年周
+      BucketGranularity.week => '%G-W%V',
+      BucketGranularity.month => '%Y-%m',
+    };
     final rows = await db.customSelect(
       "SELECT strftime(?, occurred_at, 'unixepoch', 'localtime') AS bucket, "
       'currency, rate_snapshot, '
@@ -336,6 +342,7 @@ class ReportsRepository {
           incomeMinor: amounts.income,
         ));
       } else {
+        // 日桶 `YYYY-MM-DD` / 月桶 `YYYY-MM`：原样交给展示层解析与补零
         results.add(PeriodBucket(
           label: bucket,
           expenseMinor: amounts.expense,

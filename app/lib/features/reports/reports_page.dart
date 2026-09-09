@@ -188,9 +188,51 @@ List<PeriodBucket> yearlyTrendBuckets(int year, List<PeriodBucket> sparse) {
   return allZero ? const [] : filled;
 }
 
+/// 月维度收支趋势（按日汇总）：选中月每天一个桶。
+/// 口径与 [yearlyTrendProvider] 一致（账本过滤 + 记账汇率快照回退汇率表）；
+/// repo 只回有数据的日期，补零交给 [dailyTrendBuckets]。
+final dailyTrendProvider =
+    FutureProvider.family<List<PeriodBucket>, ({int year, int month})>(
+        (ref, key) async {
+  ref.watch(ledgerVersionProvider);
+  final rates = await ref.watch(reportRatesProvider.future);
+  final sparse = await ref.watch(reportsRepositoryProvider).periodBuckets(
+        start: DateTime(key.year, key.month),
+        end: DateTime(key.year, key.month + 1),
+        granularity: BucketGranularity.day,
+        rates: rates,
+      );
+  return dailyTrendBuckets(key.year, key.month, sparse);
+});
+
+/// 把仅有数据的日期 [sparse]（label `YYYY-MM-DD`）补零为当月全部天数的桶
+/// （28/29/30/31 随年月自适应），让无数据日渲染 0 点而非断档。
+/// 全月零流水时返回空列表 → 图表走「暂无数据」空态（与 [yearlyTrendBuckets]
+/// 同口径）；label 沿用 `YYYY-MM-DD`，由 `periodAxisLabels` 渲染为「D日」。
+List<PeriodBucket> dailyTrendBuckets(
+  int year,
+  int month,
+  List<PeriodBucket> sparse,
+) {
+  String dayLabel(int day) => '$year-${month.toString().padLeft(2, '0')}'
+      '-${day.toString().padLeft(2, '0')}';
+
+  final byLabel = <String, PeriodBucket>{for (final b in sparse) b.label: b};
+  final daysInMonth = DateTime(year, month + 1, 0).day;
+  final filled = [
+    for (var d = 1; d <= daysInMonth; d++)
+      byLabel[dayLabel(d)] ??
+          PeriodBucket(label: dayLabel(d), expenseMinor: 0, incomeMinor: 0),
+  ];
+  final allZero =
+      filled.every((b) => b.expenseMinor == 0 && b.incomeMinor == 0);
+  return allZero ? const [] : filled;
+}
+
 /// 报表页（Spec §3.5 / BK-P0-005；BK-DOC-26 需求6 日历并入）：
 /// 图表视图 = 饼图（分类占比）/ 柱状（周期对比，支出/收入双柱）
-/// + 年粒度追加「收支趋势」折线（BK-DOC-28 需求9 数据源不变，展示改折线），
+/// + 年粒度「收支趋势」按月汇总（BK-DOC-28 需求9 数据源不变，展示改折线）
+/// + 月粒度「收支趋势」按日汇总（BK-DOC-31），
 /// 时间筛选为滚轮式年 → 月 → 日（BK-DOC-28 需求3）；
 /// 日历视图 = 月历每日收支净额，点日下方展开当日明细。
 class ReportsPage extends ConsumerStatefulWidget {
@@ -262,11 +304,15 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     );
     // 隐私锁锁定/后台态强制脱敏（Spec §3.6）；手动隐藏开关已按需求移除
     final hideAmounts = ref.watch(amountMaskProvider);
-    // 需求9：仅年粒度取数并渲染「收支趋势」；月/日粒度不发起这次查询，
-    // 也不会因切换粒度而多出一轮 provider 重建
-    final trend = selection.range == ReportRange.year
-        ? ref.watch(yearlyTrendProvider(selection.year))
-        : null;
+    // 需求9 + BK-DOC-31：趋势区块只在年/月粒度取数（年→按月、月→按日），
+    // 日粒度不发起查询，也不会因切到日粒度而多出一轮 provider 重建
+    final month = selection.month;
+    final trend = switch (selection.range) {
+      ReportRange.year => ref.watch(yearlyTrendProvider(selection.year)),
+      ReportRange.month when month != null =>
+        ref.watch(dailyTrendProvider((year: selection.year, month: month))),
+      _ => null,
+    };
 
     return [
       // 需求3：全宽时间 chip（当前统计期 + 展开图标）→ 滚轮弹层
@@ -300,19 +346,28 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
               ),
             ),
             // 需求9：选中年 1–12 月收支走势；使用折线呈现，图例可切换收支显隐
+            // BK-DOC-31：选中月时同一区块改按日汇总（当月每天一个点）
             if (trend != null)
               _Section(
                 title: '收支趋势',
-                subtitle: '${selection.year}年 · 按月汇总',
+                subtitle: selection.range == ReportRange.year
+                    ? '${selection.year}年 · 按月汇总'
+                    : '${selection.year}年$month月 · 按日汇总',
                 child: _chartOrRetry(
                   trend,
                   (b) => TrendLineChart(
                     buckets: b,
                     hideAmounts: hideAmounts,
-                    // 同年 12 桶：年份已由副标题承载，轴顶行让位给柱区
+                    // 同窗口桶：期间已由副标题承载，轴顶行让位给折线区
                     showLeadingYear: false,
                   ),
-                  () => ref.invalidate(yearlyTrendProvider(selection.year)),
+                  () => ref.invalidate(
+                    selection.range == ReportRange.year
+                        ? yearlyTrendProvider(selection.year)
+                        : dailyTrendProvider(
+                            (year: selection.year, month: month!),
+                          ),
+                  ),
                 ),
               ),
           ],

@@ -160,6 +160,16 @@ void main() {
     expect(GlassSelectionTokens.outerEdgeAlphaDark, 0.35);
   });
 
+  // BK-DOC-31 需求3：小尺寸控件（分类选择器）专用紧凑光晕
+  test('FG-SEL 紧凑光晕定值：半径收敛、小幅提亮（相对默认档）', () {
+    expect(GlassSelectionTokens.compactGlowAlpha, 0.30);
+    expect(GlassSelectionTokens.compactGlowBlur, 8);
+    expect(GlassSelectionTokens.compactGlowBlur,
+        lessThan(GlassSelectionTokens.glowBlur));
+    expect(GlassSelectionTokens.compactGlowAlpha,
+        greaterThan(GlassSelectionTokens.glowAlpha));
+  });
+
   test('FG-TBL 斑马纹与分隔线定值（Spec §4.3）：奇偶差固定 0.15/0.04', () {
     expect(GlassTableTokens.zebraOddFillLight - GlassTableTokens.zebraEvenFillLight,
         closeTo(0.15, 0.0001));

@@ -34,11 +34,17 @@ typedef PeriodAxisLabel = ({String? top, String main});
 /// 周期标签渲染规则（与 reports_repository 的源标签格式一一对应）：
 /// - 日（周一…周日）、年（YYYY）：原样单行；
 /// - 月（YYYY-MM）：主标签「M月」，顶行年份仅在首桶与跨年处出现一次；
+/// - 日桶（YYYY-MM-DD，按月趋势的按日汇总）：主标签「D日」；
 /// - 周（周一日期 M/D，兼容旧格式 MM-DD / MM-DD 周）：主标签「M/D」。
 List<PeriodAxisLabel> periodAxisLabels(List<String> labels) {
   final result = <PeriodAxisLabel>[];
   String? lastYear;
   for (final label in labels) {
+    final day = _dayBucket(label);
+    if (day != null) {
+      result.add((top: null, main: '${day.$3}日'));
+      continue;
+    }
     final month = _monthBucket(label);
     if (month != null) {
       final (year, mon) = month;
@@ -56,6 +62,14 @@ List<PeriodAxisLabel> periodAxisLabels(List<String> labels) {
   return result;
 }
 
+/// 「YYYY-MM-DD」日桶 → (年, 月, 日)
+(String, int, int)? _dayBucket(String label) {
+  final m = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(label);
+  return m == null
+      ? null
+      : (m.group(1)!, int.parse(m.group(2)!), int.parse(m.group(3)!));
+}
+
 /// 「YYYY-MM」月桶 → (年, 月)
 (String, int)? _monthBucket(String label) {
   final m = RegExp(r'^(\d{4})-(\d{1,2})$').firstMatch(label);
@@ -67,6 +81,19 @@ String? _weekMondayLabel(String label) {
   final m = RegExp(r'^(\d{1,2})[-/](\d{1,2})( 周)?$').firstMatch(label);
   if (m == null) return null;
   return '${int.parse(m.group(1)!)}/${int.parse(m.group(2)!)}';
+}
+
+/// x 轴标签最小间距（px）：小于该值即跳标，保证「1日…31日」「1月…12月」
+/// 在窄屏下不互相重叠
+const double kAxisLabelMinGap = 34;
+
+/// x 轴标签步长：按可用宽度与桶数算出整数跳标间隔
+/// （如月趋势 28~31 点 → 每 4 天标一次；12 个月桶 → 每 2 月标一次）。
+double axisLabelInterval(double chartWidth, int count) {
+  if (count <= 1) return 1;
+  final maxLabels =
+      (chartWidth / kAxisLabelMinGap).floor().clamp(1, count);
+  return (count / maxLabels).ceilToDouble();
 }
 
 /// 分类占比饼图（Spec §3.5；审查 U-11：扇区仅百分比，金额进外置图例；
@@ -422,9 +449,8 @@ class _TrendLineChartState extends State<TrendLineChart> {
           final axisReserved = widget.hideAmounts ? 0.0 : 52.0;
           final chartWidth =
               (constraints.maxWidth - axisReserved).clamp(1.0, double.infinity);
-          // 窄屏/多桶时自动隔一个刻度，避免月份/日期标签互相重叠
-          final axisInterval =
-              chartWidth / axisLabels.length < 34 ? 2.0 : 1.0;
+          // 窄屏/多桶时自动跳标（日桶 28~31 点、月桶 12 点），避免标签互相重叠
+          final axisInterval = axisLabelInterval(chartWidth, axisLabels.length);
           return SizedBox(
             height: 220,
             child: LineChart(
@@ -575,6 +601,11 @@ class _TrendLineChartState extends State<TrendLineChart> {
   }
 
   String _timeLabel(String label) {
+    final day = _dayBucket(label);
+    if (day != null) {
+      final (year, mon, d) = day;
+      return '$year年$mon月$d日';
+    }
     final month = _monthBucket(label);
     if (month != null) {
       final (year, mon) = month;

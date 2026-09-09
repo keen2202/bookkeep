@@ -57,5 +57,42 @@ void main() {
       ]);
       expect(periodAxisLabels(['未知']), [(top: null, main: '未知')]);
     });
+
+    // BK-DOC-31 需求1：月维度收支趋势按日汇总的日桶
+    test('日桶（YYYY-MM-DD）：主标签「D日」，不被月桶规则吞掉', () {
+      expect(
+        periodAxisLabels(['2026-08-01', '2026-08-15', '2026-08-31']),
+        [
+          (top: null, main: '1日'),
+          (top: null, main: '15日'),
+          (top: null, main: '31日'),
+        ],
+      );
+    });
+  });
+
+  // BK-DOC-31 需求1：31 个日桶在窄屏下必须跳标，标签不互相重叠
+  group('axisLabelInterval', () {
+    test('桶数少/宽度足 → 每桶都标', () {
+      expect(axisLabelInterval(320, 5), 1);
+      expect(axisLabelInterval(320, 7), 1);
+    });
+
+    test('12 个月桶（320px）→ 每 2 月标一次（与既有行为一致）', () {
+      expect(axisLabelInterval(320, 12), 2);
+    });
+
+    test('28~31 个日桶 → 跳标间隔 4，可见标签数 ≤ 9', () {
+      for (final count in [28, 29, 30, 31]) {
+        final step = axisLabelInterval(320, count);
+        expect(step, 4);
+        expect((count / step).ceil(), lessThanOrEqualTo(9));
+      }
+    });
+
+    test('单桶/空桶 → 1（不跳标，避免除零）', () {
+      expect(axisLabelInterval(320, 1), 1);
+      expect(axisLabelInterval(320, 0), 1);
+    });
   });
 }

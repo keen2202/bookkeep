@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/money_format.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_choice_chip.dart';
+import '../../shared/widgets/app_segmented_button.dart';
 import '../../shared/widgets/glass_nav.dart';
 import '../../data/local/database.dart';
 import '../../data/local/database_provider.dart';
@@ -357,7 +359,9 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
           Text(widget.rule == null ? '新建周期规则' : '编辑周期规则',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
-          SegmentedButton<String>(
+          // BK-DOC-31 需求2：选中态去 ✔（AppSegmentedButton 统一关闭
+          // showSelectedIcon，改 primary 前景 + α0.12 底突显）
+          AppSegmentedButton<String>(
             segments: const [
               ButtonSegment(value: 'expense', label: Text('支出')),
               ButtonSegment(value: 'income', label: Text('收入')),
@@ -366,7 +370,7 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
             onSelectionChanged: (s) => setState(() => _type = s.first),
           ),
           const SizedBox(height: 12),
-          SegmentedButton<RecurringFrequency>(
+          AppSegmentedButton<RecurringFrequency>(
             segments: [
               for (final f in RecurringFrequency.values)
                 ButtonSegment(value: f, label: Text(f.label)),
@@ -383,7 +387,8 @@ class _RuleEditSheetState extends ConsumerState<RuleEditSheet> {
             runSpacing: 8,
             children: [
               for (final (i, option) in options.indexed)
-                ChoiceChip(
+                // BK-DOC-31 需求2：锚点 chip 同样去 ✔（AppChoiceChip 收敛出口）
+                AppChoiceChip(
                   label: Text(option.$2),
                   // 周频率的选项同为 custom 锚点：选中态按星期几（anchorDay）判定
                   selected: _frequency == RecurringFrequency.week

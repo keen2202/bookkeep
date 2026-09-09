@@ -232,6 +232,25 @@ void main() {
     expect(weeks.first.label, '8/3');
   });
 
+  // BK-DOC-31 需求1：月维度收支趋势按日汇总的数据源
+  test('period buckets group by day granularity (monthly trend)', () async {
+    await insertTx(categoryId: foodId, amountMinor: -1000, occurredAt: DateTime(2026, 8, 3, 9));
+    await insertTx(categoryId: foodId, amountMinor: -2000, occurredAt: DateTime(2026, 8, 3, 20));
+    await insertTx(categoryId: foodId, amountMinor: 500, occurredAt: DateTime(2026, 8, 11), type: TransactionType.income);
+    await insertTx(categoryId: foodId, amountMinor: -700, occurredAt: DateTime(2026, 7, 31)); // 窗口外
+
+    final days = await repo.periodBuckets(
+        start: DateTime(2026, 8, 1),
+        end: DateTime(2026, 9, 1),
+        granularity: BucketGranularity.day);
+
+    expect(days.map((d) => d.label).toList(), ['2026-08-03', '2026-08-11']);
+    expect(days.first.expenseMinor, 3000);
+    expect(days.first.incomeMinor, 0);
+    expect(days.last.expenseMinor, 0);
+    expect(days.last.incomeMinor, 500);
+  });
+
   test('comparison buckets slice recent-year windows with expense/income', () async {
     await insertTx(categoryId: foodId, amountMinor: -1000, occurredAt: DateTime(2026, 1, 5));
     await insertTx(categoryId: foodId, amountMinor: 6000, occurredAt: DateTime(2026, 2, 5), type: TransactionType.income);

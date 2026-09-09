@@ -216,9 +216,15 @@ void main() {
     await dismissSheet(tester);
     expect(find.text('${now.year}年2月'), findsNWidgets(2));
     expect(find.text('最近5个月'), findsOneWidget);
-    // AC9-1：月粒度不渲染「收支趋势」区块
-    expect(find.text('收支趋势'), findsNothing);
+    // BK-DOC-31 需求1：月粒度「收支趋势」改按日汇总（当月每天一个点）
+    await tester.scrollUntilVisible(find.text('收支趋势'), 120,
+        scrollable: reportsScrollable());
+    expect(find.text('收支趋势'), findsOneWidget);
+    expect(find.text('${now.year}年2月 · 按日汇总'), findsOneWidget);
     expect(find.byType(BarChart), findsOneWidget);
+    final monthTrend = tester.widget<LineChart>(find.byType(LineChart));
+    expect(monthTrend.data.lineBarsData.first.spots,
+        hasLength(DateTime(now.year, 3, 0).day));
 
     // 月 → 日：日列解禁后选 3 日，口径变「最近7天」（AC3-2 / AC3-3）
     await tester.tap(find.byIcon(Icons.schedule_outlined));
@@ -229,9 +235,44 @@ void main() {
     await dismissSheet(tester);
     expect(find.text('${now.year}年2月3日'), findsNWidgets(2));
     expect(find.text('最近7天'), findsOneWidget);
-    // AC9-1：日粒度同样不渲染「收支趋势」区块
+    // 日粒度不渲染「收支趋势」区块（单日走势无意义）
     expect(find.text('收支趋势'), findsNothing);
     expect(find.byType(BarChart), findsOneWidget);
+    expect(find.byType(LineChart), findsNothing);
+  });
+
+  // ── BK-DOC-31 需求1：月维度收支趋势按日汇总 ──
+
+  testWidgets('monthly trend aggregates by day and zero-fills days without data',
+      (tester) async {
+    usePhoneViewport(tester);
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now();
+    // 2 月 3 日一笔支出：当月按日汇总应只在该日有金额，其余日补 0
+    await seedOneExpense(db, DateTime(now.year, 2, 3, 10));
+
+    await mountCharts(tester, db);
+    await tester.tap(find.byIcon(Icons.schedule_outlined));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CupertinoPicker).at(1), const Offset(0, -80));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确定'));
+    await dismissSheet(tester);
+
+    await tester.scrollUntilVisible(find.text('${now.year}年2月 · 按日汇总'), 120,
+        scrollable: reportsScrollable());
+    expect(find.text('收支趋势'), findsOneWidget);
+    expect(find.byType(LineChart), findsOneWidget);
+
+    final daysInMonth = DateTime(now.year, 3, 0).day;
+    final expenseSpots =
+        tester.widget<LineChart>(find.byType(LineChart)).data.lineBarsData.first.spots;
+    expect(expenseSpots, hasLength(daysInMonth));
+    // x 轴按日连续（0…N-1），2 月 3 日 = 索引 2
+    expect(expenseSpots[2].y, 3000);
+    expect(expenseSpots[0].y, 0);
+    expect(expenseSpots[daysInMonth - 1].y, 0);
   });
 
   testWidgets('year comparison renders current and prior-year buckets', (tester) async {
