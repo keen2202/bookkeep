@@ -12,7 +12,7 @@ import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_segmented_button.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/glass_panel.dart';
-import '../accounts/accounts_providers.dart' show exchangeRateServiceProvider;
+import '../currency/currency_providers.dart' show exchangeRateServiceProvider;
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart' show reportsRepositoryProvider;
 import '../calendar/calendar_page.dart' show CalendarPage;

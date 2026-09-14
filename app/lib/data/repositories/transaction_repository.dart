@@ -425,11 +425,19 @@ class TransactionRepository {
     return (categoryId: data['category_id'] as int?, accountId: data['account_id'] as int?);
   }
 
-  Future<List<Transaction>> listTransactions({bool includeDeleted = false}) async {
+  /// 流水列表：默认当前账本、未删除、按时间倒序。
+  /// [limit]/[before] 支持窗口分页（Spec R-20）：before 为游标（上一页最早 occurredAt）。
+  Future<List<Transaction>> listTransactions({
+    bool includeDeleted = false,
+    int? limit,
+    DateTime? before,
+  }) async {
     final q = db.select(db.transactions)
       ..where((t) => t.bookId.equals(bookId))
       ..orderBy([(t) => OrderingTerm.desc(t.occurredAt)]);
     if (!includeDeleted) q.where((t) => t.deletedAt.isNull());
+    if (before != null) q.where((t) => t.occurredAt.isSmallerThanValue(before));
+    if (limit != null) q.limit(limit);
     return q.get();
   }
 

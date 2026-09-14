@@ -7,14 +7,11 @@ import '../../data/local/database.dart';
 import '../../data/local/database_provider.dart';
 import '../../domain/services/account_balance_calculator.dart';
 import '../books/books_providers.dart' show accountRepositoryProvider, currentBookIdProvider;
-import '../currency/exchange_rate_service.dart';
+// Spec R-29：汇率服务单一来源（currency_providers），避免双实例
+import '../currency/currency_providers.dart' show exchangeRateServiceProvider;
 
 final accountBalanceCalculatorProvider = Provider<AccountBalanceCalculator>((ref) {
   return const AccountBalanceCalculator();
-});
-
-final exchangeRateServiceProvider = Provider<ExchangeRateService>((ref) {
-  return ExchangeRateService(ref.watch(databaseProvider));
 });
 
 /// 账户 + 余额 + 净资产视图模型（隐藏归档账户；仅当前账本，Spec §4.1；

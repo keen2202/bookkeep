@@ -290,18 +290,16 @@ server/tests/sync.routes.integration.test.ts
 
 | ID | 任务 | 负责人 | 状态 | 开始 | 完成 | 备注 |
 |---|---|---|---|---|---|---|
-| R-01 | merger rate_snapshot | — | pending | | | P0 |
-| R-02 | findDuplicate 时区 | — | pending | | | P0 |
-| R-03 | 预算含子分类 | — | pending | | | P0 |
-| R-04 | invite 不降级 owner | — | pending | | | P0 |
-| R-05 | 备份列白名单 | — | pending | | | P0 |
-| R-06 | HTTPS 强制 | — | pending | | | P0 |
-| R-07 | PIN 冷却 | — | pending | | | P0 |
-| R-08 | 详情脱敏 | — | pending | | | P0 |
-| R-09 | autoCreate 事务 | — | pending | | | P0 |
-| R-10 | refresh 事务 | — | pending | | | P0 |
-| R-11~R-25 | P1 批 | — | pending | | | 见任务分解 |
-| R-26~R-30 | P2 批 | — | pending | | | 见任务分解 |
+| R-01~R-10 | P0 批 | agent | completed | 2026-08-27 | 2026-08-27 | 见任务分解 BK-R01~10 |
+| R-11~R-19 | P1 逻辑/同步 | agent | completed | 2026-08-27 | 2026-08-27 | 见任务分解 |
+| R-20 | 账单窗口加载 | agent | completed | 2026-08-27 | 2026-08-27 | limit + 加载更早 |
+| R-21 | 主题缓存/局部 setState | agent | completed | 2026-08-27 | 2026-08-27 | ValueNotifier + themesProvider |
+| R-22 | 报表懒挂载 | agent | completed | 2026-08-27 | 2026-08-27 | 首次进入再建 |
+| R-23~R-26 | P1/P2 杂项 | agent | completed | 2026-08-27 | 2026-08-27 | 见任务分解 |
+| R-27 | 周期 FK+分期去重 | agent | completed | 2026-08-27 | 2026-08-27 | 新库 FK；去重不依赖 note |
+| R-28 | 币种 seed 批量 | agent | completed | 2026-08-27 | 2026-08-27 | insertOrIgnore batch |
+| R-29 | 汇率 Provider 单源 | agent | completed | 2026-08-27 | 2026-08-27 | 合并 accounts/currency |
+| R-30 | lints/日志/JWT | agent | completed | 2026-08-27 | 2026-08-27 | strict + catch 日志 + HS256 |
 
 状态取值：`pending` / `in_progress` / `completed` / `blocked`。
 

@@ -31,7 +31,8 @@ class BillsPage extends ConsumerWidget {
     return bills.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('加载失败：$e')),
-      data: (days) {
+      data: (vm) {
+        final days = vm.days;
         if (days.isEmpty) {
           // 统一空态（Spec §6 AppEmpty）
           return AppEmpty(
@@ -53,10 +54,23 @@ class BillsPage extends ConsumerWidget {
           ],
         ];
         // 审查 U-10：惰性构建；底部留白为末行提供滚动余量
+        // Spec R-20：末尾可加载更早流水
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 88),
-          itemCount: rows.length,
+          itemCount: rows.length + (vm.hasMore ? 1 : 0),
           itemBuilder: (context, i) {
+            if (i == rows.length) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: TextButton(
+                    onPressed: () =>
+                        ref.read(billsPageSizeProvider.notifier).state += kBillsPageSize,
+                    child: const Text('加载更早的账单'),
+                  ),
+                ),
+              );
+            }
             final row = rows[i];
             return row.isHeader
                 ? _DayHeader(day: row.day!, masked: masked)

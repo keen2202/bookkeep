@@ -63,8 +63,12 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   int _tab = 0;
 
-  /// 主页滚动联动（FG-NAV 分隔线渐显）：滚动 >0 渐显 / 顶部隐藏
-  bool _scrolled = false;
+  /// 主页滚动联动（FG-NAV 分隔线渐显）：滚动 >0 渐显 / 顶部隐藏。
+  /// Spec R-21：ValueNotifier 局部通知，避免整棵 MaterialApp setState 重建。
+  final ValueNotifier<bool> _scrolled = ValueNotifier(false);
+
+  /// Spec R-22：报表首次进入后再挂载，冷启动停在账单时不跑报表 SQL
+  bool _reportsMounted = false;
 
   @override
   void initState() {
@@ -90,6 +94,7 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
   void dispose() {
     syncMergeBus.removeListener(_onSyncMerged);
     WidgetsBinding.instance.removeObserver(this);
+    _scrolled.dispose();
     super.dispose();
   }
 
@@ -123,9 +128,8 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    // 个性化主题：预制主题直出 / 自定义种子色（设置页即时生效，全树热重建）
-    final themeSettings = ref.watch(themeControllerProvider);
-    final themes = materialThemesFor(themeSettings);
+    // 个性化主题：预制主题直出 / 自定义种子色（Spec R-21：Provider 记忆化 ThemeData）
+    final themes = ref.watch(materialThemesProvider);
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: 'bookkeep',
@@ -151,54 +155,66 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
             body: NotificationListener<UserScrollNotification>(
               onNotification: (n) {
                 final scrolled = n.metrics.pixels > 0;
-                if (scrolled != _scrolled) {
-                  setState(() => _scrolled = scrolled);
+                if (scrolled != _scrolled.value) {
+                  _scrolled.value = scrolled;
                 }
                 return false;
               },
-              // 审查 U-9：IndexedStack 保持各 Tab 状态（滚动位置、报表时间选择等）
+              // 审查 U-9：IndexedStack 保持各 Tab 状态；Spec R-22：报表懒挂载
               child: IndexedStack(
                 index: _tab,
-                children: const [
-                  BillsPage(),
-                  ReportsPage(),
+                children: [
+                  const BillsPage(),
+                  if (_reportsMounted)
+                    const ReportsPage()
+                  else
+                    const SizedBox.shrink(),
                 ],
               ),
             ),
-            bottomNavigationBar: GlassBottomBar(
-              selectedIndex: _tab,
-              showDivider: _scrolled,
-              onTap: (i) => setState(() => _tab = i),
-              items: [
-                for (final m in AppModule.values)
-                  GlassNavItem(
-                    icon: moduleIcon(m),
-                    label: m.label,
-                  ),
-              ],
-              // 需求6：记账入口下沉底栏中央（固定、不可拖拽）；viewer 只读隐藏
-              centerAction: viewer
+            bottomNavigationBar: ValueListenableBuilder<bool>(
+              valueListenable: _scrolled,
+              builder: (context, scrolled, _) => GlassBottomBar(
+                selectedIndex: _tab,
+                showDivider: scrolled,
+                onTap: (i) => setState(() {
+                  _tab = i;
+                  if (i == 1) _reportsMounted = true;
+                }),
+                items: [
+                  for (final m in AppModule.values)
+                    GlassNavItem(
+                      icon: moduleIcon(m),
+                      label: m.label,
+                    ),
+                ],
+                // 需求6：记账入口下沉底栏中央（固定、不可拖拽）；viewer 只读隐藏
+                centerAction: viewer
                   ? null
                   : (
                       icon: Icons.add,
                       semanticLabel: '记一笔',
                       onTap: () => _openQuickEntry(navContext),
                     ),
+              ),
             ),
-            // FG-NAV（BK-FG-021）：G3 吸顶玻璃栏；滚动后分隔线渐显
+            // FG-NAV（BK-FG-021）：G3 吸顶玻璃栏；滚动后分隔线渐显（Spec R-21 局部重建）
             appBar: PreferredSize(
               preferredSize: const Size.fromHeight(kToolbarHeight),
-              child: GlassAppBar(
-                title: Text(_tabTitles[_tab]),
-                showDivider: _scrolled,
-                actions: [
-                  const BookSwitcher(),
-                  GlassAppBarAction(
-                    icon: Icons.settings_outlined,
-                    tooltip: '设置',
-                    onPressed: () => _showSettings(navContext),
-                  ),
-                ],
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _scrolled,
+                builder: (context, scrolled, _) => GlassAppBar(
+                  title: Text(_tabTitles[_tab]),
+                  showDivider: scrolled,
+                  actions: [
+                    const BookSwitcher(),
+                    GlassAppBarAction(
+                      icon: Icons.settings_outlined,
+                      tooltip: '设置',
+                      onPressed: () => _showSettings(navContext),
+                    ),
+                  ],
+                ),
               ),
             ),
           );

@@ -130,8 +130,9 @@ Future<AppDatabase?> _openDatabase(File dbFile, KeyStore keyStore) async {
       if (!migratePlaintextToEncrypted(dbFile, key)) return null;
     }
     return openEncryptedDatabase(dbFile.path, key);
-  } catch (_) {
+  } catch (e) {
     // 密钥错误 / 库损坏：SQLCipher 打开抛 "file is not a database"
+    debugPrint('open encrypted database failed: $e');
     return null;
   }
 }

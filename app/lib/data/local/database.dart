@@ -40,7 +40,7 @@ class AppDatabase extends _$AppDatabase {
   static const _defaultBookName = '默认账本';
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -152,6 +152,10 @@ class AppDatabase extends _$AppDatabase {
               'CREATE INDEX IF NOT EXISTS idx_transactions_type_deleted_occurred '
               'ON transactions (type, deleted_at, occurred_at)',
             );
+          }
+          if (from < 9) {
+            // v9：周期/分期 FK 仅对新建库生效（SQLite 无法为已有表无损 ADD CONSTRAINT）。
+            // 存量库靠业务层过滤保证引用合法；新库 onCreate 按表定义建 REFERENCES（Spec R-27）。
           }
           // v3 回填放最后：需全部列（含 v4 book_id）已存在（迁移链 v1/v2 → v4）
           if (from < 3) {

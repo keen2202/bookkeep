@@ -66,3 +66,11 @@ final themeControllerProvider =
     mode: s.mode,
   );
 }
+
+/// 记忆化主题三要素（Spec R-21）：仅 ThemeSettings 变化时重算 ThemeData，
+/// 避免 App 壳 setState（滚动分隔线）触发昂贵的 buildTheme。
+final materialThemesProvider = Provider<({ThemeData theme, ThemeData darkTheme, ThemeMode mode})>((
+  ref,
+) {
+  return materialThemesFor(ref.watch(themeControllerProvider));
+});

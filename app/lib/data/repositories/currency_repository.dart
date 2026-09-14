@@ -74,21 +74,24 @@ class CurrencyRepository {
     final now = DateTime.now().toUtc();
     var inserted = 0;
     await db.transaction(() async {
-      for (final entry in currencySeed.entries) {
-        final existing = await (db.select(db.currencies)
-              ..where((t) => t.code.equals(entry.key)))
-            .get();
-        if (existing.isNotEmpty) continue;
-        await db.into(db.currencies).insert(CurrenciesCompanion.insert(
+      // Spec R-28：批量 insertOrIgnore，避免 N+1 逐条 select
+      await db.batch((b) {
+        for (final entry in currencySeed.entries) {
+          b.insert(
+            db.currencies,
+            CurrenciesCompanion.insert(
               code: entry.key,
               name: entry.value[0],
               symbol: Value(entry.value.length > 1 ? entry.value[1] : ''),
               // 审查 F-8：废 0.1 占位——未设置汇率 = 0 标记，UI 显式提示而非静默错误折算
               rateScaled: entry.key == 'CNY' ? kRateScale : unsetRateScaled,
               updatedAt: now,
-            ));
-        inserted++;
-      }
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+          inserted++;
+        }
+      });
       await db.into(db.appMeta).insert(
             AppMetaCompanion.insert(key: seedMetaKey, value: '1'),
             onConflict: DoUpdate((_) => const AppMetaCompanion(value: Value('1'))),

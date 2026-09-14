@@ -106,8 +106,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       if (_controller.accountId == null && vm.accounts.isNotEmpty) {
         _controller.selectAccount(vm.accounts.first.account.id);
       }
-    } catch (_) {
-      // 账户加载失败由页面错误态提示，此处静默
+    } catch (e) {
+      // 账户加载失败由页面错误态提示；记日志便于排查（Spec R-30）
+      debugPrint('quick entry load accounts failed: $e');
     }
   }
 

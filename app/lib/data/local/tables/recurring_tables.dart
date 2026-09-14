@@ -1,8 +1,12 @@
 import 'package:drift/drift.dart';
 
+import 'accounts_table.dart';
+import 'categories_table.dart';
+
 /// 周期记账规则（Spec §4.4 / BK-T-013）：
 /// frequency + interval + anchor_type + anchor_day + time_of_day 持久化，
 /// 由 AnchorResolver 统一解析为具体日期（锚点语义集中）。
+/// Spec R-27：新库启用 FK；存量库迁移不重建表（见 database.dart v9 注释）。
 class RecurringRules extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get bookId => text().named('book_id')();
@@ -15,8 +19,9 @@ class RecurringRules extends Table {
   IntColumn get amountMinor => integer().named('amount_minor')();
   /// 收支类型：expense / income（审查 F-7：周期收入可建模）
   TextColumn get type => text().withDefault(const Constant('expense'))();
-  IntColumn get accountId => integer().named('account_id')();
-  IntColumn get categoryId => integer().named('category_id').nullable()();
+  IntColumn get accountId => integer().named('account_id').references(Accounts, #id)();
+  IntColumn get categoryId =>
+      integer().named('category_id').nullable().references(Categories, #id)();
   /// 下次待生成日期（补跑游标；幂等：生成后前移）
   DateTimeColumn get nextDue => dateTime().named('next_due')();
   DateTimeColumn get startDate => dateTime().named('start_date')();
@@ -33,13 +38,13 @@ class InstallmentPlans extends Table {
   IntColumn get periods => integer()();
   DateTimeColumn get startDate => dateTime().named('start_date')();
   /// 关联账户（信用卡）；每期自动生成支出流水
-  IntColumn get linkedAccountId => integer().named('linked_account_id')();
+  IntColumn get linkedAccountId => integer().named('linked_account_id').references(Accounts, #id)();
   DateTimeColumn get createdAt => dateTime().named('created_at')();
 }
 
 class InstallmentSchedules extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get planId => integer().named('plan_id')();
+  IntColumn get planId => integer().named('plan_id').references(InstallmentPlans, #id)();
   DateTimeColumn get dueDate => dateTime().named('due_date')();
   IntColumn get amountMinor => integer().named('amount_minor')();
 
