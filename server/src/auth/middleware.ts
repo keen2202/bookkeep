@@ -22,7 +22,9 @@ export function authMiddleware(secret: string) {
       return;
     }
     try {
-      const payload = jwt.verify(header.slice(7), secret) as AuthUser;
+      const payload = jwt.verify(header.slice(7), secret, {
+        algorithms: ['HS256'],
+      }) as AuthUser;
       req.user = payload;
       next();
     } catch {

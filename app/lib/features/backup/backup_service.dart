@@ -18,9 +18,9 @@ class BackupService {
   static const format = 'bookkeep-backup';
   static const version = 1;
 
-  /// 恢复时排除的 app_meta 键（设备身份/同步游标/背景偏好不得跨设备恢复；
-  /// 审核 F6：`bg_*` 随备份恢复会产生指向不存在图片的悬空背景态）
-  static const _excludedMetaPrefixes = ['client_id', 'sync_last_seq_', 'bg_'];
+  /// 恢复时排除的 app_meta 键（设备身份/同步游标/背景偏好/PIN 哈希不得跨设备恢复；
+  /// 审核 F6：`bg_*` 随备份恢复会产生指向不存在图片的悬空背景态；Spec R-15：`privacy_`）
+  static const _excludedMetaPrefixes = ['client_id', 'sync_last_seq_', 'bg_', 'privacy_'];
 
   // 父表在前（恢复按序插入；删除取 reversed 子表先删）。
   // 审查 F-4：补齐 currencies / recurring_rules / installment_plans / installment_schedules
@@ -38,6 +38,49 @@ class BackupService {
     'installment_plans',
     'installment_schedules',
   ];
+
+  /// 恢复列白名单（Spec R-05）：与 Drift 表定义对齐，禁止恶意备份注入 SQL 列名
+  static const Map<String, Set<String>> _allowedColumns = {
+    'app_meta': {'key', 'value'},
+    'books': {'id', 'name', 'type', 'created_at'},
+    'accounts': {
+      'id', 'book_id', 'remote_id', 'account_type', 'name', 'currency',
+      'initial_balance', 'archived', 'created_at',
+    },
+    'categories': {
+      'id', 'book_id', 'remote_id', 'parent_id', 'name', 'icon',
+      'color', 'kind', 'is_system', 'sort_order', 'deleted_at', 'updated_at',
+    },
+    'account_snapshots': {'id', 'account_id', 'date', 'balance_minor'},
+    'transactions': {
+      'id', 'book_id', 'remote_id', 'account_id', 'category_id', 'type',
+      'amount_minor', 'currency', 'rate_snapshot', 'note', 'occurred_at',
+      'transfer_id', 'auto_generated', 'updated_at', 'deleted_at',
+    },
+    'budgets': {
+      'id', 'book_id', 'remote_id', 'category_id', 'period',
+      'amount_minor', 'threshold',
+    },
+    'sync_ops': {
+      'id', 'book_id', 'entity', 'entity_id', 'remote_id', 'op', 'payload',
+      'lamport', 'client_id', 'pushed', 'created_at',
+    },
+    'currencies': {
+      'code', 'name', 'symbol', 'rate_scaled', 'is_manual', 'updated_at',
+    },
+    'recurring_rules': {
+      'id', 'book_id', 'frequency', 'interval', 'anchor_type', 'anchor_day',
+      'time_of_day', 'amount_minor', 'type', 'account_id', 'category_id',
+      'next_due', 'start_date', 'end_date', 'updated_at',
+    },
+    'installment_plans': {
+      'id', 'book_id', 'name', 'total_minor', 'periods', 'start_date',
+      'linked_account_id', 'created_at',
+    },
+    'installment_schedules': {
+      'id', 'plan_id', 'due_date', 'amount_minor',
+    },
+  };
 
   /// 创建加密备份字节
   Future<Uint8List> createBackup(String password) async {
@@ -82,9 +125,19 @@ class BackupService {
       }
       for (final table in _tables) {
         final rows = tables[table] as List<dynamic>? ?? const [];
+        final allowed = _allowedColumns[table];
         for (final row in rows) {
           final map = row as Map<String, dynamic>;
-          final columns = map.keys.toList();
+          // Spec R-05：列名白名单，未知列名直接拒绝
+          final columns = <String>[
+            for (final c in map.keys)
+              if (allowed == null || allowed.contains(c)) c,
+          ];
+          if (map.keys.length != columns.length) {
+            final bad = map.keys.where((c) => !columns.contains(c)).join(', ');
+            throw BackupCipherException('备份包含未知列名，已拒绝恢复: $bad');
+          }
+          if (columns.isEmpty) continue;
           final placeholders = List.filled(columns.length, '?').join(', ');
           await db.customStatement(
             'INSERT INTO $table (${columns.join(', ')}) VALUES ($placeholders)',

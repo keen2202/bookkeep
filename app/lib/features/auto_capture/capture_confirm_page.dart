@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
 import '../../shared/theme/app_theme.dart';
-import '../../../shared/widgets/glass_nav.dart';
+import '../../shared/widgets/glass_nav.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/services/capture_candidate.dart';

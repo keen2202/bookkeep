@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/repositories/lock_repository.dart';
 import '../../shared/widgets/app_button.dart';
 import 'lock_controller.dart';
 import 'pin_pad.dart';
@@ -82,11 +83,33 @@ class _LockScreenState extends ConsumerState<_LockScreen> {
   }
 
   Future<void> _submit(String pin) async {
-    final ok = await ref.read(lockControllerProvider.notifier).unlockWithPin(pin);
-    if (!ok && mounted) {
+    final repo = ref.read(lockRepositoryProvider);
+    if (await repo.isLockedOut()) {
+      final until = await repo.pinLockUntil();
+      final secs = until == null
+          ? 0
+          : until.difference(DateTime.now()).inSeconds.clamp(0, 3600);
+      if (!mounted) return;
       setState(() => _attempt++);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PIN 错误，请重试')),
+        SnackBar(content: Text('尝试次数过多，请 $secs 秒后再试')),
+      );
+      return;
+    }
+    final ok = await ref.read(lockControllerProvider.notifier).unlockWithPin(pin);
+    if (!ok && mounted) {
+      final fails = await repo.pinFailCount();
+      setState(() => _attempt++);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            fails >= LockRepository.failThresholdHard
+                ? 'PIN 错误，已锁定 5 分钟'
+                : fails >= LockRepository.failThresholdSoft
+                    ? 'PIN 错误，已冷却 30 秒'
+                    : 'PIN 错误，请重试',
+          ),
+        ),
       );
     }
   }

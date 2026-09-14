@@ -58,9 +58,10 @@ class _CategoryPickerState extends State<CategoryPicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         for (final parent in _parents) ...[
           // 有子级：点击折叠/展开；无子级（自建顶层分类）：点击直接选中
           _ParentTile(
@@ -89,7 +90,7 @@ class _CategoryPickerState extends State<CategoryPicker> {
               ),
             ),
         ],
-      ],
+      ),
     );
   }
 }

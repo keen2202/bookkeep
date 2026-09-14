@@ -20,7 +20,8 @@ class BillDay {
 List<BillDay> groupBillsByDay(List<Transaction> transactions) {
   final byDay = <DateTime, List<Transaction>>{};
   for (final t in transactions) {
-    final day = DateTime(t.occurredAt.year, t.occurredAt.month, t.occurredAt.day);
+    final local = t.occurredAt.toLocal();
+    final day = DateTime(local.year, local.month, local.day);
     byDay.putIfAbsent(day, () => []).add(t);
   }
   final days = byDay.keys.toList()..sort((a, b) => b.compareTo(a));

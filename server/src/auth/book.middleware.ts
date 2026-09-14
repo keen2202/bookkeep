@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { DbPool } from '../db/pool';
+import { withTransaction } from '../db/tx';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -45,14 +46,17 @@ export function requireBookMember(pool: DbPool, opts: { allowWrite: boolean; aut
       }
       // 并发首推同一 book_id：ON CONFLICT 兜底 + one_owner_per_book 部分唯一索引
       // 保证仅一人成为 owner；失败者（非成员）在此被 403 拦截（评审 M5 / L-1）
-      await pool.query(
-        "INSERT INTO books (id, name, type, owner_id) VALUES ($1, 'default', 'default', $2) ON CONFLICT (id) DO NOTHING",
-        [normalized, userId],
-      );
-      await pool.query(
-        "INSERT INTO book_members (book_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING",
-        [normalized, userId],
-      );
+      // 两条 INSERT 同一事务，避免孤儿无 owner 账本（Spec R-09）
+      await withTransaction(pool, async (client) => {
+        await client.query(
+          "INSERT INTO books (id, name, type, owner_id) VALUES ($1, 'default', 'default', $2) ON CONFLICT (id) DO NOTHING",
+          [normalized, userId],
+        );
+        await client.query(
+          "INSERT INTO book_members (book_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING",
+          [normalized, userId],
+        );
+      });
       const race = await pool.query<{ role: MemberRole }>(
         'SELECT role FROM book_members WHERE book_id = $1 AND user_id = $2',
         [normalized, userId],

@@ -126,13 +126,16 @@ class BudgetRepository {
       'FROM transactions '
       'WHERE type = ? AND deleted_at IS NULL AND book_id = ? '
       'AND occurred_at >= ? AND occurred_at < ? '
-      '${categoryId != null ? 'AND category_id = ?' : ''}',
+      '${categoryId != null ? 'AND (category_id = ? OR category_id IN (SELECT id FROM categories WHERE parent_id = ? AND deleted_at IS NULL))' : ''}',
       variables: [
         Variable.withString('expense'),
         Variable.withString(currentBookId),
         Variable.withDateTime(start),
         Variable.withDateTime(end),
-        if (categoryId != null) Variable.withInt(categoryId),
+        if (categoryId != null) ...[
+          Variable.withInt(categoryId),
+          Variable.withInt(categoryId),
+        ],
       ],
     );
     final row = await query.getSingle();

@@ -187,14 +187,16 @@ class CategoryRepository {
   /// 存在未删除子分类时同样拒绝（防止父级删除后子分类失联不可见）。
   Future<void> deleteCategory(int id) async {
     final referenced = await (db.select(db.transactions)
-          ..where((t) => t.categoryId.equals(id) & t.deletedAt.isNull()))
+          ..where((t) => t.categoryId.equals(id) & t.deletedAt.isNull())
+          ..limit(1))
         .get()
         .then((rows) => rows.isNotEmpty);
     if (referenced) {
       throw CategoryInUseException();
     }
     final hasChildren = await (db.select(db.categories)
-          ..where((t) => t.parentId.equals(id) & t.deletedAt.isNull()))
+          ..where((t) => t.parentId.equals(id) & t.deletedAt.isNull())
+          ..limit(1))
         .get()
         .then((rows) => rows.isNotEmpty);
     if (hasChildren) {

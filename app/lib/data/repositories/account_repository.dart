@@ -102,7 +102,8 @@ class AccountRepository {
   /// 删除 = 软删除（归档）。仍有关联流水时拒绝（Spec §3.2）。
   Future<void> deleteAccount(int id) async {
     final hasTx = await (db.select(db.transactions)
-          ..where((t) => t.accountId.equals(id) & t.deletedAt.isNull()))
+          ..where((t) => t.accountId.equals(id) & t.deletedAt.isNull())
+          ..limit(1))
         .get()
         .then((rows) => rows.isNotEmpty);
     if (hasTx) {

@@ -65,10 +65,27 @@ abstract class SyncApi {
 class HttpSyncApi implements SyncApi {
   HttpSyncApi({required String baseUrl, http.Client? client})
       : _baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
-        _client = client ?? http.Client();
+        _client = client ?? http.Client() {
+    assertSecure(_baseUrl);
+  }
 
   final String _baseUrl;
   final http.Client _client;
+
+  /// Spec R-06：生产/远程端点必须 HTTPS；仅 debug 下允许 localhost/127.0.0.1 的 http
+  static void assertSecure(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    if (uri == null || uri.scheme.isEmpty) {
+      throw ArgumentError('invalid sync base url: $baseUrl');
+    }
+    if (uri.scheme == 'https') return;
+    final isLocalHost =
+        uri.host == 'localhost' || uri.host == '127.0.0.1' || uri.host == '::1';
+    if (uri.scheme == 'http' && isLocalHost && const bool.fromEnvironment('dart.vm.product') == false) {
+      return;
+    }
+    throw ArgumentError('sync endpoint must use HTTPS: $baseUrl');
+  }
 
   Future<http.Response> _request(
     String method,

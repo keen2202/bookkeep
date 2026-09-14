@@ -94,7 +94,8 @@ class SyncStatusNotifier extends Notifier<SyncUiState> {
     state = _uiState();
   }
 
-  /// 登录/注册 → 持久化 token → 复用/重建引擎 → 立即同步追平 op-log
+  /// 登录 → 持久化 token → 复用/重建引擎 → 立即同步追平 op-log
+  /// Spec R-16：login 401 不再静默 register，避免误建空账户
   Future<bool> login(String email, String password) async {
     final api = HttpSyncApi(baseUrl: kServerBaseUrl);
     final tokenStore = SecureTokenStore();
@@ -102,19 +103,12 @@ class SyncStatusNotifier extends Notifier<SyncUiState> {
     try {
       tokens = await api.login(email, password);
     } on SyncApiException catch (e) {
-      try {
-        if (e.statusCode == 401) {
-          tokens = await api.register(email, password);
-        } else if (e.statusCode == 409) {
-          tokens = await api.login(email, password);
-        } else {
-          _setMessage('登录失败：${e.message}');
-          return false;
-        }
-      } on SyncNetworkException catch (e2) {
-        _setMessage('网络不可用：${e2.message}');
+      if (e.statusCode == 401) {
+        _setMessage('邮箱或密码错误；若尚未注册请使用注册入口');
         return false;
       }
+      _setMessage('登录失败：${e.message}');
+      return false;
     } on SyncNetworkException catch (e) {
       _setMessage('网络不可用：${e.message}');
       return false;

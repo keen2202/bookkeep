@@ -227,6 +227,7 @@ class QuickEntryController extends ChangeNotifier {
           toAccountId: toAccountId!,
           amountMinor: amount,
           occurredAt: occurredAt,
+          note: trimmedNote.isEmpty ? null : trimmedNote,
         );
       } catch (_) {
         error = QuickEntryError.saveFailed;

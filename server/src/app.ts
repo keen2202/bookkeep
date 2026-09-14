@@ -2,6 +2,7 @@ import express from 'express';
 import { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { authMiddleware } from './auth/middleware';
 import { booksRouter } from './books/books.routes';
 import { DbPool } from './db/pool';
@@ -17,6 +18,16 @@ export interface AppDeps {
   /** 限流开关（审查 R-021）：集成测试注入 false 避免共享限流桶互扰；429 专项用例保持默认 */
   rateLimit?: boolean;
 }
+
+// 未认证请求 IP 限流（Spec R-25）：覆盖 JWT verify 前的 CPU 放大
+const unauthRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? 'ip'),
+  message: { error: 'rate_limited' },
+});
 
 export function createApp({ pool, jwtSecret = 'dev-secret', corsOrigins, rateLimit }: AppDeps) {
   const app = express();
@@ -34,8 +45,12 @@ export function createApp({ pool, jwtSecret = 'dev-secret', corsOrigins, rateLim
 
   app.use('/health', healthRouter(pool));
   app.use('/auth', authRouter({ pool, jwtSecret, rateLimit }));
-  app.use('/books', authMiddleware(jwtSecret), booksRouter({ pool }));
-  app.use('/sync', authMiddleware(jwtSecret), syncRouter({ pool, rateLimit }));
+  // sync/books：先 IP 限流再鉴权，避免无效 token 无限打 JWT verify
+  const guard = [rateLimit === false ? undefined : unauthRateLimit, authMiddleware(jwtSecret)].filter(
+    Boolean,
+  ) as express.RequestHandler[];
+  app.use('/books', ...guard, booksRouter({ pool }));
+  app.use('/sync', ...guard, syncRouter({ pool, rateLimit }));
 
   app.get('/api/protected', authMiddleware(jwtSecret), (req, res) => {
     res.json({ user: req.user });

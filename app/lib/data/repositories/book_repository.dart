@@ -30,6 +30,7 @@ class BookRepository {
     required String id,
     required String name,
     String type = 'default',
+    String role = 'owner',
   }) async {
     await db.into(db.books).insert(
           BooksCompanion.insert(
@@ -40,15 +41,17 @@ class BookRepository {
           ),
           onConflict: DoNothing(),
         );
+    await setRole(id, role);
   }
 
   /// 当前用户在该账本的角色（Spec §4.1 权限矩阵）；服务端为权威，
-  /// 此处为本地缓存（离线时保持最近一次同步值），未知默认 owner。
+  /// 此处为本地缓存（离线时保持最近一次同步值）。未知时 fail-closed 默认 viewer
+  /// （Spec R-26），避免离线场景把 viewer 当 owner 写入。
   Future<String> roleOf(String bookId) async {
     final rows = await (db.select(db.appMeta)
           ..where((t) => t.key.equals('book_role_$bookId')))
         .get();
-    return rows.isEmpty ? 'owner' : rows.single.value;
+    return rows.isEmpty ? 'viewer' : rows.single.value;
   }
 
   Future<void> setRole(String bookId, String role) async {

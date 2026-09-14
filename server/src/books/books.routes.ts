@@ -136,6 +136,14 @@ export function booksRouter({ pool }: BooksDeps): Router {
         [hash],
       );
       if (row.rows.length === 0) return null;
+      // 已是 owner 则保持角色不变，防止经邀请被降级（Spec R-04）
+      const existing = await client.query<{ role: MemberRole }>(
+        'SELECT role FROM book_members WHERE book_id = $1 AND user_id = $2',
+        [row.rows[0].book_id, userId],
+      );
+      if (existing.rows[0]?.role === 'owner') {
+        return { book_id: row.rows[0].book_id, role: 'owner' as MemberRole };
+      }
       // 已是成员则幂等更新角色（复用邀请不重复建行）
       await client.query(
         `INSERT INTO book_members (book_id, user_id, role) VALUES ($1, $2, $3)

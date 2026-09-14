@@ -14,6 +14,7 @@ import '../../shared/widgets/app_dialog.dart';
 import '../../shared/widgets/app_sheet.dart';
 import '../../shared/widgets/app_snack.dart';
 import '../accounts/accounts_providers.dart';
+import '../auth_lock/lock_controller.dart' show amountMaskProvider;
 import '../books/books_providers.dart' show transactionRepositoryProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import '../quick_entry/quick_entry_controller.dart';
@@ -166,7 +167,9 @@ class _BillDetailSheetState extends ConsumerState<BillDetailSheet> {
                 ),
               ),
               AppAmountText.minor(widget.tx.amountMinor,
-                  masked: false, tone: amountTone, large: true),
+                  masked: ref.watch(amountMaskProvider),
+                  tone: amountTone,
+                  large: true),
             ],
           ),
         ),

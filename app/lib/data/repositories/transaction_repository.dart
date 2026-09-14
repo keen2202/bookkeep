@@ -299,6 +299,7 @@ class TransactionRepository {
     required int toAccountId,
     required int amountMinor,
     required DateTime occurredAt,
+    String? note,
   }) async {
     return db.transaction(() async {
       final now = DateTime.now().toUtc();
@@ -324,6 +325,7 @@ class TransactionRepository {
             currency: fromCurrency,
             rateSnapshot: Value(fromRate),
             occurredAt: occurredAt,
+            note: Value(note),
             updatedAt: now,
           ));
       final pairedId = await db.into(db.transactions).insert(TransactionsCompanion.insert(
@@ -336,6 +338,7 @@ class TransactionRepository {
             rateSnapshot: Value(toRate),
             occurredAt: occurredAt,
             transferId: Value(fromId),
+            note: Value(note),
             updatedAt: now,
           ));
       await (db.update(db.transactions)..where((t) => t.id.equals(fromId)))
@@ -358,6 +361,7 @@ class TransactionRepository {
           'currency': fromCurrency,
           'rate_snapshot': fromRate,
           'occurred_at': occurredAt.toUtc().toIso8601String(),
+          'note': note,
           'updated_at': now.toIso8601String(),
         },
       );
@@ -376,6 +380,7 @@ class TransactionRepository {
           'currency': toCurrency,
           'rate_snapshot': toRate,
           'occurred_at': occurredAt.toUtc().toIso8601String(),
+          'note': note,
           'updated_at': now.toIso8601String(),
         },
       );
@@ -434,12 +439,13 @@ class TransactionRepository {
     required DateTime occurredAt,
     String? note,
   }) async {
+    final utc = occurredAt.isUtc ? occurredAt : occurredAt.toUtc();
     final start = DateTime.utc(
-      occurredAt.year,
-      occurredAt.month,
-      occurredAt.day,
-      occurredAt.hour,
-      occurredAt.minute,
+      utc.year,
+      utc.month,
+      utc.day,
+      utc.hour,
+      utc.minute,
     );
     final end = start.add(const Duration(minutes: 1));
     final q = db.select(db.transactions)

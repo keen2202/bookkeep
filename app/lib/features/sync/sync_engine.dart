@@ -104,16 +104,11 @@ class SyncEngine {
       _tokens = tokens;
       return;
     }
+    // Spec R-16：无存储 token 且无凭据时由调用方处理；有凭据则仅 login，不再静默 register
     try {
       tokens = await _api.login(email!, password!);
-    } on SyncApiException catch (e) {
-      if (e.statusCode == 401) {
-        tokens = await _api.register(email!, password!);
-      } else if (e.statusCode == 409) {
-        tokens = await _api.login(email!, password!);
-      } else {
-        rethrow;
-      }
+    } on SyncApiException {
+      rethrow;
     }
     await _tokenStore.write(tokens);
     _tokens = tokens;

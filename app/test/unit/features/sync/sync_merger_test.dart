@@ -70,6 +70,7 @@ void main() {
     final txs = await db.select(db.transactions).get();
     expect(txs, hasLength(1));
     expect(txs.single.amountMinor, -1250);
+    expect(txs.single.rateSnapshot, 1000000); // 默认 kRateScale
     expect(txs.single.note, isNull);
 
     // 幂等重放：不再产生重复行
@@ -94,6 +95,70 @@ void main() {
     ]);
     expect(replay, 0);
     expect(await db.select(db.transactions).get(), hasLength(1));
+  });
+
+  test('merges transaction create with rate_snapshot (Spec R-01)', () async {
+    final remoteTxId = nextId();
+    final remoteAccountId = nextId();
+    await merger.merge([
+      op('account', remoteAccountId, 'c', payload: {
+        'type': 'cash',
+        'name': 'USD',
+        'currency': 'USD',
+        'initial_balance': 0,
+        'archived': false,
+      }),
+      op('transaction', remoteTxId, 'c', payload: {
+        'account_id': remoteAccountId,
+        'category_id': null,
+        'type': 'expense',
+        'amount_minor': -1000,
+        'currency': 'USD',
+        'rate_snapshot': 7200000,
+        'occurred_at': '2026-08-01T12:00:00.000Z',
+        'note': null,
+        'auto_generated': false,
+      }),
+    ]);
+    final txs = await db.select(db.transactions).get();
+    expect(txs.single.rateSnapshot, 7200000);
+  });
+
+  test('merges transaction update keeps rate_snapshot (Spec R-01)', () async {
+    final remoteTxId = nextId();
+    final remoteAccountId = nextId();
+    await merger.merge([
+      op('account', remoteAccountId, 'c', payload: {
+        'type': 'cash',
+        'name': 'USD',
+        'currency': 'USD',
+        'initial_balance': 0,
+        'archived': false,
+      }),
+      op('transaction', remoteTxId, 'c', payload: {
+        'account_id': remoteAccountId,
+        'category_id': null,
+        'type': 'expense',
+        'amount_minor': -1000,
+        'currency': 'USD',
+        'rate_snapshot': 7000000,
+        'occurred_at': '2026-08-01T12:00:00.000Z',
+      }),
+    ]);
+    await merger.merge([
+      op('transaction', remoteTxId, 'u', payload: {
+        'account_id': remoteAccountId,
+        'category_id': null,
+        'type': 'expense',
+        'amount_minor': -2000,
+        'currency': 'USD',
+        'rate_snapshot': 7200000,
+        'occurred_at': '2026-08-01T12:00:00.000Z',
+      }, lamport: 2),
+    ]);
+    final txs = await db.select(db.transactions).get();
+    expect(txs.single.amountMinor, -2000);
+    expect(txs.single.rateSnapshot, 7200000);
   });
 
   test('applies an update op to a previously created entity', () async {

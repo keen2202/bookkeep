@@ -18,9 +18,8 @@ final bookRepositoryProvider = Provider<BookRepository>((ref) {
 /// 任何读取前必须经 main() override 注入（R-004：不再有固定占位 id）
 final currentBookIdProvider = StateProvider<String>((ref) => '');
 
-/// 当前用户在当前账本的角色（Spec §4.1 权限矩阵）。未知时默认 owner——
-/// 拦截只做收紧（viewer 禁写），服务端始终为权威校验；值来自
-/// serverBooksProvider（登录拉取）与本地缓存（离线）。
+/// 当前用户在当前账本的角色（Spec §4.1 权限矩阵）。切换账本时由 roleOf
+/// 覆盖；未知缓存 fail-closed 为 viewer（Spec R-26），服务端始终权威。
 final currentRoleProvider = StateProvider<String>((ref) => 'owner');
 
 final booksViewModelProvider = FutureProvider<List<Book>>((ref) {

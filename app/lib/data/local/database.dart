@@ -40,7 +40,7 @@ class AppDatabase extends _$AppDatabase {
   static const _defaultBookName = '默认账本';
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -59,6 +59,11 @@ class AppDatabase extends _$AppDatabase {
           );
           await _setMeta(AppMetaKeys.currentBook, defaultId);
           await _setMeta(AppMetaKeys.syncBookId, defaultId);
+          // 默认账本由本机用户创建 → 本地角色缓存为 owner（配合 roleOf fail-closed）
+          await into(appMeta).insert(
+            AppMetaCompanion.insert(key: 'book_role_$defaultId', value: 'owner'),
+            onConflict: DoUpdate((_) => const AppMetaCompanion(value: Value('owner'))),
+          );
         },
         onUpgrade: (m, from, to) async {
           if (from < 2) {
@@ -128,6 +133,25 @@ class AppDatabase extends _$AppDatabase {
             if (!hasType) {
               await m.addColumn(recurringRules, recurringRules.type);
             }
+          }
+          if (from < 8) {
+            // v8：查询路径复合索引（Spec R-19）
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_book_occurred '
+              'ON transactions (book_id, occurred_at)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_remote '
+              'ON transactions (remote_id)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_account '
+              'ON transactions (account_id, deleted_at)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_type_deleted_occurred '
+              'ON transactions (type, deleted_at, occurred_at)',
+            );
           }
           // v3 回填放最后：需全部列（含 v4 book_id）已存在（迁移链 v1/v2 → v4）
           if (from < 3) {

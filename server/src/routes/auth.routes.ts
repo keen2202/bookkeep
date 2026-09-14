@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { DbPool } from '../db/pool';
 import { hashPassword, verifyPassword } from '../auth/password';
 import { issueRefreshToken, rotateRefreshToken, signAccessToken } from '../auth/tokens';
@@ -7,12 +7,13 @@ import { issueRefreshToken, rotateRefreshToken, signAccessToken } from '../auth/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PASSWORD_LEN = 128;
 
-// 登录/注册爆破防护（审查 L-4）：5 次/分钟/IP
+// 登录/注册爆破防护（审查 L-4）：5 次/分钟/IP；IPv6 归一化（Spec R-25）
 const authRateLimit = rateLimit({
   windowMs: 60_000,
   limit: 5,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? 'ip'),
   message: { error: 'rate_limited' },
 });
 

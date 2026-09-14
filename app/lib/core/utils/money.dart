@@ -19,6 +19,11 @@ class Money {
     required int rateScaled,
     int scale = kRateScale,
   }) {
+    // 溢出防护（Spec R-13）：乘积接近 int64 上限直接拒绝
+    final maxFactor = (1 << 62) ~/ (rateScaled.abs() == 0 ? 1 : rateScaled.abs());
+    if (amountMinor.abs() > maxFactor) {
+      throw ArgumentError('amount too large for currency conversion');
+    }
     // 正负数统一四舍五入（half-up）：分子加符号相关的一半
     final half = amountMinor >= 0 ? scale ~/ 2 : -(scale ~/ 2);
     return (amountMinor * rateScaled + half) ~/ scale;
