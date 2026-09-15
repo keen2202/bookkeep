@@ -206,7 +206,7 @@ void main() {
     await db1.close();
 
     final db2 = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db2.schemaVersion, 7);
+    expect(db2.schemaVersion, 10);
     await db2.close();
   });
 
@@ -259,7 +259,7 @@ void main() {
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db.schemaVersion, 7);
+    expect(db.schemaVersion, 10);
 
     // book_id 回填到既有 sync_book_id（同步域连续），而非固定占位 id
     final account = await db.select(db.accounts).getSingle();
@@ -301,7 +301,7 @@ void main() {
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db.schemaVersion, 7);
+    expect(db.schemaVersion, 10);
 
     // 无 sync_book_id → 默认账本 = 历史占位 id（testBookId），book_id 保持列默认值
     final account = await db.select(db.accounts).getSingle();
@@ -337,7 +337,7 @@ void main() {
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db.schemaVersion, 7);
+    expect(db.schemaVersion, 10);
 
     // 既有数据保留（账户 + 周期规则）
     final account = await db.select(db.accounts).getSingle();
@@ -366,7 +366,7 @@ void main() {
     raw.close();
 
     final db = AppDatabase(NativeDatabase(File(dbPath)));
-    expect(db.schemaVersion, 7);
+    expect(db.schemaVersion, 10);
 
     const placeholder = '00000000-0000-4000-8000-000000000001';
     final current = await db.currentBookId();
@@ -383,6 +383,21 @@ void main() {
     expect(book.id, isNot(placeholder));
     expect(book.name, '默认账本');
     expect(account.name, '旧账户');
+    await db.close();
+  });
+
+  test('fresh install creates transaction query composite indexes (Spec R-19)', () async {
+    final db = AppDatabase(NativeDatabase(File(dbPath)));
+    final names = (await db.customSelect('PRAGMA index_list(transactions)').get())
+        .map((r) => r.data['name'] as String)
+        .toSet();
+    expect(names, containsAll([
+      'idx_transactions_occurred_at',
+      'idx_transactions_book_occurred',
+      'idx_transactions_remote',
+      'idx_transactions_account',
+      'idx_transactions_type_deleted_occurred',
+    ]));
     await db.close();
   });
 }

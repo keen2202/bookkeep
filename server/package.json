@@ -12,7 +12,7 @@
     "build": "tsc",
     "dev": "ts-node src/index.ts",
     "migrate": "ts-node src/db/migrate-cli.ts",
-    "test:integration": "jest --coverage=false --testPathIgnorePatterns '/node_modules/' --testMatch '**/*.integration.test.ts'"
+    "test:integration": "jest --coverage=false --config jest.integration.config.js"
   },
   "keywords": [],
   "author": "",

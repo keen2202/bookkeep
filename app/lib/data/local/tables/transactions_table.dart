@@ -7,7 +7,15 @@ import 'categories_table.dart';
 enum TransactionType { expense, income, transfer }
 
 /// 流水：金额为整数最小货币单位（分），汇率快照定点数（Spec §1.2）
+/// Spec R-19：查询路径索引；onCreate/迁移另经 `_ensureTransactionQueryIndexes` 兜底。
 @TableIndex(name: 'idx_transactions_occurred_at', columns: {#occurredAt})
+@TableIndex(name: 'idx_transactions_book_occurred', columns: {#bookId, #occurredAt})
+@TableIndex(name: 'idx_transactions_remote', columns: {#remoteId})
+@TableIndex(name: 'idx_transactions_account', columns: {#accountId, #deletedAt})
+@TableIndex(
+  name: 'idx_transactions_type_deleted_occurred',
+  columns: {#type, #deletedAt, #occurredAt},
+)
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
   /// 账本分区（Spec §4.1 / BK-T-010）

@@ -40,12 +40,31 @@ class AppDatabase extends _$AppDatabase {
   static const _defaultBookName = '默认账本';
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
+
+  /// Spec R-19：查询路径复合索引。onCreate 与 v10 升级路径共用，
+  /// 保证新装库与「v8/v9 新装但未建复合索引」的存量库都能补齐。
+  Future<void> _ensureTransactionQueryIndexes() async {
+    const stmts = [
+      'CREATE INDEX IF NOT EXISTS idx_transactions_book_occurred '
+          'ON transactions (book_id, occurred_at)',
+      'CREATE INDEX IF NOT EXISTS idx_transactions_remote '
+          'ON transactions (remote_id)',
+      'CREATE INDEX IF NOT EXISTS idx_transactions_account '
+          'ON transactions (account_id, deleted_at)',
+      'CREATE INDEX IF NOT EXISTS idx_transactions_type_deleted_occurred '
+          'ON transactions (type, deleted_at, occurred_at)',
+    ];
+    for (final sql in stmts) {
+      await customStatement(sql);
+    }
+  }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
+          await _ensureTransactionQueryIndexes();
           // 新安装：默认账本 = 随机 uuid（与同步域一致；固定 id 会造成跨用户
           // 服务端账本串扰），books 行 + current_book_id + sync_book_id 三者一致
           final defaultId = _uuid.v4();
@@ -134,24 +153,10 @@ class AppDatabase extends _$AppDatabase {
               await m.addColumn(recurringRules, recurringRules.type);
             }
           }
-          if (from < 8) {
-            // v8：查询路径复合索引（Spec R-19）
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_transactions_book_occurred '
-              'ON transactions (book_id, occurred_at)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_transactions_remote '
-              'ON transactions (remote_id)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_transactions_account '
-              'ON transactions (account_id, deleted_at)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_transactions_type_deleted_occurred '
-              'ON transactions (type, deleted_at, occurred_at)',
-            );
+          if (from < 10) {
+            // v10：查询路径复合索引（Spec R-19）。覆盖 v8 原有升级路径，
+            // 并补齐「v8/v9 全新安装走 onCreate、未执行 from<8」的缺口。
+            await _ensureTransactionQueryIndexes();
           }
           if (from < 9) {
             // v9：周期/分期 FK 仅对新建库生效（SQLite 无法为已有表无损 ADD CONSTRAINT）。

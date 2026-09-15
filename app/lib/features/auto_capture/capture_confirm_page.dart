@@ -8,6 +8,7 @@ import '../../shared/widgets/glass_nav.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
 import '../../domain/services/capture_candidate.dart';
+import '../auth_lock/lock_controller.dart' show amountMaskProvider;
 import '../books/books_providers.dart' show accountRepositoryProvider, transactionRepositoryProvider;
 import 'import_service.dart';
 
@@ -159,6 +160,8 @@ class _CaptureConfirmPageState extends ConsumerState<CaptureConfirmPage> {
   }
 
   String _formatAmount(int minor) {
+    // Spec R-08：锁屏/后台快照时脱敏
+    if (ref.watch(amountMaskProvider)) return maskedMoney();
     final sign = minor < 0 ? '-' : '+';
     return '$sign${formatMoney(minor.abs())}';
   }

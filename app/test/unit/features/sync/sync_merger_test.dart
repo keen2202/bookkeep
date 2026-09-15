@@ -242,6 +242,61 @@ void main() {
     expect(await db.select(db.pendingReplay).get(), isEmpty);
   });
 
+  test('transaction update with missing account FK is pended and replayed (Spec R-17)', () async {
+    final txRemoteId = nextId();
+    final accountA = nextId();
+    final accountB = nextId();
+
+    // 先有账户 A 与流水
+    await merger.merge([
+      op('account', accountA, 'c',
+          payload: {'type': 'cash', 'name': '钱包', 'currency': 'CNY', 'initial_balance': 0, 'archived': false}),
+      op('transaction', txRemoteId, 'c', payload: {
+        'account_id': accountA,
+        'category_id': null,
+        'type': 'expense',
+        'amount_minor': -100,
+        'currency': 'CNY',
+        'occurred_at': '2026-08-01T12:00:00.000Z',
+        'note': '旧备注',
+        'auto_generated': false,
+      }),
+    ]);
+    expect(await db.select(db.transactions).get(), hasLength(1));
+
+    // 更新指向尚未同步的账户 B → 应入重放队列，而非静默丢弃
+    final pended = await merger.merge([
+      op('transaction', txRemoteId, 'u', payload: {
+        'account_id': accountB,
+        'amount_minor': -200,
+        'note': '新备注',
+      }),
+    ]);
+    expect(pended, 0);
+    final pending = await db.select(db.pendingReplay).get();
+    expect(pending, hasLength(1));
+    expect(pending.single.op, 'u');
+    expect(pending.single.entityId, txRemoteId);
+    // 原行未被错误改写
+    final before = await db.select(db.transactions).getSingle();
+    expect(before.amountMinor, -100);
+    expect(before.note, '旧备注');
+
+    // 账户 B 到达 → 重放 update，流水改到新账户并更新金额
+    final applied = await merger.merge([
+      op('account', accountB, 'c',
+          payload: {'type': 'cash', 'name': '新账户', 'currency': 'CNY', 'initial_balance': 0, 'archived': false}),
+    ]);
+    expect(applied, 2);
+    final after = await db.select(db.transactions).getSingle();
+    expect(after.amountMinor, -200);
+    expect(after.note, '新备注');
+    final accounts = await db.select(db.accounts).get();
+    final newAccount = accounts.firstWhere((a) => a.name == '新账户');
+    expect(after.accountId, newAccount.id);
+    expect(await db.select(db.pendingReplay).get(), isEmpty);
+  });
+
   test('merges account update (archive) and category with parent resolution', () async {
     final parentId = nextId();
     final childId = nextId();

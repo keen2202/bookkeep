@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/constants.dart';
@@ -112,7 +113,8 @@ class SyncStatusNotifier extends Notifier<SyncUiState> {
     } on SyncNetworkException catch (e) {
       _setMessage('网络不可用：${e.message}');
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[sync] login failed: $e');
       _setMessage('登录失败，请重试');
       return false;
     }
@@ -135,7 +137,8 @@ class SyncStatusNotifier extends Notifier<SyncUiState> {
     } on SyncNetworkException catch (e) {
       _message = '网络不可用，队列已保留（${e.message}）';
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[sync] post-login sync failed: $e');
       _message = '登录成功，同步失败可稍后手动重试';
       return true;
     } finally {
@@ -165,7 +168,8 @@ class SyncStatusNotifier extends Notifier<SyncUiState> {
       _message = '同步完成';
     } on SyncNetworkException {
       _message = '网络不可用，队列已保留';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[sync] manual sync failed: $e');
       _message = '同步失败，请重试';
     } finally {
       _busy = false;

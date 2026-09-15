@@ -18,6 +18,7 @@ import '../../shared/widgets/category_picker.dart';
 import '../../shared/widgets/glass_nav.dart';
 import '../accounts/account_card.dart' show accountTypeLabel;
 import '../accounts/accounts_providers.dart';
+import '../auth_lock/lock_controller.dart' show amountMaskProvider;
 import '../books/books_providers.dart'
     show accountRepositoryProvider, budgetRepositoryProvider, transactionRepositoryProvider;
 import '../budgets/budget_alert_notifier.dart';
@@ -272,6 +273,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   }
 
   String get _displayAmount {
+    // Spec R-08：锁屏/后台快照时脱敏，避免系统截图泄露真实金额
+    if (ref.watch(amountMaskProvider)) return maskedMoney();
     final parsed = AmountParser.parse(_controller.input);
     if (parsed == null && _controller.input.isNotEmpty) {
       return _controller.input;

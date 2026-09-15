@@ -1,10 +1,10 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:http/http.dart' as http;
 
+import '../../core/network/json_http_client.dart';
 import '../../domain/models/remote_op.dart';
+
+export '../../core/network/json_http_client.dart'
+    show SyncApiException, SyncNetworkException, JsonHttpClient;
 
 class TokenPair {
   const TokenPair({required this.accessToken, required this.refreshToken});
@@ -32,25 +32,6 @@ class PullResult {
   final int nextSeq;
 }
 
-/// 网络层失败（离线/超时）→ 队列保持未推送，等待重试
-class SyncNetworkException implements Exception {
-  const SyncNetworkException(this.message);
-  final String message;
-
-  @override
-  String toString() => 'SyncNetworkException: $message';
-}
-
-/// 服务端业务拒绝（401/403/409/422）
-class SyncApiException implements Exception {
-  const SyncApiException(this.statusCode, this.message);
-  final int statusCode;
-  final String message;
-
-  @override
-  String toString() => 'SyncApiException($statusCode): $message';
-}
-
 /// 同步 API 契约（OpenAPI sync-api.yaml）
 abstract class SyncApi {
   Future<TokenPair> register(String email, String password);
@@ -64,13 +45,11 @@ abstract class SyncApi {
 
 class HttpSyncApi implements SyncApi {
   HttpSyncApi({required String baseUrl, http.Client? client})
-      : _baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
-        _client = client ?? http.Client() {
-    assertSecure(_baseUrl);
+      : _http = JsonHttpClient(baseUrl: baseUrl, client: client) {
+    assertSecure(_http.baseUrl);
   }
 
-  final String _baseUrl;
-  final http.Client _client;
+  final JsonHttpClient _http;
 
   /// Spec R-06：生产/远程端点必须 HTTPS；仅 debug 下允许 localhost/127.0.0.1 的 http
   static void assertSecure(String baseUrl) {
@@ -87,79 +66,30 @@ class HttpSyncApi implements SyncApi {
     throw ArgumentError('sync endpoint must use HTTPS: $baseUrl');
   }
 
-  Future<http.Response> _request(
-    String method,
-    String path, {
-    Object? body,
-    String? accessToken,
-  }) async {
-    final uri = Uri.parse('$_baseUrl$path');
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
-    };
-    try {
-      return switch (method) {
-        'GET' => await _client.get(uri, headers: headers).timeout(const Duration(seconds: 15)),
-        'DELETE' => await _client.delete(uri, headers: headers).timeout(const Duration(seconds: 15)),
-        'PATCH' => await _client
-            .patch(uri, headers: headers, body: body == null ? null : jsonEncode(body))
-            .timeout(const Duration(seconds: 15)),
-        _ => await _client
-            .post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
-            .timeout(const Duration(seconds: 15)),
-      };
-    } on TimeoutException {
-      throw const SyncNetworkException('request timeout');
-    } on SocketException catch (e) {
-      throw SyncNetworkException('network error: ${e.message}');
-    } on http.ClientException catch (e) {
-      throw SyncNetworkException('network error: ${e.message}');
-    }
-  }
-
-  Map<String, dynamic> _json(http.Response res, int expect, String path) {
-    if (res.statusCode != expect) {
-      // 解析服务端 {error} 字段（审查 B-1 衍生）：错误信息可读、可分类
-      String message = '$path -> ${res.statusCode}';
-      try {
-        final body = jsonDecode(res.body);
-        if (body is Map<String, dynamic> && body['error'] is String) {
-          message = '${body['error']} ($path -> ${res.statusCode})';
-        }
-      } catch (_) {
-        // 非 JSON 响应体：保留状态码信息
-      }
-      throw SyncApiException(res.statusCode, message);
-    }
-    if (res.body.isEmpty) return const {};
-    return jsonDecode(res.body) as Map<String, dynamic>;
-  }
-
   @override
   Future<TokenPair> register(String email, String password) async {
-    final res = await _request('POST', '/auth/register', body: {'email': email, 'password': password});
-    return TokenPair.fromJson(_json(res, 201, '/auth/register'));
+    final res = await _http.request('POST', '/auth/register', body: {'email': email, 'password': password});
+    return TokenPair.fromJson(_http.json(res, 201, '/auth/register'));
   }
 
   @override
   Future<TokenPair> login(String email, String password) async {
-    final res = await _request('POST', '/auth/login', body: {'email': email, 'password': password});
-    return TokenPair.fromJson(_json(res, 200, '/auth/login'));
+    final res = await _http.request('POST', '/auth/login', body: {'email': email, 'password': password});
+    return TokenPair.fromJson(_http.json(res, 200, '/auth/login'));
   }
 
   @override
   Future<TokenPair> refresh(String refreshToken) async {
-    final res = await _request('POST', '/auth/refresh', body: {'refresh_token': refreshToken});
-    return TokenPair.fromJson(_json(res, 200, '/auth/refresh'));
+    final res = await _http.request('POST', '/auth/refresh', body: {'refresh_token': refreshToken});
+    return TokenPair.fromJson(_http.json(res, 200, '/auth/refresh'));
   }
 
   @override
   Future<PushResult> push(String bookId, List<Map<String, dynamic>> ops,
       {required String accessToken}) async {
-    final res = await _request('POST', '/sync/push',
+    final res = await _http.request('POST', '/sync/push',
         accessToken: accessToken, body: {'book_id': bookId, 'ops': ops});
-    final json = _json(res, 200, '/sync/push');
+    final json = _http.json(res, 200, '/sync/push');
     return PushResult(
       acceptedSeq: json['accepted_seq'] as int,
       accepted: json['accepted'] as int,
@@ -170,8 +100,8 @@ class HttpSyncApi implements SyncApi {
   Future<PullResult> pull(String bookId, int sinceSeq,
       {required String accessToken, int limit = 500}) async {
     final uri = '/sync/pull?book_id=$bookId&since_seq=$sinceSeq&limit=$limit';
-    final res = await _request('GET', uri, accessToken: accessToken);
-    final json = _json(res, 200, '/sync/pull');
+    final res = await _http.request('GET', uri, accessToken: accessToken);
+    final json = _http.json(res, 200, '/sync/pull');
     final ops = (json['ops'] as List<dynamic>)
         .map((e) => RemoteOp.fromJson(e as Map<String, dynamic>))
         .toList();

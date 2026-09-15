@@ -73,8 +73,9 @@ class SyncMerger {
         .get();
     var replayed = 0;
     for (final row in rows) {
-      // 已被其他重放路径物化 → 直接清掉暂存行
-      if (await _localIdByRemoteId(row.entity, row.entityId) != null) {
+      // create 已被其他路径物化 → 直接清掉暂存行；
+      // update 的本地行本就存在（因 FK 未就绪而暂存），必须走 _apply 完成写入
+      if (row.op == 'c' && await _localIdByRemoteId(row.entity, row.entityId) != null) {
         await (db.delete(db.pendingReplay)..where((t) => t.id.equals(row.id))).go();
         replayed++;
         continue;
@@ -95,19 +96,34 @@ class SyncMerger {
     return replayed;
   }
 
-  /// 暂存 FK 未就绪的 create op（wire 格式 JSON），等待依赖实体到达后重放；
-  /// 先查重（drift DoNothing 不抑制唯一键冲突，见 2067 实测）
-  Future<void> _pendCreate(String remoteId, Map<String, dynamic> payload) async {
+  /// 暂存 FK 未就绪的 op（wire 格式 JSON），等待依赖实体到达后重放。
+  /// 同 (bookId, entityId) 已有暂存时更新为最新 op（LWW 后同实体仅一条）。
+  Future<void> _pendOp(
+    String entity,
+    String remoteId,
+    String op,
+    Map<String, dynamic> payload,
+  ) async {
+    final encoded = jsonEncode(payload);
     final exists = await (db.select(db.pendingReplay)
           ..where((t) => t.bookId.equals(bookId) & t.entityId.equals(remoteId)))
         .get();
-    if (exists.isNotEmpty) return;
+    if (exists.isNotEmpty) {
+      await (db.update(db.pendingReplay)..where((t) => t.id.equals(exists.first.id))).write(
+        PendingReplayCompanion(
+          entity: Value(entity),
+          op: Value(op),
+          payload: Value(encoded),
+        ),
+      );
+      return;
+    }
     await db.into(db.pendingReplay).insert(
           PendingReplayCompanion.insert(
-            entity: 'transaction',
+            entity: entity,
             entityId: remoteId,
-            op: 'c',
-            payload: jsonEncode(payload),
+            op: op,
+            payload: encoded,
             bookId: bookId,
             createdAt: DateTime.now().toUtc(),
           ),
@@ -137,7 +153,7 @@ class SyncMerger {
       final r = await _createTransaction(remoteId, payload);
       if (r == _fkPending) {
         // 依赖实体晚到：暂存重放队列而非丢弃（审查 F-6，修复"跳过即永久丢失"）
-        await _pendCreate(remoteId, payload);
+        await _pendOp('transaction', remoteId, 'c', payload);
         return false;
       }
       return r != null;
@@ -185,7 +201,7 @@ class SyncMerger {
     return switch (entity) {
       'account' => _updateAccount(localId, payload),
       'category' => _updateCategory(localId, payload),
-      'transaction' => _updateTransaction(localId, payload),
+      'transaction' => _updateTransaction(localId, remoteId, payload),
       'budget' => _updateBudget(localId, payload),
       _ => Future.value(false),
     };
@@ -343,10 +359,14 @@ class SyncMerger {
     return true;
   }
 
-  Future<bool> _updateTransaction(int localId, Map<String, dynamic> p) async {
+  Future<bool> _updateTransaction(int localId, String remoteId, Map<String, dynamic> p) async {
     final accountRef = _str(p, 'account_id');
     final accountId = accountRef == null ? null : await _localIdByRemoteId('account', accountRef);
-    if (accountRef != null && accountId == null) return false;
+    if (accountRef != null && accountId == null) {
+      // Spec R-17：account 未同步到本地时入重放队列，与 create 同策略，禁止静默丢弃
+      await _pendOp('transaction', remoteId, 'u', p);
+      return false;
+    }
 
     final categoryRef = _str(p, 'category_id');
     final categoryId = categoryRef == null ? null : await _localIdByRemoteId('category', categoryRef);
