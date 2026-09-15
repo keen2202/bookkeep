@@ -191,6 +191,6 @@ class _ResetDatabaseAppState extends State<_ResetDatabaseApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(home: const Scaffold(body: SizedBox.shrink()));
+    return const MaterialApp(home: Scaffold(body: SizedBox.shrink()));
   }
 }

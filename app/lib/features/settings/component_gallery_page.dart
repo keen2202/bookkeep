@@ -99,17 +99,17 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                 ),
               ),
               // ── 展区②：FG-ICON 图标容器（28/36/44 三档 + tint 变体）──
-              _Section(
+              const _Section(
                 title: 'GlassIcon 图标容器（28 / 36 / 44 · tint 变体）',
                 child: Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const GlassIcon(icon: Icons.home_outlined, size: GlassIconSize.s28),
-                    const GlassIcon(icon: Icons.receipt_long_outlined, size: GlassIconSize.s36),
-                    const GlassIcon(icon: Icons.add_circle_outline, size: GlassIconSize.s44),
-                    const GlassIcon(
+                    GlassIcon(icon: Icons.home_outlined, size: GlassIconSize.s28),
+                    GlassIcon(icon: Icons.receipt_long_outlined, size: GlassIconSize.s36),
+                    GlassIcon(icon: Icons.add_circle_outline, size: GlassIconSize.s44),
+                    GlassIcon(
                         icon: Icons.category_outlined,
                         size: GlassIconSize.s44,
                         tint: true),
@@ -250,9 +250,9 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
                   ],
                 ),
               ),
-              _Section(
+              const _Section(
                 title: 'AppTextField 输入框',
-                child: const Column(
+                child: Column(
                   children: [
                     AppTextField(label: '标准输入框', hint: '请输入内容'),
                     SizedBox(height: AppSpacing.sm),

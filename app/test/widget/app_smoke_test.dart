@@ -68,9 +68,9 @@ void main() {
     // 与 main.dart 秒开分支同构：MaterialApp.builder 直接挂 appShellBuilder
     await tester.pumpWidget(ProviderScope(
       overrides: [databaseProvider.overrideWithValue(db)],
-      child: MaterialApp(
+      child: const MaterialApp(
         builder: appShellBuilder,
-        home: const Scaffold(body: Center(child: Text('秒开内容'))),
+        home: Scaffold(body: Center(child: Text('秒开内容'))),
       ),
     ));
     await tester.pump(const Duration(milliseconds: 600));

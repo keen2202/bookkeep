@@ -163,9 +163,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.light,
     styleTag: '品牌',
     palette: _lightNeutral(
-      primary: Color(0xFF00897B),
-      container: Color(0xFFB2DFDB),
-      secondary: Color(0xFF26A69A),
+      primary: const Color(0xFF00897B),
+      container: const Color(0xFFB2DFDB),
+      secondary: const Color(0xFF26A69A),
     ),
   ),
   // T2 晴空·蓝（浅色 · 清爽）
@@ -175,9 +175,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.light,
     styleTag: '清爽',
     palette: _lightNeutral(
-      primary: Color(0xFF0A84FF),
-      container: Color(0xFFB3E5FC),
-      secondary: Color(0xFF4FC3F7),
+      primary: const Color(0xFF0A84FF),
+      container: const Color(0xFFB3E5FC),
+      secondary: const Color(0xFF4FC3F7),
     ),
   ),
   // T3 紫藤·雅（浅色 · 优雅）
@@ -187,9 +187,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.light,
     styleTag: '优雅',
     palette: _lightNeutral(
-      primary: Color(0xFF8E24AA),
-      container: Color(0xFFE1BEE7),
-      secondary: Color(0xFFBA68C8),
+      primary: const Color(0xFF8E24AA),
+      container: const Color(0xFFE1BEE7),
+      secondary: const Color(0xFFBA68C8),
     ),
   ),
   // T4 暖屿·橙（浅色 · 温暖）
@@ -199,9 +199,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.light,
     styleTag: '温暖',
     palette: _lightNeutral(
-      primary: Color(0xFFEF6C00),
-      container: Color(0xFFFFE0B2),
-      secondary: Color(0xFFFFA726),
+      primary: const Color(0xFFEF6C00),
+      container: const Color(0xFFFFE0B2),
+      secondary: const Color(0xFFFFA726),
     ),
   ),
   // T5 石墨·夜（深色 · 中性）：主色提亮保证纯黑背景上光晕/聚焦环可见（§9）
@@ -211,9 +211,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.dark,
     styleTag: '中性',
     palette: _darkNeutral(
-      primary: Color(0xFFA7B4BE),
-      container: Color(0xFF37474F),
-      secondary: Color(0xFF90A4AE),
+      primary: const Color(0xFFA7B4BE),
+      container: const Color(0xFF37474F),
+      secondary: const Color(0xFF90A4AE),
     ),
   ),
   // T6 深海·蓝（深色 · 科技）
@@ -223,9 +223,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.dark,
     styleTag: '科技',
     palette: _darkNeutral(
-      primary: Color(0xFF64B5F6),
-      container: Color(0xFF1E3A56),
-      secondary: Color(0xFF81C7E8),
+      primary: const Color(0xFF64B5F6),
+      container: const Color(0xFF1E3A56),
+      secondary: const Color(0xFF81C7E8),
     ),
   ),
   // T7 墨竹·绿（深色 · 自然）
@@ -235,9 +235,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.dark,
     styleTag: '自然',
     palette: _darkNeutral(
-      primary: Color(0xFF81C784),
-      container: Color(0xFF1E4620),
-      secondary: Color(0xFF9CCC9F),
+      primary: const Color(0xFF81C784),
+      container: const Color(0xFF1E4620),
+      secondary: const Color(0xFF9CCC9F),
     ),
   ),
   // T8 绛紫·夜（深色 · 个性）
@@ -247,9 +247,9 @@ final kThemePresetsV2 = <AppThemePreset>[
     brightness: Brightness.dark,
     styleTag: '个性',
     palette: _darkNeutral(
-      primary: Color(0xFFCE93D8),
-      container: Color(0xFF4A2B66),
-      secondary: Color(0xFFDA9FE6),
+      primary: const Color(0xFFCE93D8),
+      container: const Color(0xFF4A2B66),
+      secondary: const Color(0xFFDA9FE6),
     ),
   ),
 ];

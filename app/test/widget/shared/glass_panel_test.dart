@@ -29,9 +29,9 @@ void main() {
 
   testWidgets('降级作用域（GlassPrefsScope.blurEnabled=false）：零模糊节点 + fill α+0.10 补偿',
       (tester) async {
-    await tester.pumpWidget(_host(GlassPrefsScope(
+    await tester.pumpWidget(_host(const GlassPrefsScope(
       blurEnabled: false,
-      child: const GlassPanel(child: SizedBox(width: 100, height: 60)),
+      child: GlassPanel(child: SizedBox(width: 100, height: 60)),
     )));
     expect(find.byType(BackdropFilter), findsNothing,
         reason: '禁用磨砂后跳过 BackdropFilter 节点');
@@ -106,7 +106,7 @@ void main() {
 
   testWidgets('嵌套构造：GlassPanel.nested 零新增模糊节点且取下一档填充', (tester) async {
     await tester.pumpWidget(_host(Column(children: [
-      GlassPanel(level: GlassLevel.g2, child: const SizedBox(width: 80, height: 40)),
+      const GlassPanel(level: GlassLevel.g2, child: SizedBox(width: 80, height: 40)),
       GlassPanel.nested(host: GlassLevel.g2, child: const SizedBox(width: 80, height: 40)),
     ])));
     // 宿主面板 1 个模糊节点；嵌套层不叠加

@@ -60,8 +60,8 @@ void main() {
 
     tearDown(() => db.close());
 
-    test('v7 迁移回归：新库 schemaVersion 7 且币种表可写', () async {
-      expect(db.schemaVersion, 7);
+    test('v10 迁移回归：新库 schemaVersion 当前版本且币种表可写', () async {
+      expect(db.schemaVersion, 10);
       await repo.installSeeds();
       expect(await db.select(db.currencies).get(), isNotEmpty);
     });

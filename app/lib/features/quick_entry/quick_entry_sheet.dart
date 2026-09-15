@@ -218,7 +218,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   /// 新增态标题栏空间有限，使用 FittedBox 在窄屏收缩而非溢出/截断。
   Widget _buildTitle({required bool isEditing}) {
     if (isEditing) {
-      return Text('编辑账单');
+      return const Text('编辑账单');
     }
     return Center(
       child: FittedBox(
@@ -462,9 +462,9 @@ class _CategoryField extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         onTap: () => _openPicker(context),
         child: InputDecorator(
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             labelText: '分类',
-            suffixIcon: const Icon(Icons.expand_more),
+            suffixIcon: Icon(Icons.expand_more),
           ),
           child: Text(
             label ?? '选择分类',

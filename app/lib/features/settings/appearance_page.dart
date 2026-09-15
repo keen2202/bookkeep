@@ -37,7 +37,7 @@ class AppearancePage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          _SectionTitle('主题方案'),
+          const _SectionTitle('主题方案'),
           _ThemePresetGrid(current: themeSettings),
           const SizedBox(height: AppSpacing.lg),
           // FGDS：玻璃质感唯一可调项——低性能磨砂降级（BK-FG-003）
@@ -98,7 +98,7 @@ class _ThemePresetGrid extends ConsumerWidget {
   Future<void> _openCustomSheet(BuildContext context, WidgetRef ref) async {
     final currentSettings = ref.read(themeControllerProvider);
     final controller = ref.read(themeControllerProvider.notifier);
-    await showAppSheet(
+    await showAppSheet<void>(
       context,
       title: '自定义主题',
       child: _CustomThemeSheet(

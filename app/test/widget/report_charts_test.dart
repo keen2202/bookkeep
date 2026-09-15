@@ -11,10 +11,10 @@ void main() {
   testWidgets('period bar chart renders month labels with year header on change',
       (tester) async {
     final buckets = [
-      PeriodBucket(label: '2025-11', expenseMinor: 1000, incomeMinor: 500),
-      PeriodBucket(label: '2025-12', expenseMinor: 1000, incomeMinor: 500),
-      PeriodBucket(label: '2026-01', expenseMinor: 1000, incomeMinor: 500),
-      PeriodBucket(label: '2026-02', expenseMinor: 1000, incomeMinor: 500),
+      const PeriodBucket(label: '2025-11', expenseMinor: 1000, incomeMinor: 500),
+      const PeriodBucket(label: '2025-12', expenseMinor: 1000, incomeMinor: 500),
+      const PeriodBucket(label: '2026-01', expenseMinor: 1000, incomeMinor: 500),
+      const PeriodBucket(label: '2026-02', expenseMinor: 1000, incomeMinor: 500),
     ];
 
     await tester.pumpWidget(harness(
@@ -56,8 +56,8 @@ void main() {
   testWidgets('period bar chart shows expense/income legend for direct comparison',
       (tester) async {
     final buckets = [
-      PeriodBucket(label: '8/3', expenseMinor: 1000, incomeMinor: 500),
-      PeriodBucket(label: '8/10', expenseMinor: 2000, incomeMinor: 0),
+      const PeriodBucket(label: '8/3', expenseMinor: 1000, incomeMinor: 500),
+      const PeriodBucket(label: '8/10', expenseMinor: 2000, incomeMinor: 0),
     ];
 
     await tester.pumpWidget(harness(
@@ -169,8 +169,8 @@ void main() {
   testWidgets('trend line chart uses readable time labels in tooltip config',
       (tester) async {
     final buckets = [
-      PeriodBucket(label: '2026-03', expenseMinor: 1000, incomeMinor: 500),
-      PeriodBucket(label: '2026-04', expenseMinor: 2000, incomeMinor: 800),
+      const PeriodBucket(label: '2026-03', expenseMinor: 1000, incomeMinor: 500),
+      const PeriodBucket(label: '2026-04', expenseMinor: 2000, incomeMinor: 800),
     ];
 
     await tester.pumpWidget(harness(

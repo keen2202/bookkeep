@@ -24,7 +24,7 @@ class LocalAuthBiometric implements BiometricAuth {
     try {
       return await _auth.authenticate(
         localizedReason: '解锁 bookkeep 查看记账数据',
-        options: const AuthenticationOptions(biometricOnly: true),
+        biometricOnly: true,
       );
     } catch (_) {
       return false;

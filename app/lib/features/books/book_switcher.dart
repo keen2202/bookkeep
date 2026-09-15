@@ -25,7 +25,9 @@ class BookSwitcher extends ConsumerWidget {
       tooltip: '切换账本',
       onSelected: (value) async {
         if (value == _manageValue) {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BooksPage()));
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const BooksPage()),
+          );
           return;
         }
         if (value == currentId) return;

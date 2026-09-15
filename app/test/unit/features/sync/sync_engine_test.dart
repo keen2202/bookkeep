@@ -30,6 +30,7 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
     logger = OpLogger(db);
     server = FakeSyncServer();
+    await server.register(email, password);
     tokens = InMemoryTokenStore();
     engine = SyncEngine(
       opLogger: logger,
@@ -90,7 +91,7 @@ void main() {
     return (accountRemoteId: accountRemoteId, txRemoteId: txRemoteId);
   }
 
-  test('first sync registers the account, pushes ops, pulls and merges', () async {
+  test('first sync logs in with credentials, pushes ops, pulls and merges', () async {
     await setUpEngine();
     await createLocalAccountAndTx(-100);
 
@@ -230,6 +231,8 @@ void main() {
   test('an edit made after seeing the remote state wins by causal lamport (B2)', () async {
     const bookId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
     server = FakeSyncServer();
+    await server.register('a@test.local', 'password-123');
+    await server.register('b@test.local', 'password-123');
     server.addMember(bookId, 'a@test.local');
     server.addMember(bookId, 'b@test.local');
 
@@ -315,6 +318,8 @@ void main() {
   test('concurrent edits converge to the same final state (LWW, either side wins)', () async {
     const bookId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
     server = FakeSyncServer();
+    await server.register('a@test.local', 'password-123');
+    await server.register('b@test.local', 'password-123');
     server.addMember(bookId, 'a@test.local');
     server.addMember(bookId, 'b@test.local');
 
@@ -424,7 +429,7 @@ void main() {
     logger = OpLogger(db);
     final expiring = _ExpiringServer();
     await expiring.register(email, password);
-    tokens = InMemoryTokenStore(TokenPair(
+    tokens = InMemoryTokenStore(const TokenPair(
       accessToken: 'access-$email',
       refreshToken: 'refresh-$email',
     ));
