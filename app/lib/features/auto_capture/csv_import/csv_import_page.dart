@@ -136,7 +136,7 @@ class AutoCaptureSettingsEntry extends StatelessWidget {
           title: const Text('CSV 导入'),
           subtitle: const Text('支付宝/微信账单导入，自动去重'),
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const CsvImportPage()),
+            MaterialPageRoute<void>(builder: (_) => const CsvImportPage()),
           ),
         ),
         const ListTile(

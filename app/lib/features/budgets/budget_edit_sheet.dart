@@ -157,7 +157,7 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesViewModelProvider);
-    final parents = categoriesAsync.maybeWhen(
+    final List<Category> parents = categoriesAsync.maybeWhen(
       data: (list) =>
           list.where((c) => c.parentId == null && c.kind.name == 'expense').toList(),
       orElse: () => const <Category>[],

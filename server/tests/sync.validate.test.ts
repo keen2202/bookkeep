@@ -70,4 +70,15 @@ describe('validateOpBatch', () => {
   it('allows a null payload for delete ops', () => {
     expect(validateOpBatch({ book_id: BOOK, ops: [validOp({ op: 'd', payload: null })] }).ok).toBe(true);
   });
+
+  it('rejects a non-object body', () => {
+    expect(validateOpBatch(null).ok).toBe(false);
+    expect(validateOpBatch('not-an-object').ok).toBe(false);
+    expect(validateOpBatch([]).ok).toBe(false);
+  });
+
+  it('rejects a non-object op inside the batch', () => {
+    expect(validateOpBatch({ book_id: BOOK, ops: [null] }).ok).toBe(false);
+    expect(validateOpBatch({ book_id: BOOK, ops: ['op'] }).ok).toBe(false);
+  });
 });

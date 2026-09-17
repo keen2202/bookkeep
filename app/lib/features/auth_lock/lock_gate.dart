@@ -101,6 +101,7 @@ class _LockScreenState extends ConsumerState<_LockScreen> {
     final ok = await ref.read(lockControllerProvider.notifier).unlockWithPin(pin);
     if (!ok && mounted) {
       final fails = await repo.pinFailCount();
+      if (!mounted) return;
       setState(() => _attempt++);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

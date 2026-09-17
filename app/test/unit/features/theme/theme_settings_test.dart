@@ -68,10 +68,10 @@ void main() {
     await db.batch((batch) {
       batch.insert(db.appMeta,
           AppMetaCompanion.insert(key: 'theme_seed', value: 'D81B60'),
-          onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('D81B60'))));
+          onConflict: DoUpdate((_) => const AppMetaCompanion(value: Value('D81B60'))));
       batch.insert(db.appMeta,
           AppMetaCompanion.insert(key: 'theme_mode', value: 'dark'),
-          onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('dark'))));
+          onConflict: DoUpdate((_) => const AppMetaCompanion(value: Value('dark'))));
     });
 
     final settings = await SettingsRepository(db).themeSettings();
@@ -111,7 +111,7 @@ void main() {
     // 直接写脏值模拟异常持久化
     await db.into(db.appMeta).insert(
           AppMetaCompanion.insert(key: 'theme_preset_id', value: 't99'),
-          onConflict: DoUpdate((_) => AppMetaCompanion(value: Value('t99'))),
+          onConflict: DoUpdate((_) => const AppMetaCompanion(value: Value('t99'))),
         );
 
     final read = await repo.themeSettings();

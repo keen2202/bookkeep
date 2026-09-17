@@ -182,7 +182,7 @@ CREATE TABLE app_meta (
 );
 ''';
 
-    test('v3 数据库升级到 v4：books 表创建、既有数据归默认账本、当前账本生效', () async {
+    test('v3 数据库升级到当前版本：books 表创建、既有数据归默认账本、当前账本生效', () async {
       final dir = Directory.systemTemp.createTempSync('bk_mig_v4');
       final dbPath = '${dir.path}/test.db';
       addTearDown(() => dir.deleteSync(recursive: true));
@@ -202,7 +202,7 @@ CREATE TABLE app_meta (
       raw.close();
 
       final migrated = AppDatabase(NativeDatabase(File(dbPath)));
-      expect(migrated.schemaVersion, 7);
+      expect(migrated.schemaVersion, 10);
 
       // 老数据归默认账本（保留 legacy sync_book_id 作为默认账本 id）
       final account = await migrated.select(migrated.accounts).getSingle();

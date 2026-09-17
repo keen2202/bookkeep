@@ -257,7 +257,7 @@ class _SettingsSheet extends ConsumerWidget {
                 title: const Text('外观'),
                 subtitle: const Text('主题方案 / 玻璃质感'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AppearancePage()),
+                  MaterialPageRoute<void>(builder: (_) => const AppearancePage()),
                 ),
               ),
               // 需求6：分类入口下沉设置（同周期记账下沉先例），进入独立分类管理页
@@ -266,7 +266,7 @@ class _SettingsSheet extends ConsumerWidget {
                 title: const Text('分类管理'),
                 subtitle: const Text('支出 / 收入分类的新建与整理'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CategoryManagementPage()),
+                  MaterialPageRoute<void>(builder: (_) => const CategoryManagementPage()),
                 ),
               ),
               const Divider(),
@@ -285,7 +285,7 @@ class _SettingsSheet extends ConsumerWidget {
                 title: const Text('备份与导出'),
                 subtitle: const Text('CSV 导出 / 加密备份 / WebDAV / 恢复'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BackupPage()),
+                  MaterialPageRoute<void>(builder: (_) => const BackupPage()),
                 ),
               ),
               ListTile(
@@ -293,7 +293,7 @@ class _SettingsSheet extends ConsumerWidget {
                 title: const Text('账户管理'),
                 subtitle: const Text('新增 / 编辑 / 归档账户'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AccountsPage()),
+                  MaterialPageRoute<void>(builder: (_) => const AccountsPage()),
                 ),
               ),
               ListTile(
@@ -301,7 +301,7 @@ class _SettingsSheet extends ConsumerWidget {
                 title: const Text('周期记账'),
                 subtitle: const Text('创建 / 编辑 / 删除规则，到期自动入账'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RecurringSettingsPage()),
+                  MaterialPageRoute<void>(builder: (_) => const RecurringSettingsPage()),
                 ),
               ),
               ListTile(
@@ -309,7 +309,7 @@ class _SettingsSheet extends ConsumerWidget {
                 title: const Text('汇率管理'),
                 subtitle: const Text('手动设置各币种汇率（未设置将显式标注）'),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CurrencyManagePage()),
+                  MaterialPageRoute<void>(builder: (_) => const CurrencyManagePage()),
                 ),
               ),
               const Divider(),
