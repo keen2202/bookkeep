@@ -8,6 +8,8 @@ import 'package:bookkeep_app/data/local/database.dart';
 import 'package:bookkeep_app/data/local/database_provider.dart';
 import 'package:bookkeep_app/features/auth_lock/lock_gate.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
+import 'package:bookkeep_app/shared/icons/bk_icon.dart';
+import 'package:bookkeep_app/shared/icons/bk_icons.dart';
 import 'package:bookkeep_app/shared/theme/background/app_background.dart';
 import 'package:bookkeep_app/shared/theme/theme_transition.dart';
 import 'package:bookkeep_app/shared/widgets/glass_nav.dart';
@@ -43,10 +45,13 @@ void main() {
       find.descendant(of: find.byType(GlassBottomBar), matching: find.text('分类')),
       findsNothing,
     );
+    // BK-IC-012：中央记账 = bk.act.entry（D3 圆内加号），经 BkIcon 渲染
     expect(
       find.descendant(
         of: find.byType(GlassBottomBar),
-        matching: find.byIcon(Icons.add),
+        matching: find.byWidgetPredicate(
+          (w) => w is BkIcon && w.name == BkIcons.entry,
+        ),
       ),
       findsOneWidget,
     );

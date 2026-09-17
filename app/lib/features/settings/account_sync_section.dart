@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/icons/bk_icon.dart';
+import '../../shared/icons/bk_icons.dart';
 import '../../shared/widgets/app_button.dart';
 import '../sync/sync_providers.dart';
 import '../sync/sync_state.dart';
@@ -158,15 +160,27 @@ class _AccountSyncSectionState extends ConsumerState<AccountSyncSection> {
         ],
         if (!_loadingEmail && loggedIn) ...[
           ListTile(
-            leading: Icon(
-              switch (status.phase) {
-                SyncPhase.idle => Icons.check_circle_outline,
-                SyncPhase.error => Icons.error_outline,
-                _ => Icons.sync,
+            // BK-IC-041：同步/预警状态图形（idle 暂无 bk.status.ok，回退 Material）
+            leading: Builder(
+              builder: (context) {
+                final scheme = Theme.of(context).colorScheme;
+                return switch (status.phase) {
+                  SyncPhase.idle => Icon(
+                      Icons.check_circle_outline,
+                      color: scheme.primary,
+                    ),
+                  SyncPhase.error => BkIcon(
+                      BkIcons.statusWarn,
+                      size: 24,
+                      color: scheme.error,
+                    ),
+                  _ => BkIcon(
+                      BkIcons.statusSync,
+                      size: 24,
+                      color: scheme.primary,
+                    ),
+                };
               },
-              color: status.phase == SyncPhase.error
-                  ? Theme.of(context).colorScheme.error
-                  : Theme.of(context).colorScheme.primary,
             ),
             title: Text('同步状态：${_phaseLabels[status.phase]}'),
             subtitle: status.message == null ? null : Text(status.message!),
@@ -185,7 +199,7 @@ class _AccountSyncSectionState extends ConsumerState<AccountSyncSection> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.sync, size: 18),
+                        BkIcon(BkIcons.statusSync, size: 18),
                         SizedBox(width: 8),
                         Text('手动同步'),
                       ],

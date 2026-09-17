@@ -22,9 +22,10 @@ class LocalAuthBiometric implements BiometricAuth {
   @override
   Future<bool> authenticate() async {
     try {
+      // local_auth 3.x：options 改为顶层 biometricOnly 参数
       return await _auth.authenticate(
         localizedReason: '解锁 bookkeep 查看记账数据',
-        options: const AuthenticationOptions(biometricOnly: true),
+        biometricOnly: true,
       );
     } catch (_) {
       return false;

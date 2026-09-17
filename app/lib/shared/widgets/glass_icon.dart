@@ -28,16 +28,29 @@ enum GlassIconSize {
 /// - 图标本体尺寸 = 容器 ×0.55（15.4/19.8/24.2），默认 `text.primary`
 ///   实色绘制，可选 [tint] 主题色变体（fill 混入 primary α0.10/α0.08）；
 /// - 豁免：表格单元格内的文字型符号不设容器。
+///
+/// BK-ICON 扩展（BK-DOC-35 假设 A1 / BK-IC-003）：
+/// - 可选 [custom] 槽位：设置后替换内建 `Icon` 本体（如 BkIcon CustomPaint）；
+/// - **不**修改 blur/fill/描边/高光/投影数值（G1 仍以 BK-DOC-23 为准）；
+/// - 既有 `icon:` 调用点无需迁移即可编译。
 class GlassIcon extends StatelessWidget {
   const GlassIcon({
     super.key,
-    required this.icon,
+    this.icon,
+    this.custom,
     this.size = GlassIconSize.s36,
     this.tint = false,
     this.color,
-  });
+  }) : assert(
+          icon != null || custom != null,
+          'GlassIcon 需要 icon 或 custom 之一',
+        );
 
-  final IconData icon;
+  /// Material IconData 本体（与 [custom] 互斥优先 custom）
+  final IconData? icon;
+
+  /// 自定义本体（BK-ICON / CustomPaint）；非空时优先于 [icon]
+  final Widget? custom;
 
   /// 容器尺寸档位
   final GlassIconSize size;
@@ -47,6 +60,9 @@ class GlassIcon extends StatelessWidget {
 
   /// 覆盖图标本体颜色（默认 text.primary；tint 时默认 color.primary）
   final Color? color;
+
+  /// 本体边长 = 容器 × 0.55
+  double get bodySize => size.side * GlassIconTokens.iconScale;
 
   @override
   Widget build(BuildContext context) {
@@ -72,22 +88,23 @@ class GlassIcon extends StatelessWidget {
       );
     }
 
+    final body = custom ??
+        Icon(
+          icon,
+          // 图标本体 = 容器 × 0.55（Spec §4.1）
+          size: bodySize,
+          color: iconColor,
+          // 线条风格对齐 SF Symbols 的近似：优先调用方传入 outlined 族图标
+          applyTextScaling: true,
+        );
+
     return GlassPanel(
       level: GlassLevel.g1,
       borderRadius: BorderRadius.circular(side * GlassIconTokens.radiusFactor),
       fillOverride: fill,
       child: SizedBox.square(
         dimension: side,
-        child: Center(
-          child: Icon(
-            icon,
-            // 图标本体 = 容器 × 0.55（Spec §4.1）
-            size: side * GlassIconTokens.iconScale,
-            color: iconColor,
-            // 线条风格对齐 SF Symbols 的近似：优先调用方传入 outlined 族图标
-            applyTextScaling: true,
-          ),
-        ),
+        child: Center(child: body),
       ),
     );
   }

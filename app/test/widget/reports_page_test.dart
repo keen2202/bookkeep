@@ -17,9 +17,16 @@ import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart'
     show categorySeedProvider;
 import 'package:bookkeep_app/features/reports/reports_page.dart';
+import 'package:bookkeep_app/shared/icons/bk_icon.dart';
+import 'package:bookkeep_app/shared/icons/bk_icons.dart';
 
 import '../helpers/fixtures.dart';
 import 'categories_page_test.dart' show testSeed;
+
+/// 时间筛选 chip 上的周期图标（BK-IC-033：bk.rpt.period）
+Finder get _periodIconFinder => find.byWidgetPredicate(
+      (w) => w is BkIcon && w.name == BkIcons.rptPeriod,
+    );
 
 void main() {
   Widget harness(AppDatabase db) {
@@ -181,7 +188,7 @@ void main() {
     expect(find.text('${now.year}年'), findsNWidgets(2));
     expect(find.text('最近5年'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.schedule_outlined));
+    await tester.tap(_periodIconFinder);
     await tester.pumpAndSettle();
     expect(find.text('选择统计期'), findsOneWidget);
     expect(find.byType(CupertinoPicker), findsNWidgets(3));
@@ -208,7 +215,7 @@ void main() {
     await mountCharts(tester, db);
 
     // 年 → 月：选 2 月后窗口收敛为单月，周期对比口径变「最近5个月」（AC3-3）
-    await tester.tap(find.byIcon(Icons.schedule_outlined));
+    await tester.tap(_periodIconFinder);
     await tester.pumpAndSettle();
     await tester.drag(find.byType(CupertinoPicker).at(1), const Offset(0, -80));
     await tester.pumpAndSettle();
@@ -227,7 +234,7 @@ void main() {
         hasLength(DateTime(now.year, 3, 0).day));
 
     // 月 → 日：日列解禁后选 3 日，口径变「最近7天」（AC3-2 / AC3-3）
-    await tester.tap(find.byIcon(Icons.schedule_outlined));
+    await tester.tap(_periodIconFinder);
     await tester.pumpAndSettle();
     await tester.drag(find.byType(CupertinoPicker).at(2), const Offset(0, -120));
     await tester.pumpAndSettle();
@@ -253,7 +260,7 @@ void main() {
     await seedOneExpense(db, DateTime(now.year, 2, 3, 10));
 
     await mountCharts(tester, db);
-    await tester.tap(find.byIcon(Icons.schedule_outlined));
+    await tester.tap(_periodIconFinder);
     await tester.pumpAndSettle();
     await tester.drag(find.byType(CupertinoPicker).at(1), const Offset(0, -80));
     await tester.pumpAndSettle();
@@ -347,7 +354,7 @@ void main() {
     expect(find.byType(LineChart), findsOneWidget);
 
     // AC9-4：滚轮换年后区块随之更新（副标题带新年份）
-    await tester.tap(find.byIcon(Icons.schedule_outlined));
+    await tester.tap(_periodIconFinder);
     await tester.pumpAndSettle();
     await tester.drag(find.byType(CupertinoPicker).at(0), const Offset(0, -40));
     await tester.pumpAndSettle();

@@ -25,6 +25,7 @@ import 'features/recurring/recurring_providers.dart' show recurringServiceProvid
 import 'features/reports/reports_page.dart';
 import 'features/settings/account_sync_section.dart';
 import 'features/settings/appearance_page.dart';
+import 'shared/icons/bk_icons.dart';
 import 'shared/theme/app_icons.dart';
 import 'shared/theme/theme_controller.dart';
 import 'shared/theme/theme_transition.dart';
@@ -184,15 +185,16 @@ class _BookkeepAppState extends ConsumerState<BookkeepApp> with WidgetsBindingOb
                 items: [
                   for (final m in AppModule.values)
                     GlassNavItem(
-                      icon: moduleIcon(m),
+                      bkName: moduleBkIcon(m),
                       label: m.label,
                     ),
                 ],
                 // 需求6：记账入口下沉底栏中央（固定、不可拖拽）；viewer 只读隐藏
+                // BK-IC-012：中央动作 = D3 圆内加号（bk.act.entry），容器 primary 实色时本体 onPrimary
                 centerAction: viewer
                   ? null
-                  : (
-                      icon: Icons.add,
+                  : GlassCenterAction(
+                      bkName: BkIcons.entry,
                       semanticLabel: '记一笔',
                       onTap: () => _openQuickEntry(navContext),
                     ),

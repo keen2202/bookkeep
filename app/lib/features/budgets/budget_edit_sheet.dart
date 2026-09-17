@@ -160,7 +160,7 @@ class _BudgetEditSheetState extends ConsumerState<BudgetEditSheet> {
     final parents = categoriesAsync.maybeWhen(
       data: (list) =>
           list.where((c) => c.parentId == null && c.kind.name == 'expense').toList(),
-      orElse: () => const [],
+      orElse: () => const <Category>[],
     );
     return Padding(
       padding: const EdgeInsets.all(16),

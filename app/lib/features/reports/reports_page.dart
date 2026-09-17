@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ledger_version.dart';
 import '../../data/local/database_provider.dart';
 import '../../data/repositories/reports_repository.dart';
+import '../../shared/icons/bk_icon.dart';
+import '../../shared/icons/bk_icons.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/glass_tokens.dart';
 import '../../shared/theme/tokens.dart';
@@ -269,16 +271,17 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
           child: AppSegmentedButton<ReportsView>(
-            segments: const [
-              ButtonSegment(
+            segments: [
+              const ButtonSegment(
                 value: ReportsView.charts,
                 label: Text('图表'),
-                icon: Icon(Icons.pie_chart_outline),
+                // BK-IC-031：正式路径改用 bk.rpt.pie
+                icon: BkIcon(BkIcons.rptPie, size: 18),
               ),
-              ButtonSegment(
+              const ButtonSegment(
                 value: ReportsView.calendar,
                 label: Text('日历'),
-                icon: Icon(Icons.calendar_month_outlined),
+                icon: BkIcon(BkIcons.rptCalendar, size: 18),
               ),
             ],
             selected: {_view},
@@ -404,7 +407,8 @@ class _TimeChip extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          Icon(Icons.schedule_outlined, size: 18, color: palette.primary),
+          // BK-IC-033：周期切换用 bk.rpt.period（环形箭头+短柱，非纯时钟）
+          BkIcon(BkIcons.rptPeriod, size: 18, color: palette.primary),
           const SizedBox(width: AppSpacing.sm),
           Expanded(child: Text(label, style: context.text.titleSmall)),
           Icon(Icons.expand_more, size: 18, color: palette.textSecondary),

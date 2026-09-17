@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../icons/bk_glass_icon.dart';
+import '../icons/bk_icon.dart';
 import '../theme/app_theme.dart';
 import '../theme/glass_tokens.dart';
 import '../theme/tokens.dart';
@@ -189,28 +191,57 @@ class _GlassScaffoldState extends State<GlassScaffold> {
   }
 }
 
-/// FG-NAV 底部导航项（Spec §4.6：图标项用 28 档 G1 容器，选中项套 FG-SEL）
+/// FG-NAV 底部导航项（Spec §4.6：图标项用 28 档 G1 容器，选中项套 FG-SEL）。
+///
+/// BK-ICON（BK-IC-011）：设置 [bkName] 时用 BkIcon + selected fill 双态渲染，
+/// 忽略 [icon]/[tintIcon]；两者均未设置时 assert。
 class GlassNavItem {
   const GlassNavItem({
-    required this.icon,
+    this.icon,
     required this.label,
     this.tintIcon,
-  });
+    this.bkName,
+  }) : assert(
+          icon != null || bkName != null,
+          'GlassNavItem 需要 icon 或 bkName 之一',
+        );
 
-  final IconData icon;
+  /// Material IconData（兼容既有调用点）
+  final IconData? icon;
   final String label;
 
-  /// 选中时替换的 tint 图标（可选）
+  /// 选中时替换的 tint 图标（可选；Material 路径）
   final IconData? tintIcon;
+
+  /// BK-ICON 设计 ID（如 [BkIcons.bills]）；非空时启用 selected fill
+  final String? bkName;
 }
 
 /// 底栏中央动作（BK-DOC-28 需求6）：夹在两个 Tab 之间的主操作按钮。
 /// 非 Tab 项——不参与 [GlassBottomBar.selectedIndex] 选中态，点按不切换页面。
-typedef GlassCenterAction = ({
-  IconData icon,
-  String semanticLabel,
-  VoidCallback onTap,
-});
+///
+/// BK-ICON（BK-IC-012）：设置 [bkName] 时用 BkIcon（D3 圆内加号）绘制本体，
+/// 颜色取 `onPrimary`（A7：容器已为 primary 实色着色玻璃）。
+class GlassCenterAction {
+  const GlassCenterAction({
+    this.icon,
+    this.bkName,
+    required this.semanticLabel,
+    required this.onTap,
+  }) : assert(
+          icon != null || bkName != null,
+          'GlassCenterAction 需要 icon 或 bkName 之一',
+        );
+
+  /// Material IconData（兼容既有调用点）
+  final IconData? icon;
+
+  /// BK-ICON 设计 ID（如 `BkIcons.entry`）
+  final String? bkName;
+
+  final String semanticLabel;
+  final VoidCallback onTap;
+}
 
 /// 中央动作按钮直径（底栏内收敛尺寸；[GlassFab] 的 56 用于内容区悬浮）
 const double _centerActionSize = 48;
@@ -289,6 +320,23 @@ class GlassBottomBar extends StatelessWidget {
     final item = items[i];
     final selected = i == selectedIndex;
     final palette = context.palette;
+    // BK-ICON 路径：BkGlassIcon + selected fill；Material 路径保持原样
+    final Widget iconBody;
+    if (item.bkName != null) {
+      iconBody = BkGlassIcon(
+        name: item.bkName!,
+        size: GlassIconSize.s28,
+        selected: selected,
+      );
+    } else {
+      iconBody = GlassIcon(
+        icon: selected && item.tintIcon != null
+            ? item.tintIcon!
+            : item.icon,
+        size: GlassIconSize.s28,
+        tint: selected,
+      );
+    }
     return InkWell(
       onTap: () => onTap(i),
       child: Padding(
@@ -304,13 +352,7 @@ class GlassBottomBar extends StatelessWidget {
                   : GlassLevel.g1.fillAlphaLight,
               borderRadius: BorderRadius.circular(
                   GlassIconTokens.size28 * GlassIconTokens.radiusFactor),
-              child: GlassIcon(
-                icon: selected && item.tintIcon != null
-                    ? item.tintIcon!
-                    : item.icon,
-                size: GlassIconSize.s28,
-                tint: selected,
-              ),
+              child: iconBody,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
@@ -328,6 +370,8 @@ class GlassBottomBar extends StatelessWidget {
   /// 中央主操作按钮：与 [GlassFab] 同一主操作着色玻璃配方（G5 + primary
   /// fill α 走 [GlassButtonTokens]），尺寸收敛为 [_centerActionSize] 圆形以
   /// 适配底栏高度；不参与 Tab 选中态（BK-DOC-28 需求6）。
+  ///
+  /// BK 路径：本体用 BkIcon（D3 圆内加号），颜色 `onPrimary`（A7）。
   Widget _centerButton(BuildContext context, GlassCenterAction action) {
     final palette = context.palette;
     final dark = context.tokens.isDark;
@@ -336,6 +380,17 @@ class GlassBottomBar extends StatelessWidget {
           ? GlassButtonTokens.primaryFillDark
           : GlassButtonTokens.primaryFillLight,
     );
+    final Widget body;
+    if (action.bkName != null) {
+      // 外层已是 primary 实色玻璃圆，本体直接用 BkIcon（D3 圆内加号 + onPrimary）
+      body = BkIcon(
+        action.bkName!,
+        size: 24,
+        color: palette.onPrimary,
+      );
+    } else {
+      body = Icon(action.icon, size: 24, color: palette.onPrimary);
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       child: Semantics(
@@ -348,9 +403,7 @@ class GlassBottomBar extends StatelessWidget {
           onTap: action.onTap,
           child: SizedBox.square(
             dimension: _centerActionSize,
-            child: Center(
-              child: Icon(action.icon, size: 24, color: palette.onPrimary),
-            ),
+            child: Center(child: body),
           ),
         ),
       ),

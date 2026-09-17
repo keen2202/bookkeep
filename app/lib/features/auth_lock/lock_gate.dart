@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/lock_repository.dart';
+import '../../shared/icons/bk_icon.dart';
+import '../../shared/icons/bk_icons.dart';
 import '../../shared/widgets/app_button.dart';
 import 'lock_controller.dart';
 import 'pin_pad.dart';
@@ -129,7 +131,12 @@ class _LockScreenState extends ConsumerState<_LockScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.lock_outline, size: 64, color: theme.colorScheme.primary),
+                // BK-IC-041：隐私锁主形用 bk.status.lock
+                BkIcon(
+                  BkIcons.statusLock,
+                  size: 64,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(height: 12),
                 Text('bookkeep 已锁定', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 4),

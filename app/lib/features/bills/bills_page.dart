@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
+import '../../shared/icons/bk_icon.dart';
+import '../../shared/icons/bk_icons.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
@@ -34,9 +36,10 @@ class BillsPage extends ConsumerWidget {
       data: (vm) {
         final days = vm.days;
         if (days.isEmpty) {
-          // 统一空态（Spec §6 AppEmpty）
+          // 统一空态（Spec §6 AppEmpty）；BK-IC-022：单层主形，CTA 由底栏中央
+          // 记账按钮承担（文案引导「点击底部 + 记一笔」）
           return AppEmpty(
-            icon: Icons.receipt_long_outlined,
+            bkName: BkIcons.billEmpty,
             title: viewer ? '暂无账单' : '还没有账单',
             message: viewer ? null : '点击底部 + 记一笔',
           );
@@ -173,9 +176,13 @@ class _BillTile extends StatelessWidget {
                 ? '${categories[category.parentId]!.name} / ${category.name}'
                 : category.name;
     final icon = isTransfer
-        ? Icons.swap_horiz
+        ? null
         : categoryIcon(category?.icon ?? '');
-    final iconColor = category == null ? context.palette.textSecondary : Color(category.color);
+    final iconColor = isTransfer
+        ? context.palette.textSecondary
+        : category == null
+            ? context.palette.textSecondary
+            : Color(category.color);
     // 金额：等宽数字 + 按交易类型语义着色（UI 重构 Spec §6 AppAmountText）
     final amountTone = switch (tx.type) {
       TransactionType.expense => AppAmountTone.expense,
@@ -185,11 +192,19 @@ class _BillTile extends StatelessWidget {
     final local = tx.occurredAt.toLocal();
     final time =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    // BK-IC-021：转账用 bk.bill.transfer；分类图标 P2 前仍走 categoryIcon
+    final Widget leadingBody = isTransfer
+        ? BkIcon(
+            BkIcons.billTransfer,
+            size: 20,
+            color: iconColor,
+          )
+        : Icon(icon, size: 20, color: iconColor);
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: iconColor.withValues(alpha: 0.15),
         foregroundColor: iconColor,
-        child: Icon(icon, size: 20),
+        child: leadingBody,
       ),
       title: Text(name),
       subtitle: Text(tx.note == null || tx.note!.isEmpty ? time : '$time · ${tx.note}'),

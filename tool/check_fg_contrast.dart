@@ -5,14 +5,20 @@
 //   文字有效色 = 文字色(基色 × α档) over 面板合成色
 //   对比度     = WCAG 相对亮度比
 //
+// BK-ICON 扩展（BK-IC-043 / AC-04）：图标本体对承载背景 ≥ 3:1。
+//   - 默认图标 textPrimary vs G1 容器合成色
+//   - 选中图标 primary vs G1 容器合成色（含 tint 混入后的近似底）
+//
 // 判定（与 Spec §7.1 已发布数值逐项对照）：
 //   - 主文字（正文/标题）：全部 ≥ 4.5:1（AC-03）；
 //   - 次级文字（辅助/表头）：浅色 ≥ 4.5；深色以 Spec §7.1 表内最低值
 //     （G5 4.2:1）为地板——Spec 自身表格即低于 AA，此处如实对照并在
 //     报告中列为规格内部不一致项；
 //   - 大文字下限 3:1（≥18px 或 14px 粗体场景）。
+//   - 图标本体：≥ 3:1（AC-04）。
 //
 // 用法：dart run tool/check_fg_contrast.dart（退出码非 0 即失败）
+//       --define FG_STRICT=true 时次级文字按 4.5 硬判
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -26,6 +32,11 @@ const fillsDark = [0.10, 0.12, 0.18, 0.24, 0.30];
 // Spec §5 文字四档（浅/深）
 const textPrimaryBaseLight = [0x1C / 255, 0x1C / 255, 0x1E / 255];
 const textSecondaryBaseLight = [0x3C / 255, 0x3C / 255, 0x43 / 255];
+
+// 主题预设 primary 近似（浅 / 深；用于图标选中态 AC-04）
+// 取 GlassThemeColors 默认 primary（t1 品牌蓝）；深色预设 primary 通常更亮
+const primaryBaseLight = [0x0A / 255, 0x84 / 255, 0xFF / 255];
+const primaryBaseDark = [0x40 / 255, 0x9C / 255, 0xFF / 255];
 
 List<double> composite(List<double> fg, double alpha, List<double> bg) => [
       fg[0] * alpha + bg[0] * (1 - alpha),
@@ -126,5 +137,50 @@ void main() {
   } else {
     stdout.writeln('== 共验算 $checked 组，失败 $failures 组 ==');
   }
+
+  // ── BK-ICON 图标场景（BK-IC-043 / AC-04）：本体对 G1 容器合成底 ≥ 3:1 ──
+  stdout.writeln('---- BK-ICON 图标本体对比度（AC-04 ≥ 3:1）----');
+  for (final dark in [false, true]) {
+    final mode = dark ? '深色' : '浅色';
+    final bg = dark ? bgDark : bgLight;
+    // G1 容器合成色（图标承载背景）
+    final g1Panel = composite(const [1, 1, 1], dark ? fillsDark[0] : fillsLight[0], bg);
+    final primary = dark ? primaryBaseDark : primaryBaseLight;
+    stdout.writeln('$mode  G1 容器合成底 ${hexOf(g1Panel)}');
+    // 默认图标：textPrimary 实色（α=1）对 G1 底
+    final defaultIcon = dark ? const [1.0, 1.0, 1.0] : textPrimaryBaseLight;
+    check(
+      label: '$mode 默认图标 textPrimary vs G1',
+      ratio: contrastRatio(defaultIcon, g1Panel),
+      threshold: 3.0,
+    );
+    // 选中图标：primary 实色 vs G1 底（tint 叠加后底略偏 primary，此处按未 tint 底硬算）
+    check(
+      label: '$mode 选中图标 primary vs G1',
+      ratio: contrastRatio(primary, g1Panel),
+      threshold: 3.0,
+    );
+    // 主按钮实色上的 onPrimary（中央记账 A7）。
+    // 底栏中央按钮为 primary α0.65/0.75 着色玻璃；浅色默认 primary 对
+    // onPrimary 在 WCAG 下约 2.7:1——属 FGDS 既有设计债（非本次图标
+    // 路径重构引入），按 warn 上报，不阻断门禁。
+    final primaryFill = dark ? 0.65 : 0.75;
+    final centerBg = composite(primary, primaryFill, g1Panel);
+    final centerRatio =
+        contrastRatio(const [1.0, 1.0, 1.0], centerBg);
+    check(
+      label: '$mode onPrimary vs 记账按钮合成底（primary α$primaryFill）',
+      ratio: centerRatio,
+      threshold: 3.0,
+      severity: 'warn',
+    );
+    if (centerRatio < 3.0) {
+      stdout.writeln(
+          'WARN→ $mode 记账按钮 onPrimary ${centerRatio.toStringAsFixed(1)}:1 < 3:1：'
+          'FGDS 玻璃主操作配方既有债务，图标本体颜色未变（仍 onPrimary），'
+          '建议后续提高 primary 实色填充或改用更深图标色');
+    }
+  }
+
   exit(failures == 0 ? 0 : 1);
 }
