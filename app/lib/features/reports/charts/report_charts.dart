@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/utils/money_format.dart';
 import '../../../data/repositories/reports_repository.dart';
+import '../../../shared/icons/bk_icon.dart';
+import '../../../shared/icons/bk_icons.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/theme/chart_colors.dart';
 import '../../../shared/theme/tokens.dart';
@@ -107,7 +109,7 @@ class CategoryPieChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (slices.isEmpty) {
-      return const Center(child: Text('暂无数据'));
+      return const _ReportEmptyState();
     }
     final series = chartSeriesColors(context);
     final total = slices.fold<int>(0, (a, b) => a + b.amountMinor);
@@ -197,7 +199,7 @@ class PeriodBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (buckets.isEmpty) {
-      return const Center(child: Text('暂无数据'));
+      return const _ReportEmptyState();
     }
     // 需求「加深柱状图颜色」：弃用 chartAreaGradient（顶色 α0.12 起），
     // 改为收支语义实心色（支出红 / 收入绿，浅深主题锁定值）
@@ -391,7 +393,7 @@ class _TrendLineChartState extends State<TrendLineChart> {
   Widget build(BuildContext context) {
     final buckets = widget.buckets;
     if (buckets.isEmpty) {
-      return const Center(child: Text('暂无数据'));
+      return const _ReportEmptyState();
     }
 
     final expenseColor = context.appColors.expense;
@@ -657,6 +659,46 @@ class _TrendLineChartState extends State<TrendLineChart> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+/// 报表区块空态（34 D4 / §7.5 / BK-IC-032）：96 圆底 + 44 单层主形 +
+/// 指向「先有流水」的文案；不使用第二层装饰。
+class _ReportEmptyState extends StatelessWidget {
+  const _ReportEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: palette.primaryContainer.withValues(alpha: 0.5),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: BkIcon(
+                BkIcons.rptEmpty,
+                size: 44,
+                color: palette.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '先有流水，再来看报表',
+            style: context.text.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

@@ -33,10 +33,20 @@ const fillsDark = [0.10, 0.12, 0.18, 0.24, 0.30];
 const textPrimaryBaseLight = [0x1C / 255, 0x1C / 255, 0x1E / 255];
 const textSecondaryBaseLight = [0x3C / 255, 0x3C / 255, 0x43 / 255];
 
-// 主题预设 primary 近似（浅 / 深；用于图标选中态 AC-04）
-// 取 GlassThemeColors 默认 primary（t1 品牌蓝）；深色预设 primary 通常更亮
-const primaryBaseLight = [0x0A / 255, 0x84 / 255, 0xFF / 255];
-const primaryBaseDark = [0x40 / 255, 0x9C / 255, 0xFF / 255];
+// 主题预设 primary（必须以 theme_presets.dart 的 t1..t8 为准；
+// 每次新增/调整主题预设时同步本表，AC-04 不再只验近似单色）
+const presetLight = [
+  (id: 't1', name: '青碧·晨', primary: 0x00897B),
+  (id: 't2', name: '晴空·蓝', primary: 0x0A84FF),
+  (id: 't3', name: '紫藤·雅', primary: 0x8E24AA),
+  (id: 't4', name: '暖屿·橙', primary: 0xEF6C00),
+];
+const presetDark = [
+  (id: 't5', name: '石墨·夜', primary: 0xA7B4BE),
+  (id: 't6', name: '深海·蓝', primary: 0x64B5F6),
+  (id: 't7', name: '墨竹·绿', primary: 0x81C784),
+  (id: 't8', name: '绛紫·夜', primary: 0xCE93D8),
+];
 
 List<double> composite(List<double> fg, double alpha, List<double> bg) => [
       fg[0] * alpha + bg[0] * (1 - alpha),
@@ -61,6 +71,12 @@ double contrastRatio(List<double> a, List<double> b) {
 
 String hexOf(List<double> c) =>
     '#${c.map((v) => (v * 255).round().toRadixString(16).padLeft(2, '0').toUpperCase()).join()}';
+
+List<double> rgbOf(int hex) => [
+      ((hex >> 16) & 0xFF) / 255,
+      ((hex >> 8) & 0xFF) / 255,
+      (hex & 0xFF) / 255,
+    ];
 
 int failures = 0;
 int warnings = 0;
@@ -138,48 +154,58 @@ void main() {
     stdout.writeln('== 共验算 $checked 组，失败 $failures 组 ==');
   }
 
-  // ── BK-ICON 图标场景（BK-IC-043 / AC-04）：本体对 G1 容器合成底 ≥ 3:1 ──
+  // ── BK-ICON 图标场景（BK-IC-043 / AC-04）：本体对承载底 ≥ 3:1 ──
   stdout.writeln('---- BK-ICON 图标本体对比度（AC-04 ≥ 3:1）----');
+  // 默认图标：textPrimary 实色（α=1）对 G1 容器合成底（列表/玻璃面板）
   for (final dark in [false, true]) {
     final mode = dark ? '深色' : '浅色';
     final bg = dark ? bgDark : bgLight;
-    // G1 容器合成色（图标承载背景）
-    final g1Panel = composite(const [1, 1, 1], dark ? fillsDark[0] : fillsLight[0], bg);
-    final primary = dark ? primaryBaseDark : primaryBaseLight;
-    stdout.writeln('$mode  G1 容器合成底 ${hexOf(g1Panel)}');
-    // 默认图标：textPrimary 实色（α=1）对 G1 底
+    final g1Panel =
+        composite(const [1, 1, 1], dark ? fillsDark[0] : fillsLight[0], bg);
     final defaultIcon = dark ? const [1.0, 1.0, 1.0] : textPrimaryBaseLight;
+    stdout.writeln('$mode  G1 容器合成底 ${hexOf(g1Panel)}');
     check(
       label: '$mode 默认图标 textPrimary vs G1',
       ratio: contrastRatio(defaultIcon, g1Panel),
       threshold: 3.0,
     );
-    // 选中图标：primary 实色 vs G1 底（tint 叠加后底略偏 primary，此处按未 tint 底硬算）
+  }
+
+  // 选中 Tab（BkGlassIcon 默认不 tint，G1 容器叠在 G3 底栏之上）：
+  // 逐个校验真实 t1..t8 预设 primary；浅色弱对比预设 t4 曾仅 2.93:1，
+  // 关闭默认 tint 后按实际承载底复算应 ≥3:1。
+  stdout.writeln('---- 真实主题预设选中 Tab / 中央记账（AC-04）----');
+  for (final preset in [...presetLight, ...presetDark]) {
+    final isDark = presetLight.any((p) => p.id == preset.id) == false;
+    final bg = isDark ? bgDark : bgLight;
+    final fills = isDark ? fillsDark : fillsLight;
+    final bottomBar = composite(const [1, 1, 1], fills[2], bg);
+    final g1OnBottomBar = composite(const [1, 1, 1], fills[0], bottomBar);
+    final primary = rgbOf(preset.primary);
+
     check(
-      label: '$mode 选中图标 primary vs G1',
-      ratio: contrastRatio(primary, g1Panel),
+      label: '${preset.id} ${preset.name} 选中 Tab primary vs G1/底栏',
+      ratio: contrastRatio(primary, g1OnBottomBar),
       threshold: 3.0,
     );
-    // 主按钮实色上的 onPrimary（中央记账 A7）。
-    // 底栏中央按钮为 primary α0.65/0.75 着色玻璃；浅色默认 primary 对
-    // onPrimary 在 WCAG 下约 2.7:1——属 FGDS 既有设计债（非本次图标
-    // 路径重构引入），按 warn 上报，不阻断门禁。
-    final primaryFill = dark ? 0.65 : 0.75;
-    final centerBg = composite(primary, primaryFill, g1Panel);
-    final centerRatio =
-        contrastRatio(const [1.0, 1.0, 1.0], centerBg);
+
+    // 中央记账：主操作玻璃 = primary α0.75/0.65 over 页面背景；
+    // 运行时会从 onPrimary / textPrimary 中选对比度更高者。
+    final alpha = isDark ? 0.65 : 0.75;
+    final centerBg = composite(primary, alpha, bg);
+    final onPrimaryRatio = contrastRatio(const [1.0, 1.0, 1.0], centerBg);
+    final textPrimary = isDark ? const [1.0, 1.0, 1.0] : textPrimaryBaseLight;
+    final textPrimaryRatio = contrastRatio(textPrimary, centerBg);
+    final bestRatio = math.max(onPrimaryRatio, textPrimaryRatio);
+    stdout.writeln(
+        '     ${preset.id} 中央记账 onPrimary ${onPrimaryRatio.toStringAsFixed(2)}:1 / '
+        'textPrimary ${textPrimaryRatio.toStringAsFixed(2)}:1 → 运行时取 '
+        '${textPrimaryRatio >= onPrimaryRatio ? 'textPrimary' : 'onPrimary'}');
     check(
-      label: '$mode onPrimary vs 记账按钮合成底（primary α$primaryFill）',
-      ratio: centerRatio,
+      label: '${preset.id} ${preset.name} 中央记账动态前景 vs primary α$alpha',
+      ratio: bestRatio,
       threshold: 3.0,
-      severity: 'warn',
     );
-    if (centerRatio < 3.0) {
-      stdout.writeln(
-          'WARN→ $mode 记账按钮 onPrimary ${centerRatio.toStringAsFixed(1)}:1 < 3:1：'
-          'FGDS 玻璃主操作配方既有债务，图标本体颜色未变（仍 onPrimary），'
-          '建议后续提高 primary 实色填充或改用更深图标色');
-    }
   }
 
   exit(failures == 0 ? 0 : 1);

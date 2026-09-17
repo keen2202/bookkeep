@@ -115,7 +115,12 @@ class _BkIconState extends State<BkIcon> with SingleTickerProviderStateMixin {
     );
 
     if (painter == null) {
-      return Icon(Icons.category, size: size, color: paintColor);
+      // debug 已在 BkIconRegistry.resolve 内 assert；release 按 35 §2.1/A3
+      // 先查过渡 fallback，再回退 category，并输出可检索日志。
+      final fallback = BkIconRegistry.materialFallback(widget.name);
+      final fallbackIcon = fallback ?? Icons.category;
+      debugPrint('BkIcon 未注册: ${widget.name}；release fallback: $fallbackIcon');
+      return Icon(fallbackIcon, size: size, color: paintColor);
     }
 
     return RepaintBoundary(

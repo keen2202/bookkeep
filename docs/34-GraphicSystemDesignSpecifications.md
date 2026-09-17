@@ -29,8 +29,8 @@
 | 类别 | 包含 |
 |---|---|
 | 导航 | 账单 Tab、报表 Tab、中央记账动作 |
-| 账单 | 列表流水、转账、筛选、空态、常用操作 |
-| 报表 | 图表/日历切换、周期、隐藏金额、空态 |
+| 账单 | 列表流水（图标按产品决策采用 Material）、转账（图标采用 Material）、筛选、空态、常用操作 |
+| 报表 | 图表/日历切换、周期、空态；隐藏金额仅由 `amountMaskProvider` 自动脱敏 |
 | 状态 | 同步、锁定、预警、完成 |
 | 组件 | `BkIcon` / `BkIcons` 常量、选中态 API |
 
@@ -208,8 +208,8 @@ class BkIcon extends StatelessWidget {
 
 | ID | 含义 | 绘制要点 |
 |---|---|---|
-| `bk.bill.list` | 流水列表 | 票据 + 3 条线，比 Tab 稍密，列表头部用 |
-| `bk.bill.transfer` | 转账 | 水平双向箭头；与收入上箭头/支出下箭头区分 |
+| `bk.bill.list` | 流水列表 | 票据 + 3 条线，比 Tab 稍密；**本期不投产**，产品决策账单行采用 Material，Painter 作 P2 储备 |
+| `bk.bill.transfer` | 转账 | 水平双向箭头；**本期不投产**，账单行按产品决策采用 Material `swap_horiz`，Painter 作 P2 储备 |
 | `bk.bill.expense` | 支出方向 | 箭头向下（仅指示，不染红） |
 | `bk.bill.income` | 收入方向 | 箭头向上（仅指示，不染绿） |
 | `bk.bill.empty` | 空态主形 | **仅** 票据线性主形（D4：无星标、无装饰层） |
@@ -229,7 +229,7 @@ class BkIcon extends StatelessWidget {
 | `bk.rpt.bars` | 周期对比 | 与 Tab 报表同构，可略简 |
 | `bk.rpt.calendar` | 日历视图 | 周历框 + 顶栏挂环 + 网格点；底部可有一条净额短横 |
 | `bk.rpt.period` | 周期切换 | 环形箭头 + 短柱，避免纯时钟 |
-| `bk.rpt.hide-amount` | 隐藏金额 | 眼睛 + 斜杠 |
+| `bk.rpt.hide-amount` | 隐藏金额 | 眼睛 + 斜杠；**本期不投产**：产品定义仅保留 `amountMaskProvider` 自动脱敏，不提供手动开关入口，Painter 仅作储备 |
 | `bk.rpt.empty` | 空态主形 | **仅** 等高基线上的三根矮柱线性图（无第二层装饰） |
 
 图表图例继续使用 `chartSeriesColorsFromPalette`；图例色块 8×8、圆角 2，不使用 BK-ICON。
@@ -325,7 +325,7 @@ tool/check_bk_icons.dart                      # 裸 Icons 扫描（扩展）
 | 0 | 命名、BkIcon 骨架、Painter 生成约定、Golden 模板 | P0 | 0.5 周 |
 | 1 | 首页：bills / reports / entry（含选中态） | P0 | 0.5 周 |
 | 2 | 账单链路：列表、转账、操作、空态 | P0 | 1 周 |
-| 3 | 报表链路：双视图、周期、隐藏金额、空态 | P0 | 1 周 |
+| 3 | 报表链路：双视图、周期、空态、自动脱敏 | P0 | 1 周 |
 | 4 | 状态图标 + CI 扫描收敛 | P1 | 0.5 周 |
 | 5 | 分类库 60+ 同风格迁移 | P2 | 2 周 |
 
@@ -360,14 +360,14 @@ tool/check_bk_icons.dart                      # 裸 Icons 扫描（扩展）
 | bk.nav.bills | 底栏 | P0 |
 | bk.nav.reports | 底栏 | P0 |
 | bk.act.entry | 底栏中央 | P0 |
-| bk.bill.list | 账单 | P0 |
-| bk.bill.transfer | 账单 | P0 |
+| bk.bill.list | 储备 | P2（暂不投产） |
+| bk.bill.transfer | 储备 | P2（暂不投产） |
 | bk.bill.empty | 账单空态 | P0 |
 | bk.bill.filter | 账单 | P1 |
 | bk.rpt.pie | 报表 | P0 |
 | bk.rpt.bars | 报表 | P0 |
 | bk.rpt.calendar | 报表 | P0 |
-| bk.rpt.hide-amount | 报表 | P0 |
+| bk.rpt.hide-amount | 储备 | P2（暂不投产） |
 | bk.rpt.empty | 报表空态 | P0 |
 | bk.rpt.period | 报表 | P1 |
 | bk.status.sync | 全局 | P1 |

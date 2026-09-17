@@ -331,6 +331,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             _Section(
               title: '分类占比',
               subtitle: selection.label,
+              iconName: BkIcons.rptPie,
               child: _chartOrRetry(
                 slices,
                 (s) => CategoryPieChart(slices: s, hideAmounts: hideAmounts),
@@ -340,6 +341,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             _Section(
               title: '周期对比',
               subtitle: _comparisonSubtitle,
+              iconName: BkIcons.rptBars,
               child: _chartOrRetry(
                 buckets,
                 (b) => PeriodBarChart(buckets: b, hideAmounts: hideAmounts),
@@ -598,10 +600,18 @@ Widget _chartOrRetry<T>(
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, this.subtitle, required this.child});
+  const _Section({
+    required this.title,
+    this.subtitle,
+    this.iconName,
+    required this.child,
+  });
 
   final String title;
   final String? subtitle;
+
+  /// BK-ICON 设计 ID（如 `bk.rpt.bars`）；区块标题前缀，不抢图表主体。
+  final String? iconName;
   final Widget child;
 
   @override
@@ -618,7 +628,26 @@ class _Section extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              Expanded(
+                child: Row(
+                  children: [
+                    if (iconName != null) ...[
+                      BkIcon(
+                        iconName!,
+                        size: 18,
+                        color: context.palette.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               if (subtitle != null)
                 Text(
                   subtitle!,

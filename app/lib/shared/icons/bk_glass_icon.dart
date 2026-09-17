@@ -9,8 +9,10 @@ import 'bk_icon.dart';
 ///
 /// - 容器材质仍为 G1（BK-DOC-23 §4.1），不改 blur/fill/描边/高光/投影；
 /// - 本体尺寸 = 容器 × 0.55；
-/// - [selected] 为 true 时默认容器 tint（与 Tab 选中 fill 兼容）；
-/// - 可用 [tint] 覆盖默认 tint 策略。
+/// - 默认走 34 D6/A2 的 **fill 单色**：本体由 BkIcon 绘制 primary 填充，
+///   容器不再默认混入 primary（35 §4.4 tint 可选），避免弱对比预设下
+///   容器 tint 进一步压低图标对比度；
+/// - 如需 duo 态，可显式 [tint] = true。
 class BkGlassIcon extends StatelessWidget {
   const BkGlassIcon({
     super.key,
@@ -30,7 +32,7 @@ class BkGlassIcon extends StatelessWidget {
   /// Tab 选中态（nav 族 fill 双态 + 容器 tint）
   final bool selected;
 
-  /// 覆盖容器 tint；null 时等于 [selected]
+  /// 覆盖容器 tint；null 时不额外 tint（34 A2 fill 单色）
   final bool? tint;
 
   /// 覆盖本体颜色
@@ -39,7 +41,8 @@ class BkGlassIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bodySize = size.side * GlassIconTokens.iconScale;
-    final useTint = tint ?? selected;
+    // A2 fill 默认不 tint；duo/需要时显式 tint:true。
+    final useTint = tint ?? false;
     return GlassIcon(
       size: size,
       tint: useTint,

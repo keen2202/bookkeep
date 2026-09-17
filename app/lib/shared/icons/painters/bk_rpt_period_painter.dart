@@ -51,6 +51,6 @@ class BkRptPeriodPainter extends BkPainterBase {
     final p = strokePaint();
     canvas.drawPath(arcPath, p);
     canvas.drawPath(arrowHead, p);
-    canvas.drawPath(shortBar, strokePaint(width: 1.5));
+    canvas.drawPath(shortBar, strokePaint());
   }
 }

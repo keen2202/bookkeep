@@ -59,6 +59,6 @@ class BkNavReportsPainter extends BkPainterBase {
       }
     }
     // 基线始终线性（不参与 fill）
-    canvas.drawPath(baseline, strokePaint(width: 1.5));
+    canvas.drawPath(baseline, strokePaint());
   }
 }

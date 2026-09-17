@@ -10,3 +10,6 @@ lock_gate.dart
 amount_keyboard.dart
 reports_page.dart
 bk_icon.dart
+
+# BK-IC-021 产品决策：账单行列表/转账图标采用 Material
+bills_page.dart

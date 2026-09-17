@@ -33,12 +33,12 @@
 | ID | 分类 | 优先级 | 问题摘要 | 影响面 |
 | --- | --- | --- | --- | --- |
 | P-01 | 架构/接口 | P0 | 无 BK-ICON 统一出口；业务直引 `Icons.*`，与 GlassIcon 容器脱节可审计 | 全客户端 UI |
-| P-02 | 视觉一致性 | P0 | 模块 outlined / 分类 filled / 操作系统默认混用，线宽不齐 | 首页、账单、报表、分类 |
+| P-02 | 视觉一致性 | P0 | 模块 outlined / 分类 filled / 操作系统默认混用，线宽不齐；账单列表/转账按 2026-09 产品决策采用 Material，Bk Painter 不接生产 | 首页、账单、报表、分类 |
 | P-03 | 产品语义 | P0 | 底栏 `receipt_long_outlined` / `bar_chart_outlined` 财务辨识弱；中央记账未用 D3 圆内加号 | 底栏导航、极速记账入口 |
 | P-04 | 状态机 | P0 | Tab 无规范选中填充/双色；`GlassIcon` 仅 tint，无 `selected` 路径语义 | 底栏、Segment |
 | P-05 | 主题绑定 | P0 | 图标色存在散落字面量风险；未强制 paint 时读 ThemePalette | 多主题 t1–t8 + custom |
 | P-06 | 空态产品化 | P1 | `AppEmpty` 空态为 Material 单图 + 圆底，无 CTA 纪律；且与 D4「无二层装饰」需对齐 | 账单/报表空态转化 |
-| P-07 | 报表图形 | P1 | 图表/日历切换、隐藏金额、周期等图标未进 `bk.rpt.*` 命名与线性规格 | 报表页 |
+| P-07 | 报表图形 | P1 | 图表/日历切换、周期等图标未进 `bk.rpt.*` 命名与线性规格；隐藏金额按产品定义仅自动脱敏，不提供手动图标入口 | 报表页 |
 | P-08 | 状态图形 | P1 | 同步/锁定/预警分散，无统一 `bk.status.*` | 同步、隐私锁、预算阈值 |
 | P-09 | 工程实现 | P0 | 目标为 CustomPainter；当前依赖 Material IconData，缺路径源与 shouldRepaint 约定 | shared/icons 新层 |
 | P-10 | 质量门禁 | P1 | 无裸 `Icons.` 扫描、无图标对比度场景、无 Tab 双态 Golden | CI、验收 AC-01/03/04/06/08 |
@@ -73,7 +73,7 @@
 
 | 建议 | 对应问题 | 做法 |
 | --- | --- | --- |
-| 脱敏态图标语义 | P-06, 隐私锁 | 隐藏金额图标 `bk.rpt.hide-amount`；锁定脱敏旁路信息用 `textTertiary`/`textDisabled`，**不得单独作为可点主操作**（34 §5.3） |
+| 脱敏态图标语义 | P-06, 隐私锁 | 隐藏金额由 `amountMaskProvider` 自动脱敏，不提供 `bk.rpt.hide-amount` 手动开关；锁定脱敏旁路信息用 `textTertiary`/`textDisabled`，**不得单独作为可点主操作**（34 §5.3） |
 | 禁止图标旁路金额泄露 | 隐私 | 空态/报表插画位不得内嵌真实金额文案；Golden 测试需在脱敏开启下抽一组 |
 | 无远程资源 | P-09 | AC-09：无 flutter_svg、无 http 图标 CDN、无运行时 SVG 解析 → 无供应链图标注入面 |
 
@@ -140,16 +140,16 @@ BkXxxPainter.paint (24×24 栅格, stroke 1.75)
 
 ### Step 2 — 账单链路（P0）
 
-1. `bk.bill.list/transfer/empty`（P1 filter 可同 PR）。
-2. `bills_page` / 空态 `AppEmpty` 插画位改 BkIcon 主形（D4 单层）。
-3. 转账图标与收支方向图标不染红绿。
+1. `bk.bill.empty` 与 `bk.bill.filter` 生产接线；`bk.bill.list/transfer` 保留 P2 储备，账单行按 2026-09 产品决策采用 Material。
+2. `bills_page` / 空态 `AppEmpty` 插画位改 `bk.bill.empty` 主形（D4 单层）。
+3. 筛选入口（类型/分类）接入；转账 Material 图标不染红绿。
 
-**退出**：账单空态 CTA 策略与 AC-07 预检。
+**退出**：账单空态 CTA 策略、筛选入口与 AC-07 预检。
 
 ### Step 3 — 报表链路（P0）
 
-1. `bk.rpt.pie/bars/calendar/hide-amount/empty`（P1 period 可同 PR）。
-2. Segment 双视图、隐藏金额、空态接入。
+1. `bk.rpt.pie/bars/calendar/empty`（P1 period 可同 PR）；`bk.rpt.hide-amount` 仅保留 Painter 储备，不接手动入口。
+2. Segment 双视图、空态接入；隐藏金额由 `amountMaskProvider` 自动脱敏，不提供手动开关。
 3. 图例仍走 `chartSeriesColorsFromPalette`，不占用 BK-ICON。
 
 **退出**：报表双视图 Golden 更新策略明确。
@@ -257,8 +257,10 @@ typedef BkIconPainterFactory = CustomPainter Function({
 | `app/lib/shared/widgets/glass_icon.dart` | 修改 | 组合 CustomPaint 槽位或等价扩展（A1） |
 | `app/lib/shared/theme/app_icons.dart` | 修改 | `moduleIcon` → Bk 常量 |
 | `app/lib/app.dart` | 修改 | 底栏与中央记账入口 |
-| `app/lib/features/bills/bills_page.dart` | 修改 | 列表/空态图标 |
-| `app/lib/features/reports/reports_page.dart` | 修改 | Segment、隐藏金额等 |
+| `app/lib/features/bills/bills_page.dart` | 修改 | 列表/空态图标、筛选栏 |
+| `app/lib/features/bills/bill_filter_sheet.dart` | 新建 | 筛选弹层（类型/分类） |
+| `app/lib/features/bills/bills_providers.dart` | 修改 | BillFilter / 过滤逻辑 |
+| `app/lib/features/reports/reports_page.dart` | 修改 | Segment、自动脱敏状态等 |
 | `app/lib/shared/widgets/app_empty.dart` | 修改 | 插画位支持 Widget/BkIcon（D4） |
 | `app/lib/shared/utils/category_icon.dart` | 修改（P2） | 映射底层绘制 |
 | `app/lib/shared/theme/glass_tokens.dart` | 只读引用 | 不改 G1–G5；可引用 GlassMotion |
@@ -277,13 +279,13 @@ typedef BkIconPainterFactory = CustomPainter Function({
 
 | Phase | 任务簇（见 36） | 状态 | 出口条件 |
 | --- | --- | --- | --- |
-| P0 基建 | BK-IC-001…005 | **in_progress**（36 中 BK-IC-001） | 组件可编译、Token 单源、注册表可解析 |
-| P1 首页导航 | BK-IC-010…014 | pending | AC-01/06/10 预检 |
-| P2 账单链路 | BK-IC-020…023 | pending | 账单空态/列表接入 |
-| P3 报表链路 | BK-IC-030…033 | pending | 双视图/隐藏金额/空态 |
-| P4 门禁与状态 | BK-IC-040…044 | pending | AC-01/03/04 扫描绿 |
-| P5 分类库 | BK-IC-050…052 | pending | P2 迁移完成或明确延期 |
-| 验收 | BK-IC-060…063 | pending | AC-01~10 + 盲测记录归档 |
+| P0 基建 | BK-IC-001…005 | **completed** | 组件可编译、Token 单源、注册表可解析 |
+| P1 首页导航 | BK-IC-010…014 | **completed** | AC-01/06/10 预检 |
+| P2 账单链路 | BK-IC-020…023 | **completed** | 账单空态/列表/筛选接入 |
+| P3 报表链路 | BK-IC-030…033 | **completed**（hide-amount 手动验收按产品定义移除） | 双视图/自动脱敏/空态 |
+| P4 门禁与状态 | BK-IC-040…044 | **completed** | AC-01/03/04 扫描绿 |
+| P5 分类库 | BK-IC-050…052 | **pending**（P2 可延期） | P2 迁移完成或明确延期 |
+| 验收 | BK-IC-060…063 | **in_progress**（060/061 已完成；062/063 待办） | AC-01~10 + 盲测记录归档 |
 
 > 进度状态以 36 文档 Status 字段为执行真源；本表仅作阶段汇总。
 

@@ -41,6 +41,6 @@ class BkRptEmptyPainter extends BkPainterBase {
     for (final path in barPaths) {
       canvas.drawPath(path, p);
     }
-    canvas.drawPath(baseline, strokePaint(width: 1.5));
+    canvas.drawPath(baseline, strokePaint());
   }
 }

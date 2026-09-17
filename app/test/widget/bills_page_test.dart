@@ -131,6 +131,54 @@ void main() {
     expect(find.text('-¥30.00'), findsOneWidget);
   });
 
+  testWidgets('filter narrows rows by type and can be cleared', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final ids = await seedDb(db);
+    final now = DateTime.now();
+    await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
+          accountId: ids.accountId,
+          categoryId: Value(ids.breakfastId),
+          type: TransactionType.expense,
+          amountMinor: -2550,
+          currency: 'CNY',
+          occurredAt: now,
+          updatedAt: DateTime.utc(2026, 8, 1),
+        ));
+    await db.into(db.transactions).insert(TransactionsCompanion.insert(
+          bookId: testBookId,
+          accountId: ids.accountId,
+          categoryId: Value(ids.lunchId),
+          type: TransactionType.income,
+          amountMinor: 10000,
+          currency: 'CNY',
+          occurredAt: now.add(const Duration(minutes: 1)),
+          updatedAt: DateTime.utc(2026, 8, 1),
+        ));
+
+    await tester.pumpWidget(harness(db));
+    await pumpUntilFound(tester, find.text('餐饮 / 早餐'));
+    expect(find.text('筛选'), findsOneWidget);
+
+    await tester.tap(find.text('筛选'));
+    await tester.pumpAndSettle();
+    expect(find.text('筛选账单'), findsOneWidget);
+
+    await tester.tap(find.text('支出'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+
+    await pumpUntilFound(tester, find.text('筛选：支出'));
+    expect(find.text('餐饮 / 早餐'), findsOneWidget);
+    expect(find.text('餐饮 / 晚餐'), findsNothing);
+
+    await tester.tap(find.text('清除'));
+    await pumpUntilFound(tester, find.text('餐饮 / 晚餐'));
+    expect(find.text('筛选'), findsOneWidget);
+  });
+
   testWidgets('masked mode hides amounts', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);

@@ -160,13 +160,14 @@ class _AccountSyncSectionState extends ConsumerState<AccountSyncSection> {
         ],
         if (!_loadingEmail && loggedIn) ...[
           ListTile(
-            // BK-IC-041：同步/预警状态图形（idle 暂无 bk.status.ok，回退 Material）
+            // BK-IC-041：同步/预警/完成状态图形统一走 bk.status.*
             leading: Builder(
               builder: (context) {
                 final scheme = Theme.of(context).colorScheme;
                 return switch (status.phase) {
-                  SyncPhase.idle => Icon(
-                      Icons.check_circle_outline,
+                  SyncPhase.idle => BkIcon(
+                      BkIcons.statusOk,
+                      size: 24,
                       color: scheme.primary,
                     ),
                   SyncPhase.error => BkIcon(

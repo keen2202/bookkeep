@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money_format.dart';
+import '../../shared/icons/bk_icon.dart';
+import '../../shared/icons/bk_icons.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/glass_tokens.dart';
 import '../../shared/widgets/glass_panel.dart';
@@ -38,15 +40,36 @@ class BudgetSummaryCard extends ConsumerWidget {
         final masked = ref.watch(amountMaskProvider);
         String money(int minor) => masked ? maskedMoney() : formatMoney(minor);
         final theme = Theme.of(context);
-        final badge = progress.exceeded
-            ? Text('已超支',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.error))
-            : progress.overThreshold
-                ? Text('接近上限',
+        final String? warningLabel;
+        final Color? warningColor;
+        if (progress.exceeded) {
+          warningLabel = '已超支';
+          warningColor = theme.colorScheme.error;
+        } else if (progress.overThreshold) {
+          warningLabel = '接近上限';
+          warningColor = context.appColors.warning;
+        } else {
+          warningLabel = null;
+          warningColor = null;
+        }
+        final badge = warningLabel == null
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  BkIcon(
+                    BkIcons.statusWarn,
+                    size: 16,
+                    color: warningColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    warningLabel,
                     style: theme.textTheme.bodySmall
-                        ?.copyWith(color: context.appColors.warning))
-                : null;
+                        ?.copyWith(color: warningColor),
+                  ),
+                ],
+              );
         return _card(
           context,
           onTap: viewer ? null : () => BudgetManageSheet.show(context),

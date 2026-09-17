@@ -15,6 +15,8 @@ import 'package:bookkeep_app/data/repositories/category_repository.dart';
 import 'package:bookkeep_app/data/repositories/lock_repository.dart';
 import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
+import 'package:bookkeep_app/shared/icons/bk_icon.dart';
+import 'package:bookkeep_app/shared/icons/bk_icons.dart';
 import 'package:bookkeep_app/shared/widgets/glass_nav.dart';
 
 import '../helpers/fixtures.dart';
@@ -40,10 +42,12 @@ void main() {
   }
 
   /// 底栏中央「记一笔」按钮（BK-DOC-28 需求6：固定底栏中央、不可拖拽，
-  /// 非 Tab 项，经加号图标定位）
+  /// 非 Tab 项；BK-IC-012 后为 BkIcons.entry CustomPainter，不再渲染 Icons.add）
   Finder addEntryButton() => find.descendant(
         of: find.byType(GlassBottomBar),
-        matching: find.byIcon(Icons.add),
+        matching: find.byWidgetPredicate(
+          (w) => w is BkIcon && w.name == BkIcons.entry,
+        ),
       );
 
   /// 经数字键盘输入 6 位 PIN 并等待 PBKDF2 校验/落库完成

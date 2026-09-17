@@ -168,9 +168,16 @@ void main() {
     addTearDown(db.close);
 
     await tester.pumpWidget(harness(db));
-    await pumpUntilFound(tester, find.text('暂无数据'));
+    const emptyCopy = '先有流水，再来看报表';
+    await pumpUntilFound(tester, find.text(emptyCopy));
 
-    expect(find.text('暂无数据'), findsWidgets);
+    expect(find.text(emptyCopy), findsWidgets);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is BkIcon && w.name == BkIcons.rptEmpty,
+      ),
+      findsWidgets,
+    );
   });
 
   // ── BK-DOC-28 需求3：时间筛选 = 年/月/日三列滚轮弹层（取代区间 SegmentedButton

@@ -191,7 +191,8 @@ class _GlassScaffoldState extends State<GlassScaffold> {
   }
 }
 
-/// FG-NAV 底部导航项（Spec §4.6：图标项用 28 档 G1 容器，选中项套 FG-SEL）。
+/// FG-NAV 底部导航项（BK-DOC-34 §4.2：Tab 图标项用 44 档 G1 容器，
+/// 本体约 24；选中项套 FG-SEL）。
 ///
 /// BK-ICON（BK-IC-011）：设置 [bkName] 时用 BkIcon + selected fill 双态渲染，
 /// 忽略 [icon]/[tintIcon]；两者均未设置时 assert。
@@ -247,8 +248,9 @@ class GlassCenterAction {
 const double _centerActionSize = 48;
 
 /// FG-NAV 底部导航栏（Spec §4.6；BK-FG-021）：G3 通栏玻璃 + 顶部
-/// 0.5px 分隔线（滚动联动语义同 AppBar）；图标项 28 档 [GlassIcon]，
-/// 选中项以 [GlassSelection] 呈现 FG-SEL 四层。
+/// 0.5px 分隔线（滚动联动语义同 AppBar）；BK-ICON Tab 图标项 44 档
+/// [GlassIcon]（本体约 24，BK-DOC-34 §4.2），选中项以 [GlassSelection]
+/// 呈现 FG-SEL 四层。
 ///
 /// [centerAction] 非空时在 items 中点插入固定 [_centerActionSize] 圆形主操作
 /// 按钮（BK-DOC-28 需求6：记账入口下沉底栏中央、不可拖拽），两侧 Tab 经
@@ -325,10 +327,11 @@ class GlassBottomBar extends StatelessWidget {
     if (item.bkName != null) {
       iconBody = BkGlassIcon(
         name: item.bkName!,
-        size: GlassIconSize.s28,
+        size: GlassIconSize.s44,
         selected: selected,
       );
     } else {
+      // Material 兼容路径保持原 28 档，仅 BK-ICON 正式路径按 34 §4.2 升 44。
       iconBody = GlassIcon(
         icon: selected && item.tintIcon != null
             ? item.tintIcon!
@@ -344,14 +347,18 @@ class GlassBottomBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 图标项：28 档 G1 容器；选中项套 FG-SEL 四层（宿主 fill 为 G1 α）
+            // 图标项：BK 路径 44 档、Material 兼容路径 28 档；选中项套
+            // FG-SEL 四层（宿主 fill 为对应 G1 α）
             GlassSelection(
               selected: selected,
               hostFillAlpha: context.tokens.isDark
                   ? GlassLevel.g1.fillAlphaDark
                   : GlassLevel.g1.fillAlphaLight,
               borderRadius: BorderRadius.circular(
-                  GlassIconTokens.size28 * GlassIconTokens.radiusFactor),
+                  (item.bkName != null
+                          ? GlassIconTokens.size44
+                          : GlassIconTokens.size28) *
+                      GlassIconTokens.radiusFactor),
               child: iconBody,
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -371,7 +378,8 @@ class GlassBottomBar extends StatelessWidget {
   /// fill α 走 [GlassButtonTokens]），尺寸收敛为 [_centerActionSize] 圆形以
   /// 适配底栏高度；不参与 Tab 选中态（BK-DOC-28 需求6）。
   ///
-  /// BK 路径：本体用 BkIcon（D3 圆内加号），颜色 `onPrimary`（A7）。
+  /// BK 路径：本体用 BkIcon（D3 圆内加号），前景色在 ThemePalette 的
+  /// `onPrimary` 与 `textPrimary` 中按实际合成底对比度择高，保证 AC-04 ≥3:1。
   Widget _centerButton(BuildContext context, GlassCenterAction action) {
     final palette = context.palette;
     final dark = context.tokens.isDark;
@@ -380,16 +388,24 @@ class GlassBottomBar extends StatelessWidget {
           ? GlassButtonTokens.primaryFillDark
           : GlassButtonTokens.primaryFillLight,
     );
+    // 主操作玻璃为半透明 primary，实际合成底近似为 fill over 页面背景；
+    // 对两种 ThemePalette 前景槽位复算，取可达对比度更高者（不引入裸 hex）。
+    final compositeBg = glassComposite(fill, palette.background);
+    final onPrimaryRatio = glassContrastRatio(palette.onPrimary, compositeBg);
+    final textPrimaryRatio = glassContrastRatio(palette.textPrimary, compositeBg);
+    final foreground = textPrimaryRatio >= onPrimaryRatio
+        ? palette.textPrimary
+        : palette.onPrimary;
     final Widget body;
     if (action.bkName != null) {
-      // 外层已是 primary 实色玻璃圆，本体直接用 BkIcon（D3 圆内加号 + onPrimary）
+      // 外层已是 primary 着色玻璃圆，本体直接用 BkIcon（D3 圆内加号）
       body = BkIcon(
         action.bkName!,
         size: 24,
-        color: palette.onPrimary,
+        color: foreground,
       );
     } else {
-      body = Icon(action.icon, size: 24, color: palette.onPrimary);
+      body = Icon(action.icon, size: 24, color: foreground);
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),

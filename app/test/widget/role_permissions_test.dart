@@ -14,6 +14,8 @@ import 'package:bookkeep_app/features/accounts/accounts_page.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/books/books_page.dart' show showBookActions;
 import 'package:bookkeep_app/features/books/books_providers.dart';
+import 'package:bookkeep_app/shared/icons/bk_icon.dart';
+import 'package:bookkeep_app/shared/icons/bk_icons.dart';
 import 'package:bookkeep_app/shared/widgets/glass_nav.dart';
 
 import '../helpers/fixtures.dart';
@@ -46,10 +48,13 @@ void main() {
     );
   }
 
-  /// 底栏中央「记一笔」动作按钮（BK-DOC-28 需求6：非 Tab 项，固定不可拖拽）
+  /// 底栏中央「记一笔」动作按钮（BK-DOC-28 需求6：非 Tab 项，固定不可拖拽；
+  /// BK-IC-012 后为 BkIcons.entry CustomPainter）
   Finder centerAddButton() => find.descendant(
         of: find.byType(GlassBottomBar),
-        matching: find.byIcon(Icons.add),
+        matching: find.byWidgetPredicate(
+          (w) => w is BkIcon && w.name == BkIcons.entry,
+        ),
       );
 
   testWidgets('viewer 隐藏底栏中央「记一笔」按钮', (tester) async {

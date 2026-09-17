@@ -15,6 +15,7 @@ import 'painters/bk_rpt_hide_amount_painter.dart';
 import 'painters/bk_rpt_period_painter.dart';
 import 'painters/bk_rpt_pie_painter.dart';
 import 'painters/bk_status_lock_painter.dart';
+import 'painters/bk_status_ok_painter.dart';
 import 'painters/bk_status_sync_painter.dart';
 import 'painters/bk_status_warn_painter.dart';
 
@@ -162,6 +163,11 @@ abstract final class BkIconRegistry {
       BkIcons.statusWarn,
       ({required color, required selected, selectedT}) =>
           BkStatusWarnPainter(color: color, selected: selected, selectedT: selectedT),
+    );
+    register(
+      BkIcons.statusOk,
+      ({required color, required selected, selectedT}) =>
+          BkStatusOkPainter(color: color, selected: selected, selectedT: selectedT),
     );
   }
 }

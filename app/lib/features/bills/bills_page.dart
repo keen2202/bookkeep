@@ -7,14 +7,18 @@ import '../../data/local/tables/transactions_table.dart';
 import '../../shared/icons/bk_icon.dart';
 import '../../shared/icons/bk_icons.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/theme/glass_tokens.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
 import '../../shared/widgets/app_amount_text.dart';
+import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_empty.dart';
+import '../../shared/widgets/glass_panel.dart';
 import '../auth_lock/lock_controller.dart';
 import '../books/books_providers.dart' show currentRoleProvider;
 import '../categories/categories_page.dart' show categoriesViewModelProvider;
 import 'bill_detail_sheet.dart' show showBillDetailSheet;
+import 'bill_filter_sheet.dart' show showBillFilterSheet;
 import 'bills_grouping.dart';
 import 'bills_providers.dart';
 
@@ -29,6 +33,7 @@ class BillsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bills = ref.watch(billsViewModelProvider);
+    final filter = ref.watch(billFilterProvider);
     final viewer = ref.watch(currentRoleProvider) == 'viewer';
     return bills.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -36,8 +41,17 @@ class BillsPage extends ConsumerWidget {
       data: (vm) {
         final days = vm.days;
         if (days.isEmpty) {
-          // 统一空态（Spec §6 AppEmpty）；BK-IC-022：单层主形，CTA 由底栏中央
-          // 记账按钮承担（文案引导「点击底部 + 记一笔」）
+          // 筛选后为空：提供一键清除；无流水空态：BK-IC-022 单层主形 + 底栏 CTA。
+          if (filter.isActive) {
+            return AppEmpty(
+              bkName: BkIcons.billEmpty,
+              title: '没有符合条件的账单',
+              message: '试试清除筛选条件',
+              actionLabel: '清除筛选',
+              onAction: () =>
+                  ref.read(billFilterProvider.notifier).state = filter.clear(),
+            );
+          }
           return AppEmpty(
             bkName: BkIcons.billEmpty,
             title: viewer ? '暂无账单' : '还没有账单',
@@ -45,10 +59,11 @@ class BillsPage extends ConsumerWidget {
           );
         }
         final categoriesAsync = ref.watch(categoriesViewModelProvider);
-        final categories = categoriesAsync.maybeWhen(
-          data: (c) => {for (final cat in c) cat.id: cat},
-          orElse: () => const <int, Category>{},
+        final categoryList = categoriesAsync.maybeWhen(
+          data: (c) => c,
+          orElse: () => const <Category>[],
         );
+        final categories = {for (final cat in categoryList) cat.id: cat};
         final masked = ref.watch(amountMaskProvider);
         final rows = <_BillRow>[
           for (final day in days) ...[
@@ -58,33 +73,58 @@ class BillsPage extends ConsumerWidget {
         ];
         // 审查 U-10：惰性构建；底部留白为末行提供滚动余量
         // Spec R-20：末尾可加载更早流水
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 88),
-          itemCount: rows.length + (vm.hasMore ? 1 : 0),
-          itemBuilder: (context, i) {
-            if (i == rows.length) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: TextButton(
-                    onPressed: () =>
-                        ref.read(billsPageSizeProvider.notifier).state += kBillsPageSize,
-                    child: const Text('加载更早的账单'),
-                  ),
-                ),
-              );
-            }
-            final row = rows[i];
-            return row.isHeader
-                ? _DayHeader(day: row.day!, masked: masked)
-                : _BillTile(
-                    tx: row.tx!,
-                    categories: categories,
-                    masked: masked,
-                    // viewer 权限矩阵：只读，不提供修改/删除入口
-                    onTap: viewer ? null : () => showBillDetailSheet(context, tx: row.tx!),
-                  );
-          },
+        return Column(
+          children: [
+            _BillFilterBar(
+              filter: filter,
+              categories: categories,
+              onTap: () async {
+                final picked = await showBillFilterSheet(
+                  context,
+                  categories: categoryList,
+                  initial: filter,
+                );
+                if (picked != null) {
+                  ref.read(billFilterProvider.notifier).state = picked;
+                }
+              },
+              onClear: () =>
+                  ref.read(billFilterProvider.notifier).state = filter.clear(),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 88),
+                itemCount: rows.length + (vm.hasMore ? 1 : 0),
+                itemBuilder: (context, i) {
+                  if (i == rows.length) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: TextButton(
+                          onPressed: () => ref
+                              .read(billsPageSizeProvider.notifier)
+                              .state += kBillsPageSize,
+                          child: const Text('加载更早的账单'),
+                        ),
+                      ),
+                    );
+                  }
+                  final row = rows[i];
+                  return row.isHeader
+                      ? _DayHeader(day: row.day!, masked: masked)
+                      : _BillTile(
+                          tx: row.tx!,
+                          categories: categories,
+                          masked: masked,
+                          // viewer 权限矩阵：只读，不提供修改/删除入口
+                          onTap: viewer
+                              ? null
+                              : () => showBillDetailSheet(context, tx: row.tx!),
+                        );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -102,6 +142,83 @@ class _BillRow {
   final BillDay? day;
   final Transaction? tx;
   final bool isHeader;
+}
+
+class _BillFilterBar extends StatelessWidget {
+  const _BillFilterBar({
+    required this.filter,
+    required this.categories,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final BillFilter filter;
+  final Map<int, Category> categories;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final label = _label(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: GlassPanel(
+              level: GlassLevel.g1,
+              borderRadius: AppRadius.pillAll,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              onTap: onTap,
+              child: Row(
+                children: [
+                  BkIcon(
+                    BkIcons.billFilter,
+                    size: 18,
+                    color:
+                        filter.isActive ? palette.primary : palette.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: filter.isActive
+                            ? palette.primary
+                            : palette.textPrimary,
+                        fontWeight: filter.isActive ? FontWeight.w600 : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (filter.isActive)
+            AppButton.text(
+              onPressed: onClear,
+              child: const Text('清除'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _label(BuildContext context) {
+    final parts = <String>[
+      if (filter.type != null)
+        switch (filter.type!) {
+          TransactionType.expense => '支出',
+          TransactionType.income => '收入',
+          TransactionType.transfer => '转账',
+        },
+      if (filter.categoryId != null)
+        categories[filter.categoryId]?.name ?? '指定分类',
+    ];
+    return parts.isEmpty ? '筛选' : '筛选：${parts.join(' · ')}';
+  }
 }
 
 class _DayHeader extends StatelessWidget {
@@ -175,8 +292,9 @@ class _BillTile extends StatelessWidget {
             : category.parentId != null && categories[category.parentId] != null
                 ? '${categories[category.parentId]!.name} / ${category.name}'
                 : category.name;
+    // BK-IC-021 产品决策：账单行列表/转账图标继续采用 Material。
     final icon = isTransfer
-        ? null
+        ? Icons.swap_horiz
         : categoryIcon(category?.icon ?? '');
     final iconColor = isTransfer
         ? context.palette.textSecondary
@@ -192,14 +310,7 @@ class _BillTile extends StatelessWidget {
     final local = tx.occurredAt.toLocal();
     final time =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    // BK-IC-021：转账用 bk.bill.transfer；分类图标 P2 前仍走 categoryIcon
-    final Widget leadingBody = isTransfer
-        ? BkIcon(
-            BkIcons.billTransfer,
-            size: 20,
-            color: iconColor,
-          )
-        : Icon(icon, size: 20, color: iconColor);
+    final Widget leadingBody = Icon(icon, size: 20, color: iconColor);
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: iconColor.withValues(alpha: 0.15),
