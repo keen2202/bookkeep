@@ -5,6 +5,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/ledger_version.dart';
 import '../../core/utils/money_format.dart';
+import '../../shared/icons/bk_icon.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/glass_tokens.dart';
 import '../../shared/theme/tokens.dart';
@@ -483,7 +484,6 @@ class _DayTxTile extends StatelessWidget {
             : parent == null
                 ? category.name
                 : '${parent.name} / ${category.name}';
-    final icon = isTransfer ? Icons.swap_horiz : categoryIcon(category?.icon ?? '');
     final iconColor =
         category == null ? context.palette.textSecondary : Color(category.color);
     final tone = switch (tx.type) {
@@ -500,7 +500,13 @@ class _DayTxTile extends StatelessWidget {
       leading: CircleAvatar(
         backgroundColor: iconColor.withValues(alpha: 0.15),
         foregroundColor: iconColor,
-        child: Icon(icon, size: 20),
+        child: isTransfer
+            ? const Icon(Icons.swap_horiz, size: 20)
+            : BkIcon(
+                categoryIcon(category?.icon ?? ''),
+                size: 20,
+                color: iconColor,
+              ),
       ),
       title: Text(name),
       subtitle: Text(note == null || note.isEmpty ? time : '$time · $note'),

@@ -33,9 +33,8 @@ const hexScanPatterns = [
   'lib/app.dart',
 ];
 
-/// 过渡期白名单（分类库 P2 迁移前；BK-IC-044 收紧）
+/// 过渡期白名单（分类库 P2 已迁移；BK-IC-044 / BK-IC-052 收紧）
 const defaultAllowPatterns = [
-  'category_icon.dart',
   'component_gallery_page.dart',
   // 非核心链路图标，P1 门禁后逐步清空
   'app.dart',

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'bk_category_icons.dart';
 import 'bk_icons.dart';
 import 'painters/bk_act_entry_painter.dart';
 import 'painters/bk_bill_empty_painter.dart';
 import 'painters/bk_bill_filter_painter.dart';
 import 'painters/bk_bill_list_painter.dart';
 import 'painters/bk_bill_transfer_painter.dart';
+import 'painters/bk_category_painter.dart';
 import 'painters/bk_nav_bills_painter.dart';
 import 'painters/bk_nav_reports_painter.dart';
 import 'painters/bk_rpt_bars_painter.dart';
@@ -81,6 +83,7 @@ abstract final class BkIconRegistry {
     if (_bootstrapped) return;
     _bootstrapped = true;
     _registerFirstWave();
+    _registerCategoryLibrary();
   }
 
   static void _registerFirstWave() {
@@ -169,5 +172,21 @@ abstract final class BkIconRegistry {
       ({required color, required selected, selectedT}) =>
           BkStatusOkPainter(color: color, selected: selected, selectedT: selectedT),
     );
+  }
+
+  /// 分类库（P2；BK-IC-050）：保留 seed `iconName` 契约，全部映射为
+  /// `bk.cat.<iconName>` 通用 Painter；未知名称统一回退 `bk.cat.category`。
+  static void _registerCategoryLibrary() {
+    for (final iconName in BkCategoryCatalog.names) {
+      register(
+        BkCategoryCatalog.id(iconName),
+        ({required color, required selected, selectedT}) => BkCategoryPainter(
+          iconName: iconName,
+          color: color,
+          selected: selected,
+          selectedT: selectedT,
+        ),
+      );
+    }
   }
 }

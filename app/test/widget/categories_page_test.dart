@@ -13,6 +13,8 @@ import 'package:bookkeep_app/features/books/books_providers.dart';
 import 'package:bookkeep_app/features/categories/categories_page.dart';
 import 'package:bookkeep_app/features/categories/category_edit_sheet.dart'
     show CategoryLevel;
+import 'package:bookkeep_app/shared/icons/bk_icon.dart';
+import 'package:bookkeep_app/shared/utils/category_icon.dart';
 import 'package:bookkeep_app/shared/widgets/app_button.dart';
 
 import '../helpers/fixtures.dart';
@@ -501,10 +503,13 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, '分类名称'), '电影之夜');
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pump();
-    // 图标库选择 movie（背景列表无同名图标，命中唯一）
-    await tester.ensureVisible(find.byIcon(Icons.movie));
+    // 图标库选择 movie（BK-IC-051 后选择器走 BkIcon，背景列表无同名图标）
+    final movieIcon = find.byWidgetPredicate(
+      (w) => w is BkIcon && w.name == categoryIcon('movie'),
+    );
+    await tester.ensureVisible(movieIcon);
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.movie).first);
+    await tester.tap(movieIcon);
     await tester.pump();
 
     await tester.ensureVisible(find.widgetWithText(AppButton, '保存'));
@@ -519,7 +524,9 @@ void main() {
     expect(
       find.descendant(
         of: find.widgetWithText(ListTile, '电影之夜'),
-        matching: find.byIcon(Icons.movie),
+        matching: find.byWidgetPredicate(
+          (w) => w is BkIcon && w.name == categoryIcon('movie'),
+        ),
       ),
       findsOneWidget,
     );

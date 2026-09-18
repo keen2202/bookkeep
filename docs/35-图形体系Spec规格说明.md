@@ -253,6 +253,9 @@ typedef BkIconPainterFactory = CustomPainter Function({
 | `app/lib/shared/icons/bk_icons.dart` | 新建 | 名称常量 |
 | `app/lib/shared/icons/bk_icon_tokens.dart` | 新建 | 栅格/描边 Token（可选并入 bk_icon.dart） |
 | `app/lib/shared/icons/painters/*.dart` | 新建 | 各图标 CustomPainter |
+| `app/lib/shared/icons/bk_category_icons.dart` | 新建（P2） | 分类 seed `iconName` → `bk.cat.*` 名称目录 |
+| `app/lib/shared/icons/bk_category_paths.dart` | 新建（P2） | 分类线性 Path 源（24 栅格，惰性编译缓存） |
+| `app/lib/shared/icons/painters/bk_category_painter.dart` | 新建（P2） | 分类库通用 CustomPainter |
 | `app/lib/shared/icons/bk_icon_registry.dart` | 新建 | name → painter 注册与 fallback |
 | `app/lib/shared/widgets/glass_icon.dart` | 修改 | 组合 CustomPaint 槽位或等价扩展（A1） |
 | `app/lib/shared/theme/app_icons.dart` | 修改 | `moduleIcon` → Bk 常量 |
@@ -262,7 +265,7 @@ typedef BkIconPainterFactory = CustomPainter Function({
 | `app/lib/features/bills/bills_providers.dart` | 修改 | BillFilter / 过滤逻辑 |
 | `app/lib/features/reports/reports_page.dart` | 修改 | Segment、自动脱敏状态等 |
 | `app/lib/shared/widgets/app_empty.dart` | 修改 | 插画位支持 Widget/BkIcon（D4） |
-| `app/lib/shared/utils/category_icon.dart` | 修改（P2） | 映射底层绘制 |
+| `app/lib/shared/utils/category_icon.dart` | 修改（P2） | `categoryIcon` 保留同名，改返回 `bk.cat.<iconName>` |
 | `app/lib/shared/theme/glass_tokens.dart` | 只读引用 | 不改 G1–G5；可引用 GlassMotion |
 | `tool/check_bk_icons.dart` | 新建 | 裸 Icons 扫描 |
 | `tool/check_fg_contrast.dart` | 修改 | 图标对比度场景 |
@@ -284,7 +287,7 @@ typedef BkIconPainterFactory = CustomPainter Function({
 | P2 账单链路 | BK-IC-020…023 | **completed** | 账单空态/列表/筛选接入 |
 | P3 报表链路 | BK-IC-030…033 | **completed**（hide-amount 手动验收按产品定义移除） | 双视图/自动脱敏/空态 |
 | P4 门禁与状态 | BK-IC-040…044 | **completed** | AC-01/03/04 扫描绿 |
-| P5 分类库 | BK-IC-050…052 | **pending**（P2 可延期） | P2 迁移完成或明确延期 |
+| P5 分类库 | BK-IC-050…052 | **completed** | 98 个 `iconName` 可解析为 `bk.cat.*`；分类图标链路（选择器/分类管理/账单行/详情/日历）全部走 `BkIcon`；`category_icon.dart` 退出裸 `Icons.` 白名单 |
 | 验收 | BK-IC-060…063 | **in_progress**（060/061 已完成；062/063 待办） | AC-01~10 + 盲测记录归档 |
 
 > 进度状态以 36 文档 Status 字段为执行真源；本表仅作阶段汇总。

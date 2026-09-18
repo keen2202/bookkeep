@@ -1,8 +1,7 @@
 # BK-ICON 裸 Icons 扫描白名单（BK-IC-042 / BK-IC-044）。
 # 每行一条：文件名或相对路径。
-# 分类库（P2）迁移完成后应清空 category_icon 相关条目。
-
-category_icon.dart
+# BK-IC-052：分类库 P2 已迁移，category_icon.dart 不再豁免；
+# 其余为系统控件符号/非 BK-ICON 最小集范围。
 component_gallery_page.dart
 
 # 过渡期（非 BK-ICON 最小集范围 / 系统控件符号）

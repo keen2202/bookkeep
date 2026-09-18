@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/tables/categories_table.dart';
+import '../../shared/icons/bk_icon.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
@@ -188,7 +189,7 @@ class _CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(categoryIcon(p.icon),
+                            BkIcon(categoryIcon(p.icon),
                                 size: 18, color: Color(p.color)),
                             const SizedBox(width: AppSpacing.xs),
                             Text(p.name),
@@ -206,7 +207,7 @@ class _CategoryEditSheetState extends ConsumerState<CategoryEditSheet> {
             children: [
               Text('图标', style: context.text.titleSmall),
               const SizedBox(width: AppSpacing.sm),
-              Icon(categoryIcon(_iconName),
+              BkIcon(categoryIcon(_iconName),
                   size: 20, color: Color(_palette[_colorIndex])),
             ],
           ),
@@ -313,7 +314,7 @@ class _IconPicker extends StatelessWidget {
                             ? Border.all(color: palette.primary, width: 1.5)
                             : null,
                       ),
-                      child: Icon(
+                      child: BkIcon(
                         categoryIcon(name),
                         size: 22,
                         color: selected == name

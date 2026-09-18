@@ -10,6 +10,14 @@ abstract final class BkIcons {
   // ── act：底栏中央动作 ─────────────────────────────────────
   static const String entry = 'bk.act.entry';
 
+  // ── cat：分类库（P2，BK-IC-050）────────────────────────────
+  /// 分类 seed `iconName` 的统一设计 ID 前缀：`bk.cat.<iconName>`。
+  /// 名称目录见 `bk_category_icons.dart`（不修改 DB seed 字段）。
+  static const String catPrefix = 'bk.cat.';
+
+  /// 未知/缺失分类 iconName 的通用图形 `bk.cat.category`。
+  static const String catFallback = 'bk.cat.category';
+
   // ── bill：账单链路 ────────────────────────────────────────
   /// P2 储备：产品决策账单列表/转账图标采用 Material，暂不接生产。
   static const String billList = 'bk.bill.list';

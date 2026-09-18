@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ledger_version.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/transactions_table.dart';
+import '../../shared/icons/bk_glass_icon.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/glass_icon.dart';
 import '../../shared/theme/tokens.dart';
@@ -131,9 +132,14 @@ class _BillDetailSheetState extends ConsumerState<BillDetailSheet> {
             : category.parentId != null && categories[category.parentId] != null
                 ? '${categories[category.parentId]!.name} / ${category.name}'
                 : category.name;
-    final icon = _isTransfer ? Icons.swap_horiz : categoryIcon(category?.icon ?? '');
     final iconColor =
         category == null ? context.palette.textSecondary : Color(category.color);
+    final Widget headerIcon = _isTransfer
+        ? GlassIcon(icon: Icons.swap_horiz, size: GlassIconSize.s36, color: iconColor)
+        : BkGlassIcon(
+            name: categoryIcon(category?.icon ?? ''),
+            size: GlassIconSize.s36,
+            color: iconColor);
     final amountTone = switch (widget.tx.type) {
       TransactionType.expense => AppAmountTone.expense,
       TransactionType.income => AppAmountTone.income,
@@ -152,7 +158,7 @@ class _BillDetailSheetState extends ConsumerState<BillDetailSheet> {
           child: Row(
             children: [
               // GLS-010 散点收敛：CircleAvatar → GlassIcon（L1 Token 同源）
-              GlassIcon(icon: icon, size: GlassIconSize.s36, color: iconColor),
+              headerIcon,
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(

@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../theme/glass_tokens.dart';
 import '../theme/tokens.dart';
 import '../utils/category_icon.dart';
+import '../icons/bk_icon.dart';
 import 'glass_selection.dart';
 
 /// 两级分类选择器（Spec §3.3 / BK-P0-003；FGDS v1.0 BK-FG-022）：
@@ -133,7 +134,7 @@ class _ParentTile extends StatelessWidget {
         dense: true,
         contentPadding: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
-        leading: Icon(categoryIcon(parent.icon), color: iconColor),
+        leading: BkIcon(categoryIcon(parent.icon), color: iconColor),
         // 一级分类加粗主文字色，与下方缩进的二级 chip 形成层级对比
         title: Text(
           parent.name,
@@ -200,7 +201,7 @@ class _CategoryChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(categoryIcon(category.icon), size: 16, color: iconColor),
+              BkIcon(categoryIcon(category.icon), size: 16, color: iconColor),
               const SizedBox(width: AppSpacing.xs + 2),
               DefaultTextStyle.merge(
                 style: context.text.bodyMedium

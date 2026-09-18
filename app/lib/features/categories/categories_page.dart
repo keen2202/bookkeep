@@ -9,6 +9,7 @@ import '../../core/ledger_version.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables/categories_table.dart';
 import '../../domain/models/category_seed.dart';
+import '../../shared/icons/bk_icon.dart';
 import '../../shared/theme/tokens.dart';
 import '../../shared/utils/category_icon.dart';
 import '../../shared/widgets/app_segmented_button.dart';
@@ -295,7 +296,7 @@ class _ParentHeader extends StatelessWidget {
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
             shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
-            leading: Icon(categoryIcon(parent.icon), color: Color(parent.color)),
+            leading: BkIcon(categoryIcon(parent.icon), color: Color(parent.color)),
             title: Text(
               parent.name,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -339,7 +340,7 @@ class _ChildTile extends StatelessWidget {
         start: AppSpacing.md + AppSpacing.sm + AppSpacing.lg,
         end: AppSpacing.md,
       ),
-      leading: Icon(categoryIcon(child.icon), color: Color(child.color)),
+      leading: BkIcon(categoryIcon(child.icon), color: Color(child.color)),
       title: Text(child.name),
       // 编辑/删除入口（含系统分类，软删除保留历史流水分类名快照）：
       // 点击整行或右侧菜单均可打开操作弹层；viewer 只读隐藏

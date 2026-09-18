@@ -292,10 +292,8 @@ class _BillTile extends StatelessWidget {
             : category.parentId != null && categories[category.parentId] != null
                 ? '${categories[category.parentId]!.name} / ${category.name}'
                 : category.name;
-    // BK-IC-021 产品决策：账单行列表/转账图标继续采用 Material。
-    final icon = isTransfer
-        ? Icons.swap_horiz
-        : categoryIcon(category?.icon ?? '');
+    // BK-IC-021 产品决策：转账仍采用 Material `swap_horiz`；
+    // 分类图标按 P2 分类库迁移为 BkIcon（BK-IC-051）。
     final iconColor = isTransfer
         ? context.palette.textSecondary
         : category == null
@@ -310,7 +308,10 @@ class _BillTile extends StatelessWidget {
     final local = tx.occurredAt.toLocal();
     final time =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    final Widget leadingBody = Icon(icon, size: 20, color: iconColor);
+    final Widget leadingBody = isTransfer
+        ? Icon(Icons.swap_horiz, size: 20, color: iconColor)
+        : BkIcon(categoryIcon(category?.icon ?? ''),
+            size: 20, color: iconColor);
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: iconColor.withValues(alpha: 0.15),

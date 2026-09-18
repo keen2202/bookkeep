@@ -15,7 +15,7 @@ final billsPageSizeProvider = StateProvider<int>((ref) => kBillsPageSize);
 /// 账单筛选条件（BK-IC-023）。
 ///
 /// 只作用于当前窗口内已加载流水：`type` 与 `categoryId` 可单独/组合使用；
-/// 分类只支持精确 ID（分类库 P2 迁移前保持与 `categoryIcon` 契约一致）。
+/// 分类只支持精确 ID（分类库 P2 迁移后保持与 `categoryIcon` 的 `bk.cat.*` 契约一致）。
 class BillFilter {
   const BillFilter({this.type, this.categoryId});
 
